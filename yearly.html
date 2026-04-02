@@ -4,42 +4,15 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Yearly | yoshi.gg</title>
-  <style>
-    /* Basic Page Reset */
-    body { 
-      margin: 0; 
-      padding: 0; 
-      background-color: #f3f3f3; 
-      font-family: 'Courier New', Courier, monospace; 
-    }
-    
-    /* Container to allow sideways scrolling on small screens */
-    #report-container { 
-      padding: 20px; 
-      overflow-x: auto; 
-    }
-
-    /* Table Base Styles */
-    table { 
-      border-collapse: collapse; 
-      margin: 0 auto; 
-      background-color: #ffffff;
-      box-shadow: 0 4px 8px rgba(0,0,0,0.1);
-    }
-    td { 
-      border: 1px solid #cccccc; 
-      padding: 4px 8px; 
-      white-space: pre-wrap; 
-      word-break: break-word; 
-    }
-  </style>
+  
+  <link rel="stylesheet" href="style.css">
 </head>
 <body>
 
   <div id="main-header"></div>
 
   <div id="report-container">
-    <h2 style="text-align: center; margin-top: 50px;">Loading GOTY Data...</h2>
+    <h2 style="text-align: center; margin-top: 50px;">Loading Yearly Data...</h2>
   </div>
 
   <script src="nav.js"></script>
@@ -127,8 +100,7 @@
       container.innerHTML = html;
     }
 
-    // --- THIS IS THE ONLY LINE YOU CHANGE PER PAGE ---
-    // Change this to 'bty_data.json', 'master_data.json', etc.
+    // Load the specific JSON file for this page
     loadSheetData('yearly_data.json'); 
   </script>
 </body>
