@@ -27,8 +27,9 @@ td, th {
   border: 1px solid #cccccc; 
   padding: 2px 4px; /* Tighter padding to match Google Sheets */
   white-space: pre-wrap; 
-  word-wrap: break-word; 
-  overflow-wrap: break-word; /* Forces long unbroken text to wrap */
+  word-break: normal; /* FIX: Prevents words like 'Rating' from snapping in half */
+  overflow-wrap: normal; /* FIX: Keeps words together */
   vertical-align: bottom; /* Matches Google Sheets default alignment */
   overflow: hidden; /* Prevents text from spilling out of bounds */
+  box-sizing: border-box; /* FIX: Calculates exact pixel widths correctly with padding */
 }
