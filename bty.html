@@ -5,10 +5,33 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Better Than You Gaming | yoshi.gg</title>
   <style>
-    body { margin: 0; padding: 0; background-color: #f3f3f3; font-family: 'Courier New', Courier, monospace; }
-    #report-container { padding: 20px; overflow-x: auto; }
-    table { border-collapse: collapse; margin-bottom: 20px; }
-    td, th { border: 1px solid #ccc; padding: 4px 8px; white-space: pre-wrap; word-break: break-word; }
+    /* Basic Page Reset */
+    body { 
+      margin: 0; 
+      padding: 0; 
+      background-color: #f3f3f3; 
+      font-family: 'Courier New', Courier, monospace; 
+    }
+    
+    /* Container to allow sideways scrolling on small screens */
+    #report-container { 
+      padding: 20px; 
+      overflow-x: auto; 
+    }
+
+    /* Table Base Styles */
+    table { 
+      border-collapse: collapse; 
+      margin: 0 auto; 
+      background-color: #ffffff;
+      box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+    }
+    td { 
+      border: 1px solid #cccccc; 
+      padding: 4px 8px; 
+      white-space: pre-wrap; 
+      word-break: break-word; 
+    }
   </style>
 </head>
 <body>
@@ -16,10 +39,97 @@
   <div id="main-header"></div>
 
   <div id="report-container">
-    <h2 style="text-align: center;">Loading GOTY Data...</h2>
+    <h2 style="text-align: center; margin-top: 50px;">Loading GOTY Data...</h2>
   </div>
 
   <script src="nav.js"></script>
-  
-  </body>
+
+  <script>
+    async function loadSheetData(jsonFileName) {
+      try {
+        const response = await fetch(jsonFileName);
+        const data = await response.json();
+        renderTable(data, 'report-container');
+      } catch (err) {
+        document.getElementById('report-container').innerHTML = 
+          `<h2 style="text-align: center; color: red;">Error loading data. Make sure ${jsonFileName} is uploaded!</h2>`;
+        console.error(err);
+      }
+    }
+
+    function renderTable(data, containerId) {
+      const container = document.getElementById(containerId);
+      let html = '<table>';
+      
+      // 1. Apply Exact Column Widths
+      if (data.widths && data.widths.length > 0) {
+        html += '<colgroup>';
+        data.widths.forEach(w => {
+          html += `<col style="width: ${w}px; min-width: ${w}px;">`;
+        });
+        html += '</colgroup>';
+      }
+
+      // 2. Map out Merged Cells (So we don't draw cells that are hidden behind a merge)
+      const skipCells = new Set();
+      const merges = {};
+      if (data.mergedRanges) {
+        data.mergedRanges.forEach(m => {
+          merges[`${m.row},${m.col}`] = m;
+          for (let r = 0; r < m.numRows; r++) {
+            for (let c = 0; c < m.numCols; c++) {
+              if (r === 0 && c === 0) continue; // Keep the master top-left cell of the merge
+              skipCells.add(`${m.row + r},${m.col + c}`);
+            }
+          }
+        });
+      }
+
+      // 3. Draw the Rows and Cells
+      for (let r = 0; r < data.values.length; r++) {
+        html += '<tr>';
+        for (let c = 0; c < data.values[r].length; c++) {
+          
+          // If this cell is swallowed by a merge, skip drawing it
+          if (skipCells.has(`${r},${c}`)) continue;
+
+          let colspan = 1;
+          let rowspan = 1;
+          if (merges[`${r},${c}`]) {
+            colspan = merges[`${r},${c}`].numCols;
+            rowspan = merges[`${r},${c}`].numRows;
+          }
+
+          // Extract Data and Styles
+          const val = data.values[r][c] || '';
+          const bg = (data.backgrounds && data.backgrounds[r] && data.backgrounds[r][c]) ? data.backgrounds[r][c] : '';
+          const fw = (data.fontWeights && data.fontWeights[r] && data.fontWeights[r][c]) ? data.fontWeights[r][c] : 'normal';
+          const fc = (data.fontColors && data.fontColors[r] && data.fontColors[r][c]) ? data.fontColors[r][c] : '#000000';
+          const align = (data.horizontalAlignments && data.horizontalAlignments[r] && data.horizontalAlignments[r][c]) ? data.horizontalAlignments[r][c] : 'left';
+          const fSize = (data.fontSizes && data.fontSizes[r] && data.fontSizes[r][c]) ? data.fontSizes[r][c] : 8;
+
+          // Build inline CSS
+          let style = ``;
+          if (bg && bg !== '#ffffff' && bg !== 'null') style += `background-color: ${bg}; `;
+          if (fw !== 'normal') style += `font-weight: ${fw}; `;
+          if (fc && fc !== '#000000') style += `color: ${fc}; `;
+          if (align) style += `text-align: ${align}; `;
+          if (fSize) style += `font-size: ${fSize}pt; `;
+
+          // Create the cell
+          html += `<td colspan="${colspan}" rowspan="${rowspan}" style="${style}">${val}</td>`;
+        }
+        html += '</tr>';
+      }
+      html += '</table>';
+      
+      // Inject into the page
+      container.innerHTML = html;
+    }
+
+    // --- THIS IS THE ONLY LINE YOU CHANGE PER PAGE ---
+    // Change this to 'bty_data.json', 'master_data.json', etc.
+    loadSheetData('bty_data.json'); 
+  </script>
+</body>
 </html>
