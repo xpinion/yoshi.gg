@@ -1,0 +1,34 @@
+/* style.css - Master Stylesheet for yoshi.gg */
+
+/* Basic Page Reset */
+body { 
+  margin: 0; 
+  padding: 0; 
+  background-color: #f3f3f3; 
+  font-family: 'Courier New', Courier, monospace; 
+}
+
+/* Container to allow sideways scrolling on small screens */
+#report-container { 
+  padding: 20px; 
+  overflow-x: auto; 
+}
+
+/* Table Base Styles */
+table { 
+  border-collapse: collapse; 
+  margin: 0 auto; 
+  background-color: #ffffff;
+  box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+  table-layout: fixed; /* Forces browser to obey your exact JSON column widths */
+}
+
+td, th { 
+  border: 1px solid #cccccc; 
+  padding: 2px 4px; /* Tighter padding to match Google Sheets */
+  white-space: pre-wrap; 
+  word-wrap: break-word; 
+  overflow-wrap: break-word; /* Forces long unbroken text to wrap */
+  vertical-align: bottom; /* Matches Google Sheets default alignment */
+  overflow: hidden; /* Prevents text from spilling out of bounds */
+}
