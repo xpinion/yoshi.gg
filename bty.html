@@ -16,18 +16,8 @@
     .gotm-header { text-align: center; font-size: 1.2em; font-weight: bold; color: #666; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 20px; }
     
     .hero-card { 
-      background: linear-gradient(135deg, #111, #333); 
-      color: #fff; 
-      border-radius: 12px; 
-      padding: 30px; 
-      margin-bottom: 20px; 
-      box-shadow: 0 8px 15px rgba(0,0,0,0.2); 
-      border-top: 4px solid #FFD700; 
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 30px;
-      flex-wrap: wrap; 
+      background: linear-gradient(135deg, #111, #333); color: #fff; border-radius: 12px; padding: 30px; margin-bottom: 20px; box-shadow: 0 8px 15px rgba(0,0,0,0.2); border-top: 4px solid #FFD700; 
+      display: flex; align-items: center; justify-content: center; gap: 30px; flex-wrap: wrap; 
     }
     .hero-art { width: 160px; height: 220px; border-radius: 8px; object-fit: cover; box-shadow: 0 4px 15px rgba(0,0,0,0.6); }
     .hero-details { text-align: left; }
@@ -37,18 +27,7 @@
     .hero-score { display: inline-block; background: #FFD700; color: #111; font-size: 1.5em; font-weight: 900; padding: 5px 20px; border-radius: 30px; }
     
     .past-gotm-grid { display: flex; gap: 15px; overflow-x: auto; padding-bottom: 15px; }
-    .mini-gotm-card { 
-      flex: 0 0 auto; 
-      background: #f8f9fa; 
-      border: 1px solid #ddd; 
-      border-radius: 8px; 
-      padding: 15px; 
-      min-width: 150px; 
-      text-align: center; 
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-    }
+    .mini-gotm-card { flex: 0 0 auto; background: #f8f9fa; border: 1px solid #ddd; border-radius: 8px; padding: 15px; min-width: 150px; text-align: center; display: flex; flex-direction: column; align-items: center; }
     .mini-art { width: 100px; height: 140px; border-radius: 6px; object-fit: cover; margin-bottom: 12px; box-shadow: 0 2px 5px rgba(0,0,0,0.2); }
     .mini-month { font-size: 0.8em; color: #777; text-transform: uppercase; font-weight: bold; margin-bottom: 5px; }
     .mini-game { font-weight: 600; color: #222; margin-bottom: 10px; font-size: 1.1em; }
@@ -65,17 +44,7 @@
 
     /* Interactive Dropdown Styling */
     .year-dropdown {
-      font-size: 1em;
-      font-weight: 900;
-      color: inherit; /* Inherits the green or red from the title! */
-      background: transparent;
-      border: none;
-      border-bottom: 3px solid rgba(0,0,0,0.1);
-      cursor: pointer;
-      outline: none;
-      font-family: inherit;
-      padding: 0 5px;
-      transition: all 0.2s;
+      font-size: 1em; font-weight: 900; color: inherit; background: transparent; border: none; border-bottom: 3px solid rgba(0,0,0,0.1); cursor: pointer; outline: none; font-family: inherit; padding: 0 5px; transition: all 0.2s;
     }
     .year-dropdown:hover { border-bottom: 3px solid inherit; opacity: 0.8; }
     .year-dropdown option { color: #111; font-weight: normal; }
@@ -108,7 +77,7 @@
   <div class="bty-container">
     <div class="dashboard-header">Collaborative Dashboard</div>
     
-    <div id="loading-text" style="text-align: center; font-family: Courier New;">Loading Dashboard Data...</div>
+    <div id="loading-text" style="text-align: center; font-family: Courier New;">Loading Interactive Dashboard...</div>
 
     <div id="gotm-container" class="gotm-section" style="display: none;">
       <div class="gotm-header">Game of the Month Showcase</div>
@@ -119,13 +88,13 @@
     <div id="activity-container" class="leaderboards-wrapper" style="display: none;">
       <div class="leaderboard-column">
         <div class="board-title yoshi-title">
-          Yoshi's <select id="yoshi-year-select" class="year-dropdown"></select> Completions
+          Yoshi's <select id="y-feed-select" class="year-dropdown"></select> Completions
         </div>
         <div id="yoshi-feed" class="scrollable-feed"></div>
       </div>
       <div class="leaderboard-column">
         <div class="board-title apple-title">
-          Apple's <select id="apple-year-select" class="year-dropdown"></select> Completions
+          Apple's <select id="a-feed-select" class="year-dropdown"></select> Completions
         </div>
         <div id="apple-feed" class="scrollable-feed"></div>
       </div>
@@ -133,15 +102,21 @@
 
     <div class="leaderboards-wrapper" id="boards-wrapper" style="display: none;">
       <div class="leaderboard-column">
-        <div class="board-title yoshi-title">Yoshi's All-Time Top 25</div>
+        <div class="board-title yoshi-title">
+          Yoshi's <select id="y-top-select" class="year-dropdown"></select> Top 25
+        </div>
         <div id="yoshi-list"></div>
       </div>
       <div class="leaderboard-column">
-        <div class="board-title combined-title">Combined All-Time (Out of 20)</div>
+        <div class="board-title combined-title">
+          Combined <select id="c-top-select" class="year-dropdown"></select> Top 25
+        </div>
         <div id="combined-list"></div>
       </div>
       <div class="leaderboard-column">
-        <div class="board-title apple-title">Apple's All-Time Top 25</div>
+        <div class="board-title apple-title">
+          Apple's <select id="a-top-select" class="year-dropdown"></select> Top 25
+        </div>
         <div id="apple-list"></div>
       </div>
     </div>
@@ -167,37 +142,26 @@
         const metaRows = metaData.values;
         const masterRows = masterData.values;
 
-        // --- 1. SMART GAME OF THE MONTH WITH BOX ART ---
+        // --- 1. GAME OF THE MONTH ---
         let currentMonthNum = new Date().getMonth() + 1; 
         let gotmArray = [];
         const defaultImg = "https://via.placeholder.com/160x220/222/555?text=No+Art"; 
 
         for (let i = 4; i <= 15; i++) {
           if (!btyRows[i]) continue;
-          let rawText = btyRows[i][1] || ''; 
-          let score = btyRows[i][2] || '';   
-          let imgUrl = btyRows[i][3] || defaultImg; 
-
+          let rawText = btyRows[i][1] || ''; let score = btyRows[i][2] || ''; let imgUrl = btyRows[i][3] || defaultImg; 
           if (rawText && rawText.includes('-')) {
-            let parts = rawText.split(' - ');
-            let rawMonth = parts[0].trim();
-            let gameName = parts[1].trim();
-
+            let parts = rawText.split(' - '); let rawMonth = parts[0].trim(); let gameName = parts[1].trim();
             let numMatch = rawMonth.match(/^(\d{2})/);
             if (numMatch) {
               let mNum = parseInt(numMatch[1], 10);
-              let nameMatch = rawMonth.match(/\((.*?)\)/);
-              let cleanMonthName = nameMatch ? nameMatch[1] : rawMonth;
-
-              if (mNum <= currentMonthNum) {
-                gotmArray.push({ num: mNum, monthName: cleanMonthName, game: gameName, score: score, img: imgUrl });
-              }
+              let cleanMonthName = (rawMonth.match(/\((.*?)\)/) || [])[1] || rawMonth;
+              if (mNum <= currentMonthNum) gotmArray.push({ num: mNum, monthName: cleanMonthName, game: gameName, score: score, img: imgUrl });
             }
           }
         }
 
         gotmArray.sort((a, b) => b.num - a.num);
-
         if (gotmArray.length > 0) {
           let topGotm = gotmArray[0];
           document.getElementById('hero-gotm').innerHTML = `
@@ -209,181 +173,48 @@
                 <div class="hero-score">${topGotm.score} / 10</div>
               </div>
             </div>`;
-
           let pastHTML = '';
           for (let j = 1; j < gotmArray.length; j++) {
-            pastHTML += `
-              <div class="mini-gotm-card">
-                <img src="${gotmArray[j].img}" alt="Box Art" class="mini-art">
-                <div class="mini-month">${gotmArray[j].monthName}</div>
-                <div class="mini-game">${gotmArray[j].game}</div>
-                <div class="mini-score">${gotmArray[j].score}</div>
-              </div>`;
+            pastHTML += `<div class="mini-gotm-card"><img src="${gotmArray[j].img}" alt="Box Art" class="mini-art"><div class="mini-month">${gotmArray[j].monthName}</div><div class="mini-game">${gotmArray[j].game}</div><div class="mini-score">${gotmArray[j].score}</div></div>`;
           }
           document.getElementById('past-gotm').innerHTML = pastHTML;
           document.getElementById('gotm-container').style.display = 'block';
         }
 
-        // --- 2. INTERACTIVE MULTI-DATABASE FEED ENGINE ---
-        
-        // Data Storage
+        // --- 2. DATA EXTRACTION ---
         let allYoshiCompletions = [];
         let allAppleCompletions = [];
         let yoshiYearsSet = new Set();
         let appleYearsSet = new Set();
 
-        // PARSE YOSHI ALL-TIME
+        // Parse Yoshi Completions
         for (let i = 1; i < masterRows.length; i++) {
           if (!masterRows[i]) continue;
-          let mDate = masterRows[i][1] || '';   
-          let mGame = masterRows[i][2] || '';   
-          let mSystem = masterRows[i][3] || ''; 
-          let mStatus = masterRows[i][8] || ''; 
-          
+          let mDate = masterRows[i][1] || ''; let mGame = masterRows[i][2] || ''; let mSystem = masterRows[i][3] || ''; let mStatus = masterRows[i][8] || ''; 
           if ((mStatus === 'Completed' || mStatus === 'M-Completed') && mDate.length >= 4) {
-            let yearMatch = mDate.match(/^(\d{4})/);
-            if (yearMatch) {
-              let year = yearMatch[1];
-              yoshiYearsSet.add(year); // Save this year to the list
-
-              let shortDate = mDate;
-              let dateParts = mDate.split(/[-/]/); 
-              if (dateParts.length >= 3) shortDate = `${dateParts[1]}/${dateParts[2]}`;
-
-              let yScore = '';
-              let metaMatch = metaRows.find(r => r && r[0] === mGame);
-              if (metaMatch) yScore = metaMatch[6] || ''; 
-
-              allYoshiCompletions.push({ 
-                rawDate: mDate, displayDate: shortDate, game: mGame, 
-                score: yScore, system: mSystem, year: year, rowIndex: i 
-              });
-            }
+            let year = mDate.substring(0,4); yoshiYearsSet.add(year);
+            let dateParts = mDate.split(/[-/]/); let shortDate = dateParts.length >= 3 ? `${dateParts[1]}/${dateParts[2]}` : mDate;
+            let yScore = ''; let metaMatch = metaRows.find(r => r && r[0] === mGame); if (metaMatch) yScore = metaMatch[6] || ''; 
+            allYoshiCompletions.push({ rawDate: mDate, displayDate: shortDate, game: mGame, score: yScore, system: mSystem, year: year, rowIndex: i });
           }
         }
 
-        // PARSE APPLE ALL-TIME
+        // Parse Apple Completions
         for(let i = 1; i < metaRows.length; i++) {
           if (!metaRows[i]) continue;
-          let aGame = metaRows[i][0] || '';     
-          let aScore = metaRows[i][7] || '';    
-          let aDate = metaRows[i][8] || '';     
-          let aSystem = metaRows[i][9] || '';   
-
+          let aGame = metaRows[i][0] || ''; let aScore = metaRows[i][7] || ''; let aDate = metaRows[i][8] || ''; let aSystem = metaRows[i][9] || '';   
           if (aDate && aDate.trim() !== '' && aDate.length >= 4) {
-            let yearMatch = aDate.match(/^(\d{4})/);
-            if (yearMatch) {
-              let year = yearMatch[1];
-              appleYearsSet.add(year); // Save this year to the list
-
-              let parts = aDate.split('/');
-              let shortDate = parts.length === 3 ? `${parts[1]}/${parts[2]}` : aDate;
-
-              allAppleCompletions.push({ 
-                rawDate: aDate, displayDate: shortDate, game: aGame, 
-                score: aScore, system: aSystem, year: year, rowIndex: i 
-              });
-            }
+            let year = aDate.substring(0,4); appleYearsSet.add(year);
+            let parts = aDate.split('/'); let shortDate = parts.length === 3 ? `${parts[1]}/${parts[2]}` : aDate;
+            allAppleCompletions.push({ rawDate: aDate, displayDate: shortDate, game: aGame, score: aScore, system: aSystem, year: year, rowIndex: i });
           }
         }
 
-        // POPULATE DROPDOWNS
-        const yoshiSelect = document.getElementById('yoshi-year-select');
-        const appleSelect = document.getElementById('apple-year-select');
-        
-        let yYearsArray = Array.from(yoshiYearsSet).sort().reverse();
-        let aYearsArray = Array.from(appleYearsSet).sort().reverse();
-        
-        // Failsafe in case of empty lists
-        if (yYearsArray.length === 0) yYearsArray.push(new Date().getFullYear().toString());
-        if (aYearsArray.length === 0) aYearsArray.push(new Date().getFullYear().toString());
-
-        yoshiSelect.innerHTML = yYearsArray.map(y => `<option value="${y}">${y}</option>`).join('');
-        appleSelect.innerHTML = aYearsArray.map(y => `<option value="${y}">${y}</option>`).join('');
-
-        // RENDERING FUNCTIONS
-        function renderYoshiFeed(targetYear) {
-          let filtered = allYoshiCompletions.filter(act => act.year === targetYear);
-          
-          filtered.sort((a, b) => {
-            let dateDiff = a.rawDate.localeCompare(b.rawDate);
-            return dateDiff !== 0 ? dateDiff : a.rowIndex - b.rowIndex;
-          });
-          
-          filtered.forEach((act, index) => { act.compNum = index + 1; });
-          
-          filtered.sort((a, b) => {
-            let dateDiff = b.rawDate.localeCompare(a.rawDate);
-            return dateDiff !== 0 ? dateDiff : b.compNum - a.compNum;
-          });
-
-          let html = '';
-          filtered.forEach(act => {
-            let sBadge = act.score ? `<div class="score-badge">${act.score}</div>` : '';
-            let sysText = act.system ? ` (${act.system})` : '';
-            html += `
-              <div class="game-card yoshi-card">
-                <div class="rank-badge feed-date-badge">${act.displayDate}</div>
-                <div class="game-name">${act.game}${sysText} <span class="completion-num">(#${act.compNum})</span></div>
-                ${sBadge}
-              </div>`;
-          });
-          document.getElementById('yoshi-feed').innerHTML = html || `<div class="score-empty"><br>No completions logged for ${targetYear}.</div>`;
-        }
-
-        function renderAppleFeed(targetYear) {
-          let filtered = allAppleCompletions.filter(act => act.year === targetYear);
-          
-          filtered.sort((a, b) => {
-            let dateDiff = a.rawDate.localeCompare(b.rawDate);
-            return dateDiff !== 0 ? dateDiff : a.rowIndex - b.rowIndex;
-          });
-          
-          filtered.forEach((act, index) => { act.compNum = index + 1; });
-          
-          filtered.sort((a, b) => {
-            let dateDiff = b.rawDate.localeCompare(a.rawDate);
-            return dateDiff !== 0 ? dateDiff : b.compNum - a.compNum;
-          });
-
-          let html = '';
-          filtered.forEach(act => {
-            let sBadge = act.score ? `<div class="score-badge">${act.score}</div>` : '';
-            let sysText = act.system ? ` (${act.system})` : '';
-            html += `
-              <div class="game-card apple-card">
-                <div class="rank-badge feed-date-badge">${act.displayDate}</div>
-                <div class="game-name">${act.game}${sysText} <span class="completion-num">(#${act.compNum})</span></div>
-                ${sBadge}
-              </div>`;
-          });
-          document.getElementById('apple-feed').innerHTML = html || `<div class="score-empty"><br>No completions logged for ${targetYear}.</div>`;
-        }
-
-        // ADD EVENT LISTENERS FOR INTERACTIVITY
-        yoshiSelect.addEventListener('change', (e) => renderYoshiFeed(e.target.value));
-        appleSelect.addEventListener('change', (e) => renderAppleFeed(e.target.value));
-
-        // INITIAL RENDER
-        renderYoshiFeed(yoshiSelect.value);
-        renderAppleFeed(appleSelect.value);
-        document.getElementById('activity-container').style.display = 'flex';
-
-
-        // --- 3. ALL-TIME TOP 25 LEADERBOARDS ---
-        let allYoshiGames = [];
-        let allAppleGames = [];
-        let allCombinedGames = [];
-
+        // Parse All-Time Scores (For All-Time Leaderboards)
+        let allYoshiGames = []; let allAppleGames = []; let allCombinedGames = [];
         for(let i = 1; i < metaRows.length; i++) {
             if (!metaRows[i]) continue;
-            let gameName = metaRows[i][0] || '';
-            let yScoreRaw = metaRows[i][6] || '';
-            let aScoreRaw = metaRows[i][7] || '';
-
-            let yNum = parseFloat(yScoreRaw);
-            let aNum = parseFloat(aScoreRaw);
-
+            let gameName = metaRows[i][0] || ''; let yNum = parseFloat(metaRows[i][6] || ''); let aNum = parseFloat(metaRows[i][7] || '');
             if (gameName) {
                 if (!isNaN(yNum)) allYoshiGames.push({ name: gameName, score: yNum });
                 if (!isNaN(aNum)) allAppleGames.push({ name: gameName, score: aNum });
@@ -391,57 +222,95 @@
             }
         }
 
-        const sortGames = (a, b) => {
-            let scoreDiff = b.score - a.score;
-            return scoreDiff !== 0 ? scoreDiff : a.name.localeCompare(b.name);
-        };
-        const sortCombined = (a, b) => {
-            let scoreDiff = b.totalScore - a.totalScore;
-            return scoreDiff !== 0 ? scoreDiff : a.name.localeCompare(b.name);
-        };
+        // --- 3. POPULATE DROPDOWNS ---
+        let yYearsArray = Array.from(yoshiYearsSet).sort().reverse();
+        let aYearsArray = Array.from(appleYearsSet).sort().reverse();
+        let combinedYearsArray = Array.from(new Set([...yYearsArray, ...aYearsArray])).sort().reverse();
 
-        allYoshiGames.sort(sortGames);
-        allAppleGames.sort(sortGames);
-        allCombinedGames.sort(sortCombined);
+        const buildOptions = (years) => `<option value="All-Time">All-Time</option>` + years.map(y => `<option value="${y}">${y}</option>`).join('');
+        const buildFeedOptions = (years) => years.map(y => `<option value="${y}">${y}</option>`).join('');
 
-        function generateRankedCards(gamesArray, cardClass, isCombined) {
-          let html = '';
-          let currentRank = 1;
-          let actualPosition = 1;
-          let lastScore = -1;
+        document.getElementById('y-feed-select').innerHTML = buildFeedOptions(yYearsArray);
+        document.getElementById('a-feed-select').innerHTML = buildFeedOptions(aYearsArray);
+        
+        document.getElementById('y-top-select').innerHTML = buildOptions(yYearsArray);
+        document.getElementById('a-top-select').innerHTML = buildOptions(aYearsArray);
+        document.getElementById('c-top-select').innerHTML = buildOptions(combinedYearsArray);
 
-          gamesArray.slice(0, 25).forEach((game) => {
-            let scoreToCompare = isCombined ? game.totalScore : game.score;
-            
-            if (scoreToCompare !== lastScore) {
-              currentRank = actualPosition;
-              lastScore = scoreToCompare;
-            }
 
-            let displayScore = isCombined ? 
-              (Number.isInteger(game.totalScore) ? game.totalScore : game.totalScore.toFixed(1)) : 
-              (Number.isInteger(game.score) ? game.score : game.score.toFixed(1));
-              
-            let badgeStyle = isCombined ? 'style="background: #673AB7;"' : '';
-            let outOf = isCombined ? ' <span style="font-size:0.7em; color:#bbb;">/ 20</span>' : '';
+        // --- 4. RENDER FUNCTIONS ---
+        function renderFeeds() {
+          let yYear = document.getElementById('y-feed-select').value;
+          let aYear = document.getElementById('a-feed-select').value;
 
-            html += `
-              <div class="game-card ${cardClass}">
-                <div class="rank-badge">#${currentRank}</div>
-                <div class="game-name">${game.name}</div>
-                <div class="score-badge" ${badgeStyle}>${displayScore}${outOf}</div>
-              </div>`;
-              
-            actualPosition++;
-          });
-          
-          return html || '<div class="score-empty">No games rated yet.</div>';
+          let yFiltered = allYoshiCompletions.filter(act => act.year === yYear);
+          yFiltered.sort((a, b) => a.rawDate.localeCompare(b.rawDate) || a.rowIndex - b.rowIndex);
+          yFiltered.forEach((act, idx) => act.compNum = idx + 1);
+          yFiltered.sort((a, b) => b.rawDate.localeCompare(a.rawDate) || b.compNum - a.compNum);
+
+          let aFiltered = allAppleCompletions.filter(act => act.year === aYear);
+          aFiltered.sort((a, b) => a.rawDate.localeCompare(b.rawDate) || a.rowIndex - b.rowIndex);
+          aFiltered.forEach((act, idx) => act.compNum = idx + 1);
+          aFiltered.sort((a, b) => b.rawDate.localeCompare(a.rawDate) || b.compNum - a.compNum);
+
+          document.getElementById('yoshi-feed').innerHTML = yFiltered.map(act => `
+            <div class="game-card yoshi-card"><div class="rank-badge feed-date-badge">${act.displayDate}</div><div class="game-name">${act.game}${act.system ? ` (${act.system})` : ''} <span class="completion-num">(#${act.compNum})</span></div>${act.score ? `<div class="score-badge">${act.score}</div>` : ''}</div>
+          `).join('') || `<div class="score-empty"><br>No completions logged.</div>`;
+
+          document.getElementById('apple-feed').innerHTML = aFiltered.map(act => `
+            <div class="game-card apple-card"><div class="rank-badge feed-date-badge">${act.displayDate}</div><div class="game-name">${act.game}${act.system ? ` (${act.system})` : ''} <span class="completion-num">(#${act.compNum})</span></div>${act.score ? `<div class="score-badge">${act.score}</div>` : ''}</div>
+          `).join('') || `<div class="score-empty"><br>No completions logged.</div>`;
         }
 
-        document.getElementById('yoshi-list').innerHTML = generateRankedCards(allYoshiGames, 'yoshi-card', false);
-        document.getElementById('apple-list').innerHTML = generateRankedCards(allAppleGames, 'apple-card', false);
-        document.getElementById('combined-list').innerHTML = generateRankedCards(allCombinedGames, 'combined-card', true);
+        function generateRankedCards(gamesArray, cardClass, isCombined) {
+          let html = ''; let currentRank = 1; let actualPosition = 1; let lastScore = -1;
+          gamesArray.slice(0, 25).forEach(game => {
+            let scoreToCompare = isCombined ? game.totalScore : game.score;
+            if (scoreToCompare !== lastScore) { currentRank = actualPosition; lastScore = scoreToCompare; }
+            let displayScore = isCombined ? (Number.isInteger(game.totalScore) ? game.totalScore : game.totalScore.toFixed(1)) : (Number.isInteger(game.score) ? game.score : game.score.toFixed(1));
+            html += `<div class="game-card ${cardClass}"><div class="rank-badge">#${currentRank}</div><div class="game-name">${game.name}</div><div class="score-badge" ${isCombined ? 'style="background: #673AB7;"' : ''}>${displayScore}${isCombined ? ' <span style="font-size:0.7em; color:#bbb;">/ 20</span>' : ''}</div></div>`;
+            actualPosition++;
+          });
+          return html || '<div class="score-empty">No rated games found for this filter.</div>';
+        }
+
+        function renderLeaderboards() {
+          let yYear = document.getElementById('y-top-select').value;
+          let aYear = document.getElementById('a-top-select').value;
+          let cYear = document.getElementById('c-top-select').value;
+
+          // Yoshi
+          let yData = yYear === 'All-Time' ? allYoshiGames : Array.from(new Map(allYoshiCompletions.filter(c => c.year === yYear && c.score !== '').map(c => [c.game, {name: c.game, score: parseFloat(c.score)}])).values()).filter(c => !isNaN(c.score));
+          yData.sort((a, b) => (b.score - a.score) !== 0 ? (b.score - a.score) : a.name.localeCompare(b.name));
+          
+          // Apple
+          let aData = aYear === 'All-Time' ? allAppleGames : Array.from(new Map(allAppleCompletions.filter(c => c.year === aYear && c.score !== '').map(c => [c.game, {name: c.game, score: parseFloat(c.score)}])).values()).filter(c => !isNaN(c.score));
+          aData.sort((a, b) => (b.score - a.score) !== 0 ? (b.score - a.score) : a.name.localeCompare(b.name));
+
+          // Combined (Games beaten by EITHER player in that year, where BOTH have a score)
+          let cData = allCombinedGames;
+          if (cYear !== 'All-Time') {
+            let validGames = new Set([...allYoshiCompletions.filter(c => c.year === cYear).map(c => c.game), ...allAppleCompletions.filter(c => c.year === cYear).map(c => c.game)]);
+            cData = allCombinedGames.filter(g => validGames.has(g.name));
+          }
+          cData.sort((a, b) => (b.totalScore - a.totalScore) !== 0 ? (b.totalScore - a.totalScore) : a.name.localeCompare(b.name));
+
+          document.getElementById('yoshi-list').innerHTML = generateRankedCards(yData, 'yoshi-card', false);
+          document.getElementById('apple-list').innerHTML = generateRankedCards(aData, 'apple-card', false);
+          document.getElementById('combined-list').innerHTML = generateRankedCards(cData, 'combined-card', true);
+        }
+
+        // --- 5. INITIALIZE & LISTEN ---
+        document.getElementById('y-feed-select').addEventListener('change', renderFeeds);
+        document.getElementById('a-feed-select').addEventListener('change', renderFeeds);
+        document.getElementById('y-top-select').addEventListener('change', renderLeaderboards);
+        document.getElementById('a-top-select').addEventListener('change', renderLeaderboards);
+        document.getElementById('c-top-select').addEventListener('change', renderLeaderboards);
+
+        renderFeeds();
+        renderLeaderboards();
         
+        document.getElementById('activity-container').style.display = 'flex';
         document.getElementById('boards-wrapper').style.display = 'flex';
         document.getElementById('loading-text').style.display = 'none';
 
