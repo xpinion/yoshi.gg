@@ -8,147 +8,32 @@
   <link rel="stylesheet" href="style.css">
 
   <style>
-    .bty-container {
-      max-width: 1400px;
-      margin: 40px auto;
-      padding: 0 20px;
-      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-    }
+    .bty-container { max-width: 1400px; margin: 40px auto; padding: 0 20px; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+    .dashboard-header { text-align: center; margin-bottom: 20px; font-size: 2.5em; font-weight: 900; text-transform: uppercase; letter-spacing: 2px; color: #111; }
+
+    /* GOTM SHOWCASE */
+    .gotm-section { background: #fff; border-radius: 12px; padding: 30px; margin-bottom: 40px; box-shadow: 0 10px 20px rgba(0,0,0,0.05); }
+    .gotm-header { text-align: center; font-size: 1.2em; font-weight: bold; color: #666; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 20px; }
+    .hero-card { background: linear-gradient(135deg, #111, #333); color: #fff; border-radius: 12px; padding: 30px; text-align: center; margin-bottom: 20px; box-shadow: 0 8px 15px rgba(0,0,0,0.2); border-top: 4px solid #FFD700; }
+    .hero-month { color: #FFD700; font-weight: bold; letter-spacing: 2px; text-transform: uppercase; font-size: 0.9em; margin-bottom: 5px; }
+    .hero-game { font-size: 2.5em; font-weight: 900; margin-bottom: 15px; }
+    .hero-score { display: inline-block; background: #FFD700; color: #111; font-size: 1.5em; font-weight: 900; padding: 5px 20px; border-radius: 30px; }
     
-    .dashboard-header {
-      text-align: center;
-      margin-bottom: 20px;
-      font-size: 2.5em;
-      font-weight: 900;
-      text-transform: uppercase;
-      letter-spacing: 2px;
-      color: #111;
-    }
+    .past-gotm-grid { display: flex; gap: 15px; overflow-x: auto; padding-bottom: 10px; }
+    .mini-gotm-card { flex: 0 0 auto; background: #f8f9fa; border: 1px solid #ddd; border-radius: 8px; padding: 15px; min-width: 200px; text-align: center; }
+    .mini-month { font-size: 0.8em; color: #777; text-transform: uppercase; font-weight: bold; margin-bottom: 5px; }
+    .mini-game { font-weight: 600; color: #222; margin-bottom: 10px; font-size: 1.1em; }
+    .mini-score { background: #333; color: #fff; padding: 3px 10px; border-radius: 4px; font-weight: bold; display: inline-block; }
 
-    /* --- GAME OF THE MONTH SHOWCASE --- */
-    .gotm-section {
-      background: #fff;
-      border-radius: 12px;
-      padding: 30px;
-      margin-bottom: 40px;
-      box-shadow: 0 10px 20px rgba(0,0,0,0.05);
-    }
-    .gotm-header {
-      text-align: center;
-      font-size: 1.2em;
-      font-weight: bold;
-      color: #666;
-      text-transform: uppercase;
-      letter-spacing: 2px;
-      margin-bottom: 20px;
-    }
-    .hero-card {
-      background: linear-gradient(135deg, #111, #333);
-      color: #fff;
-      border-radius: 12px;
-      padding: 30px;
-      text-align: center;
-      margin-bottom: 20px;
-      box-shadow: 0 8px 15px rgba(0,0,0,0.2);
-      border-top: 4px solid #FFD700; 
-    }
-    .hero-month {
-      color: #FFD700;
-      font-weight: bold;
-      letter-spacing: 2px;
-      text-transform: uppercase;
-      font-size: 0.9em;
-      margin-bottom: 5px;
-    }
-    .hero-game {
-      font-size: 2.5em;
-      font-weight: 900;
-      margin-bottom: 15px;
-    }
-    .hero-score {
-      display: inline-block;
-      background: #FFD700;
-      color: #111;
-      font-size: 1.5em;
-      font-weight: 900;
-      padding: 5px 20px;
-      border-radius: 30px;
-    }
-    .past-gotm-grid {
-      display: flex;
-      gap: 15px;
-      overflow-x: auto;
-      padding-bottom: 10px;
-    }
-    .mini-gotm-card {
-      flex: 0 0 auto;
-      background: #f8f9fa;
-      border: 1px solid #ddd;
-      border-radius: 8px;
-      padding: 15px;
-      min-width: 200px;
-      text-align: center;
-    }
-    .mini-month {
-      font-size: 0.8em;
-      color: #777;
-      text-transform: uppercase;
-      font-weight: bold;
-      margin-bottom: 5px;
-    }
-    .mini-game {
-      font-weight: 600;
-      color: #222;
-      margin-bottom: 10px;
-      font-size: 1.1em;
-    }
-    .mini-score {
-      background: #333;
-      color: #fff;
-      padding: 3px 10px;
-      border-radius: 4px;
-      font-weight: bold;
-      display: inline-block;
-    }
-
-    /* --- LEADERBOARDS & LISTS --- */
-    .leaderboards-wrapper {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 25px;
-      justify-content: center;
-      margin-bottom: 40px;
-    }
-    .leaderboard-column {
-      flex: 1;
-      min-width: 320px;
-      background: #fff;
-      border-radius: 12px;
-      padding: 20px;
-      box-shadow: 0 10px 20px rgba(0,0,0,0.05);
-    }
-    .board-title {
-      text-align: center;
-      font-size: 1.5em;
-      font-weight: bold;
-      margin-bottom: 20px;
-      padding-bottom: 10px;
-      border-bottom: 2px solid #eee;
-    }
+    /* LEADERBOARDS & LISTS */
+    .leaderboards-wrapper { display: flex; flex-wrap: wrap; gap: 25px; justify-content: center; margin-bottom: 40px; }
+    .leaderboard-column { flex: 1; min-width: 320px; background: #fff; border-radius: 12px; padding: 20px; box-shadow: 0 10px 20px rgba(0,0,0,0.05); }
+    .board-title { text-align: center; font-size: 1.5em; font-weight: bold; margin-bottom: 20px; padding-bottom: 10px; border-bottom: 2px solid #eee; }
     .yoshi-title { color: #2e7d32; }
     .apple-title { color: #c62828; }
     .combined-title { color: #673AB7; } 
 
-    .game-card {
-      display: flex;
-      align-items: center;
-      background: #f8f9fa;
-      margin-bottom: 10px;
-      border-radius: 8px;
-      padding: 12px 15px;
-      transition: transform 0.2s, box-shadow 0.2s;
-      border-left: 5px solid #ccc;
-    }
+    .game-card { display: flex; align-items: center; background: #f8f9fa; margin-bottom: 10px; border-radius: 8px; padding: 12px 15px; transition: transform 0.2s, box-shadow 0.2s; border-left: 5px solid #ccc; }
     .game-card:hover { transform: translateX(5px); box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
     .yoshi-card { border-left-color: #4CAF50; }
     .apple-card { border-left-color: #F44336; }
@@ -157,19 +42,17 @@
     .rank-badge { font-weight: 900; font-size: 1.2em; color: #555; min-width: 45px; }
     .game-name { flex: 1; font-weight: 600; color: #222; font-size: 1.05em; padding-right: 10px; }
     .score-badge { background: #222; color: #fff; font-weight: bold; padding: 5px 10px; border-radius: 6px; font-size: 1.1em; white-space: nowrap; }
-    .score-empty { color: #999; font-style: italic; font-size: 0.9em; }
+    .score-empty { color: #999; font-style: italic; font-size: 0.9em; text-align: center; width: 100%; display: block;}
 
-    /* Feed Container (Allows internal scrolling) */
-    .scrollable-feed {
-      max-height: 500px;
-      overflow-y: auto;
-      padding-right: 10px;
-    }
-    /* Custom Scrollbar for sleekness */
+    /* FEED EXTRAS */
+    .scrollable-feed { max-height: 500px; overflow-y: auto; padding-right: 10px; }
     .scrollable-feed::-webkit-scrollbar { width: 6px; }
     .scrollable-feed::-webkit-scrollbar-track { background: #f1f1f1; border-radius: 4px; }
     .scrollable-feed::-webkit-scrollbar-thumb { background: #ccc; border-radius: 4px; }
     .scrollable-feed::-webkit-scrollbar-thumb:hover { background: #999; }
+    
+    /* Forces the date badge to always maintain space from the game name */
+    .feed-date-badge { font-size: 1.05em; min-width: 65px; margin-right: 15px; color: #666; }
   </style>
 </head>
 <body>
@@ -179,7 +62,7 @@
   <div class="bty-container">
     <div class="dashboard-header">Collaborative Dashboard</div>
     
-    <div id="loading-text" style="text-align: center; font-family: Courier New;">Loading Dashboard Data...</div>
+    <div id="loading-text" style="text-align: center; font-family: Courier New;">Loading Multi-Database Dashboard...</div>
 
     <div id="gotm-container" class="gotm-section" style="display: none;">
       <div class="gotm-header">Game of the Month Showcase</div>
@@ -204,11 +87,11 @@
 
     <div id="activity-container" class="leaderboards-wrapper" style="display: none;">
       <div class="leaderboard-column">
-        <div class="board-title yoshi-title">Yoshi's Completions</div>
+        <div class="board-title yoshi-title" id="yoshi-feed-title">Yoshi's Completions</div>
         <div id="yoshi-feed" class="scrollable-feed"></div>
       </div>
       <div class="leaderboard-column">
-        <div class="board-title apple-title">Apple's Completions</div>
+        <div class="board-title apple-title" id="apple-feed-title">Apple's Completions</div>
         <div id="apple-feed" class="scrollable-feed"></div>
       </div>
     </div>
@@ -220,18 +103,31 @@
   <script>
     async function loadDashboardData() {
       try {
-        const response = await fetch('bty_data.json');
-        const data = await response.json();
-        const rows = data.values;
+        // Fetch BOTH JSON files simultaneously!
+        const [btyResponse, metaResponse] = await Promise.all([
+          fetch('bty_data.json'),
+          fetch('metadata_data.json')
+        ]);
         
-        // --- 1. SMART GAME OF THE MONTH ---
+        const btyData = await btyResponse.json();
+        const metaData = await metaResponse.json();
+        
+        const btyRows = btyData.values;
+        const metaRows = metaData.values;
+
+        // Dynamic Year Title Generation
+        const currentYear = new Date().getFullYear();
+        document.getElementById('yoshi-feed-title').innerText = `Yoshi's ${currentYear} Completions`;
+        document.getElementById('apple-feed-title').innerText = `Apple's ${currentYear} Completions`;
+        
+        // --- 1. SMART GAME OF THE MONTH (From bty_data) ---
         let currentMonthNum = new Date().getMonth() + 1; 
         let gotmArray = [];
 
         for (let i = 4; i <= 15; i++) {
-          if (!rows[i]) continue;
-          let rawText = rows[i][1] || ''; 
-          let score = rows[i][2] || '';   
+          if (!btyRows[i]) continue;
+          let rawText = btyRows[i][1] || ''; 
+          let score = btyRows[i][2] || '';   
 
           if (rawText && rawText.includes('-')) {
             let parts = rawText.split(' - ');
@@ -276,17 +172,17 @@
         }
 
 
-        // --- 2. LEADERBOARDS ---
+        // --- 2. LEADERBOARDS (From bty_data) ---
         let yoshiGames = [];
         let appleGames = [];
 
         for (let i = 4; i <= 28; i++) {
-          if (!rows[i]) continue; 
-          let yGame = rows[i][9] || '';
-          if (yGame) yoshiGames.push({ rank: rows[i][7] || '', score: rows[i][8] || '', name: yGame });
+          if (!btyRows[i]) continue; 
+          let yGame = btyRows[i][9] || '';
+          if (yGame) yoshiGames.push({ rank: btyRows[i][7] || '', score: btyRows[i][8] || '', name: yGame });
 
-          let aGame = rows[i][13] || '';
-          if (aGame) appleGames.push({ rank: rows[i][11] || '', score: rows[i][12] || '', name: aGame });
+          let aGame = btyRows[i][13] || '';
+          if (aGame) appleGames.push({ rank: btyRows[i][11] || '', score: btyRows[i][12] || '', name: aGame });
         }
 
         let yoshiHTML = '';
@@ -323,7 +219,7 @@
             combinedHTML += `<div class="game-card combined-card"><div class="rank-badge">#${index + 1}</div><div class="game-name">${game.name}</div><div class="score-badge" style="background: #673AB7;">${displayScore} <span style="font-size:0.7em; color:#bbb;">/ 20</span></div></div>`;
           });
         } else {
-          combinedHTML = `<div class="score-empty" style="text-align: center; margin-top: 20px;">No shared rated games yet!</div>`;
+          combinedHTML = `<div class="score-empty" style="margin-top: 20px;">No shared rated games yet!</div>`;
         }
 
         document.getElementById('yoshi-list').innerHTML = yoshiHTML;
@@ -332,63 +228,82 @@
         document.getElementById('boards-wrapper').style.display = 'flex';
 
 
-        // --- 3. SIDE-BY-SIDE ACTIVITY FEED ---
+        // --- 3. THE FEED ENGINE ---
+        
+        // YOSHI'S FEED (Parsed from bty_data)
         let yoshiFeedHTML = '';
-        let appleFeedHTML = '';
-
-        // Start scanning from row 20 to the very bottom
-        for (let i = 19; i < rows.length; i++) {
-          if (!rows[i]) continue;
-
-          // Yoshi Parse (Col B = Index 1, Col C = Index 2)
-          let yCell = rows[i][1] || '';
-          let yScore = rows[i][2] || '';
+        for (let i = 19; i < btyRows.length; i++) {
+          if (!btyRows[i]) continue;
+          let yCell = btyRows[i][1] || '';
+          let yScore = btyRows[i][2] || '';
           
-          // Loosened the rules to just look for a slash and a hyphen
           if (yCell.includes('/') && yCell.includes(' - ')) {
             let parts = yCell.split(' - ');
-            let date = parts.shift().trim(); // Pulls out the date
-            let game = parts.join(' - ').trim(); // Puts the game name back together
-            let sBadge = yScore ? `<div class="score-badge">${yScore}</div>` : '';
-
-            yoshiFeedHTML += `
-              <div class="game-card yoshi-card">
-                <div class="rank-badge" style="font-size: 1em;">${date}</div>
-                <div class="game-name">${game}</div>
-                ${sBadge}
-              </div>`;
-          }
-
-          // Apple Parse (Col E = Index 4, Col F = Index 5)
-          let aCell = rows[i][4] || '';
-          let aScore = rows[i][5] || '';
-          
-          if (aCell.includes('/') && aCell.includes(' - ')) {
-            let parts = aCell.split(' - ');
             let date = parts.shift().trim(); 
             let game = parts.join(' - ').trim(); 
-            let sBadge = aScore ? `<div class="score-badge">${aScore}</div>` : '';
+            let sBadge = yScore ? `<div class="score-badge">${yScore}</div>` : '';
 
-            appleFeedHTML += `
-              <div class="game-card apple-card">
-                <div class="rank-badge" style="font-size: 1em;">${date}</div>
+            // Using the new feed-date-badge class for guaranteed spacing
+            yoshiFeedHTML += `
+              <div class="game-card yoshi-card">
+                <div class="rank-badge feed-date-badge">${date}</div>
                 <div class="game-name">${game}</div>
                 ${sBadge}
               </div>`;
           }
         }
 
-        // Inject the feeds!
-        if (yoshiFeedHTML || appleFeedHTML) {
-          document.getElementById('yoshi-feed').innerHTML = yoshiFeedHTML || '<div class="score-empty">No completions yet.</div>';
-          document.getElementById('apple-feed').innerHTML = appleFeedHTML || '<div class="score-empty">No completions yet.</div>';
-          document.getElementById('activity-container').style.display = 'flex';
+        // APPLE'S FEED (Pulled directly from metadata_data.json!)
+        let appleActivities = [];
+        
+        // Loop through metadata (Start at 1 to skip header row)
+        for(let i = 1; i < metaRows.length; i++) {
+          if (!metaRows[i]) continue;
+          let aGame = metaRows[i][0] || '';   // Column A (Videogame)
+          let aScore = metaRows[i][7] || '';  // Column H (Apple Score)
+          let aDate = metaRows[i][8] || '';   // Column I (yyyy/mm/dd)
+
+          if (aDate && aDate.trim() !== '') {
+            // Check if the completion date is in the current year
+            if (aDate.startsWith(currentYear.toString())) {
+              
+              // Convert "2026/03/21" into "03/21" to match Yoshi's format
+              let parts = aDate.split('/');
+              let shortDate = parts.length === 3 ? `${parts[1]}/${parts[2]}` : aDate;
+
+              appleActivities.push({
+                rawDate: aDate, // Stored for accurate sorting
+                displayDate: shortDate,
+                game: aGame,
+                score: aScore
+              });
+            }
+          }
         }
+
+        // Sort Apple's feed chronologically descending (Newest first)
+        appleActivities.sort((a, b) => b.rawDate.localeCompare(a.rawDate));
+
+        let appleFeedHTML = '';
+        appleActivities.forEach(act => {
+          let sBadge = act.score ? `<div class="score-badge">${act.score}</div>` : '';
+          appleFeedHTML += `
+            <div class="game-card apple-card">
+              <div class="rank-badge feed-date-badge">${act.displayDate}</div>
+              <div class="game-name">${act.game}</div>
+              ${sBadge}
+            </div>`;
+        });
+
+        // Inject Feeds
+        document.getElementById('yoshi-feed').innerHTML = yoshiFeedHTML || '<div class="score-empty"><br>No completions logged for this year yet.</div>';
+        document.getElementById('apple-feed').innerHTML = appleFeedHTML || '<div class="score-empty"><br>No completions logged for this year yet.</div>';
+        document.getElementById('activity-container').style.display = 'flex';
 
         document.getElementById('loading-text').style.display = 'none';
 
       } catch (err) {
-        document.getElementById('loading-text').innerHTML = '<span style="color: red;">Error loading dashboard data.</span>';
+        document.getElementById('loading-text').innerHTML = '<span style="color: red;">Error loading dashboard data. Make sure both bty_data.json and metadata_data.json are uploaded!</span>';
         console.error(err);
       }
     }
