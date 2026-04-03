@@ -11,7 +11,7 @@
     .bty-container { max-width: 1400px; margin: 40px auto; padding: 0 20px; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
     .dashboard-header { text-align: center; margin-bottom: 20px; font-size: 2.5em; font-weight: 900; text-transform: uppercase; letter-spacing: 2px; color: #111; }
 
-    /* --- GOTM SHOWCASE (UPDATED FOR BOX ART) --- */
+    /* --- GOTM SHOWCASE --- */
     .gotm-section { background: #fff; border-radius: 12px; padding: 30px; margin-bottom: 40px; box-shadow: 0 10px 20px rgba(0,0,0,0.05); }
     .gotm-header { text-align: center; font-size: 1.2em; font-weight: bold; color: #666; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 20px; }
     
@@ -27,7 +27,7 @@
       align-items: center;
       justify-content: center;
       gap: 30px;
-      flex-wrap: wrap; /* Helps on mobile screens */
+      flex-wrap: wrap; 
     }
     .hero-art { width: 160px; height: 220px; border-radius: 8px; object-fit: cover; box-shadow: 0 4px 15px rgba(0,0,0,0.6); }
     .hero-details { text-align: left; }
@@ -152,15 +152,13 @@
         // --- 1. SMART GAME OF THE MONTH WITH BOX ART ---
         let currentMonthNum = new Date().getMonth() + 1; 
         let gotmArray = [];
-
-        // Using a generic placeholder if you haven't added an image URL yet
         const defaultImg = "https://via.placeholder.com/160x220/222/555?text=No+Art"; 
 
         for (let i = 4; i <= 15; i++) {
           if (!btyRows[i]) continue;
           let rawText = btyRows[i][1] || ''; 
           let score = btyRows[i][2] || '';   
-          let imgUrl = btyRows[i][3] || defaultImg; // Column D (Index 3) for the image link!
+          let imgUrl = btyRows[i][3] || defaultImg; 
 
           if (rawText && rawText.includes('-')) {
             let parts = rawText.split(' - ');
@@ -208,13 +206,16 @@
           document.getElementById('gotm-container').style.display = 'block';
         }
 
-        // --- 2. THE MULTI-DATABASE FEED ENGINE (WITH COMPLETION COUNTERS) ---
+        // --- 2. THE MULTI-DATABASE FEED ENGINE ---
+        
+        // YOSHI'S COMPLETIONS
         let yoshiActivities = [];
         for (let i = 1; i < masterRows.length; i++) {
           if (!masterRows[i]) continue;
-          let mDate = masterRows[i][1] || '';   
-          let mGame = masterRows[i][2] || '';   
-          let mStatus = masterRows[i][8] || ''; 
+          let mDate = masterRows[i][1] || '';   // Column B
+          let mGame = masterRows[i][2] || '';   // Column C
+          let mSystem = masterRows[i][3] || ''; // Column D (System)
+          let mStatus = masterRows[i][8] || ''; // Column I
           
           if ((mStatus === 'Completed' || mStatus === 'M-Completed') && mDate.includes(currentYear.toString())) {
             let shortDate = mDate;
@@ -225,52 +226,89 @@
             let metaMatch = metaRows.find(r => r && r[0] === mGame);
             if (metaMatch) yScore = metaMatch[6] || ''; 
 
-            yoshiActivities.push({ rawDate: mDate, displayDate: shortDate, game: mGame, score: yScore });
+            yoshiActivities.push({ 
+              rawDate: mDate, 
+              displayDate: shortDate, 
+              game: mGame, 
+              score: yScore, 
+              system: mSystem, 
+              rowIndex: i // Used for tie-breaking!
+            });
           }
         }
         
-        // Count them! Sort oldest first, assign number, then sort newest first for display
-        yoshiActivities.sort((a, b) => a.rawDate.localeCompare(b.rawDate));
+        // Smart Sort: Oldest to newest (Tie-breaker: spreadsheet row number)
+        yoshiActivities.sort((a, b) => {
+          let dateDiff = a.rawDate.localeCompare(b.rawDate);
+          return dateDiff !== 0 ? dateDiff : a.rowIndex - b.rowIndex;
+        });
+        
+        // Assign sequential completion numbers
         yoshiActivities.forEach((act, index) => { act.compNum = index + 1; });
-        yoshiActivities.sort((a, b) => b.rawDate.localeCompare(a.rawDate));
+        
+        // Final Sort: Newest to oldest (Tie-breaker: highest completion number on top)
+        yoshiActivities.sort((a, b) => {
+          let dateDiff = b.rawDate.localeCompare(a.rawDate);
+          return dateDiff !== 0 ? dateDiff : b.compNum - a.compNum;
+        });
 
         let yoshiFeedHTML = '';
         yoshiActivities.forEach(act => {
           let sBadge = act.score ? `<div class="score-badge">${act.score}</div>` : '';
+          let sysText = act.system ? ` (${act.system})` : '';
           yoshiFeedHTML += `
             <div class="game-card yoshi-card">
               <div class="rank-badge feed-date-badge">${act.displayDate}</div>
-              <div class="game-name">${act.game} <span class="completion-num">(#${act.compNum})</span></div>
+              <div class="game-name">${act.game}${sysText} <span class="completion-num">(#${act.compNum})</span></div>
               ${sBadge}
             </div>`;
         });
 
-        // Same for Apple
+
+        // APPLE'S COMPLETIONS
         let appleActivities = [];
         for(let i = 1; i < metaRows.length; i++) {
           if (!metaRows[i]) continue;
-          let aGame = metaRows[i][0] || '';   
-          let aScore = metaRows[i][7] || '';  
-          let aDate = metaRows[i][8] || '';   
+          let aGame = metaRows[i][0] || '';     // Column A 
+          let aScore = metaRows[i][7] || '';    // Column H 
+          let aDate = metaRows[i][8] || '';     // Column I 
+          let aSystem = metaRows[i][9] || '';   // Column J (System)
 
           if (aDate && aDate.trim() !== '' && aDate.startsWith(currentYear.toString())) {
               let parts = aDate.split('/');
               let shortDate = parts.length === 3 ? `${parts[1]}/${parts[2]}` : aDate;
-              appleActivities.push({ rawDate: aDate, displayDate: shortDate, game: aGame, score: aScore });
+              appleActivities.push({ 
+                rawDate: aDate, 
+                displayDate: shortDate, 
+                game: aGame, 
+                score: aScore, 
+                system: aSystem, 
+                rowIndex: i 
+              });
           }
         }
         
-        appleActivities.sort((a, b) => a.rawDate.localeCompare(b.rawDate));
+        // Smart Sort
+        appleActivities.sort((a, b) => {
+          let dateDiff = a.rawDate.localeCompare(b.rawDate);
+          return dateDiff !== 0 ? dateDiff : a.rowIndex - b.rowIndex;
+        });
+        
         appleActivities.forEach((act, index) => { act.compNum = index + 1; });
-        appleActivities.sort((a, b) => b.rawDate.localeCompare(a.rawDate));
+        
+        appleActivities.sort((a, b) => {
+          let dateDiff = b.rawDate.localeCompare(a.rawDate);
+          return dateDiff !== 0 ? dateDiff : b.compNum - a.compNum;
+        });
 
         let appleFeedHTML = '';
         appleActivities.forEach(act => {
           let sBadge = act.score ? `<div class="score-badge">${act.score}</div>` : '';
+          let sysText = act.system ? ` (${act.system})` : '';
           appleFeedHTML += `
             <div class="game-card apple-card">
               <div class="rank-badge feed-date-badge">${act.displayDate}</div>
-              <div class="game-name">${act.game} <span class="completion-num">(#${act.compNum})</span></div>
+              <div class="game-name">${act.game}${sysText} <span class="completion-num">(#${act.compNum})</span></div>
               ${sBadge}
             </div>`;
         });
