@@ -3,97 +3,191 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Bty | yoshi.gg</title>
+  <title>Better Than You | yoshi.gg</title>
   
   <link rel="stylesheet" href="style.css">
+
+  <style>
+    .bty-container {
+      max-width: 1200px;
+      margin: 40px auto;
+      padding: 0 20px;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    }
+    
+    .dashboard-header {
+      text-align: center;
+      margin-bottom: 40px;
+      font-size: 2.5em;
+      font-weight: 900;
+      text-transform: uppercase;
+      letter-spacing: 2px;
+      color: #111;
+    }
+
+    .leaderboards-wrapper {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 30px;
+      justify-content: center;
+    }
+
+    .leaderboard-column {
+      flex: 1;
+      min-width: 300px;
+      background: #fff;
+      border-radius: 12px;
+      padding: 20px;
+      box-shadow: 0 10px 20px rgba(0,0,0,0.05);
+    }
+
+    .board-title {
+      text-align: center;
+      font-size: 1.5em;
+      font-weight: bold;
+      margin-bottom: 20px;
+      padding-bottom: 10px;
+      border-bottom: 2px solid #eee;
+    }
+
+    .yoshi-title { color: #2e7d32; }
+    .apple-title { color: #c62828; }
+
+    /* The sleek UI Card for each game */
+    .game-card {
+      display: flex;
+      align-items: center;
+      background: #f8f9fa;
+      margin-bottom: 10px;
+      border-radius: 8px;
+      padding: 12px 15px;
+      transition: transform 0.2s, box-shadow 0.2s;
+      border-left: 5px solid #ccc;
+    }
+
+    .game-card:hover {
+      transform: translateX(5px);
+      box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+    }
+
+    .yoshi-card { border-left-color: #4CAF50; }
+    .apple-card { border-left-color: #F44336; }
+
+    /* Card internal elements */
+    .rank-badge {
+      font-weight: 900;
+      font-size: 1.2em;
+      color: #555;
+      width: 40px;
+    }
+    .game-name {
+      flex: 1;
+      font-weight: 600;
+      color: #222;
+      font-size: 1.05em;
+    }
+    .score-badge {
+      background: #222;
+      color: #fff;
+      font-weight: bold;
+      padding: 5px 10px;
+      border-radius: 6px;
+      font-size: 1.1em;
+    }
+    .score-empty {
+      color: #999;
+      font-style: italic;
+      font-size: 0.9em;
+    }
+  </style>
 </head>
 <body>
 
   <div id="main-header"></div>
 
-  <div id="report-container">
-    <h2 style="text-align: center; margin-top: 50px;">Loading Bty Data...</h2>
+  <div class="bty-container">
+    <div class="dashboard-header">Rivalry Dashboard</div>
+    
+    <div id="loading-text" style="text-align: center; font-family: Courier New;">Loading Top 25 Data...</div>
+
+    <div class="leaderboards-wrapper" id="boards-wrapper" style="display: none;">
+      
+      <div class="leaderboard-column">
+        <div class="board-title yoshi-title">Yoshi's Top 25</div>
+        <div id="yoshi-list"></div>
+      </div>
+
+      <div class="leaderboard-column">
+        <div class="board-title apple-title">Apple's Top 25</div>
+        <div id="apple-list"></div>
+      </div>
+
+    </div>
   </div>
 
   <script src="nav.js"></script>
 
   <script>
-    async function loadSheetData(jsonFileName) {
+    async function loadDashboardData() {
       try {
-        const response = await fetch(jsonFileName);
+        const response = await fetch('bty_data.json');
         const data = await response.json();
-        renderTable(data, 'report-container');
+        const rows = data.values;
+        
+        let yoshiHTML = '';
+        let appleHTML = '';
+
+        // Loop through rows 5 to 29 (which are indexes 4 through 28 in the array)
+        for (let i = 4; i <= 28; i++) {
+          
+          // Protect against empty rows at the bottom
+          if (!rows[i]) continue; 
+
+          // --- EXTRACT YOSHI'S DATA (Cols H=7, I=8, J=9) ---
+          let yRank = rows[i][7] || '';
+          let yScore = rows[i][8] || '';
+          let yGame = rows[i][9] || '';
+
+          if (yRank) {
+            let scoreHTML = yScore ? `<div class="score-badge">${yScore}</div>` : `<div class="score-empty">Unrated</div>`;
+            yoshiHTML += `
+              <div class="game-card yoshi-card">
+                <div class="rank-badge">#${yRank}</div>
+                <div class="game-name">${yGame}</div>
+                ${scoreHTML}
+              </div>`;
+          }
+
+          // --- EXTRACT APPLE'S DATA (Cols L=11, M=12, N=13) ---
+          let aRank = rows[i][11] || '';
+          let aScore = rows[i][12] || '';
+          let aGame = rows[i][13] || '';
+
+          if (aRank) {
+            let scoreHTML = aScore ? `<div class="score-badge">${aScore}</div>` : `<div class="score-empty">Unrated</div>`;
+            appleHTML += `
+              <div class="game-card apple-card">
+                <div class="rank-badge">#${aRank}</div>
+                <div class="game-name">${aGame}</div>
+                ${scoreHTML}
+              </div>`;
+          }
+        }
+
+        // Inject HTML and hide the loading text
+        document.getElementById('yoshi-list').innerHTML = yoshiHTML;
+        document.getElementById('apple-list').innerHTML = appleHTML;
+        document.getElementById('loading-text').style.display = 'none';
+        document.getElementById('boards-wrapper').style.display = 'flex';
+
       } catch (err) {
-        document.getElementById('report-container').innerHTML = 
-          '<h2 style="text-align: center; color: red;">Error loading data. Make sure ' + jsonFileName + ' is uploaded!</h2>';
+        document.getElementById('loading-text').innerHTML = '<span style="color: red;">Error loading dashboard data.</span>';
         console.error(err);
       }
     }
 
-    function renderTable(data, containerId) {
-      const container = document.getElementById(containerId);
-      let html = '<table>';
-      
-      if (data.widths && data.widths.length > 0) {
-        html += '<colgroup>';
-        data.widths.forEach(w => {
-          html += '<col style="width: ' + w + 'px; min-width: ' + w + 'px;">';
-        });
-        html += '</colgroup>';
-      }
-
-      const skipCells = new Set();
-      const merges = {};
-      if (data.mergedRanges) {
-        data.mergedRanges.forEach(m => {
-          merges[m.row + ',' + m.col] = m;
-          for (let r = 0; r < m.numRows; r++) {
-            for (let c = 0; c < m.numCols; c++) {
-              if (r === 0 && c === 0) continue; 
-              skipCells.add((m.row + r) + ',' + (m.col + c));
-            }
-          }
-        });
-      }
-
-      for (let r = 0; r < data.values.length; r++) {
-        html += '<tr>';
-        for (let c = 0; c < data.values[r].length; c++) {
-          
-          if (skipCells.has(r + ',' + c)) continue;
-
-          let colspan = 1;
-          let rowspan = 1;
-          if (merges[r + ',' + c]) {
-            colspan = merges[r + ',' + c].numCols;
-            rowspan = merges[r + ',' + c].numRows;
-          }
-
-          const val = data.values[r][c] || '';
-          const bg = (data.backgrounds && data.backgrounds[r] && data.backgrounds[r][c]) ? data.backgrounds[r][c] : '';
-          const fw = (data.fontWeights && data.fontWeights[r] && data.fontWeights[r][c]) ? data.fontWeights[r][c] : 'normal';
-          const fc = (data.fontColors && data.fontColors[r] && data.fontColors[r][c]) ? data.fontColors[r][c] : '#000000';
-          const align = (data.horizontalAlignments && data.horizontalAlignments[r] && data.horizontalAlignments[r][c]) ? data.horizontalAlignments[r][c] : 'left';
-          const fSize = (data.fontSizes && data.fontSizes[r] && data.fontSizes[r][c]) ? data.fontSizes[r][c] : 8;
-
-          let style = '';
-          if (bg && bg !== '#ffffff' && bg !== 'null') style += 'background-color: ' + bg + '; ';
-          if (fw !== 'normal') style += 'font-weight: ' + fw + '; ';
-          if (fc && fc !== '#000000') style += 'color: ' + fc + '; ';
-          if (align) style += 'text-align: ' + align + '; ';
-          if (fSize) style += 'font-size: ' + fSize + 'pt; ';
-
-          html += '<td colspan="' + colspan + '" rowspan="' + rowspan + '" style="' + style + '">' + val + '</td>';
-        }
-        html += '</tr>';
-      }
-      html += '</table>';
-      
-      container.innerHTML = html;
-    }
-
-    // Automatically points to the correct JSON file!
-    loadSheetData('bty_data.json'); 
+    // Fire it up!
+    loadDashboardData();
   </script>
 </body>
 </html>
