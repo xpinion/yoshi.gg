@@ -69,21 +69,6 @@
       <div id="past-gotm" class="past-gotm-grid"></div>
     </div>
 
-    <div class="leaderboards-wrapper" id="boards-wrapper" style="display: none;">
-      <div class="leaderboard-column">
-        <div class="board-title yoshi-title">Yoshi's Top 25</div>
-        <div id="yoshi-list"></div>
-      </div>
-      <div class="leaderboard-column">
-        <div class="board-title combined-title">Combined (Out of 20)</div>
-        <div id="combined-list"></div>
-      </div>
-      <div class="leaderboard-column">
-        <div class="board-title apple-title">Apple's Top 25</div>
-        <div id="apple-list"></div>
-      </div>
-    </div>
-
     <div id="activity-container" class="leaderboards-wrapper" style="display: none;">
       <div class="leaderboard-column">
         <div class="board-title yoshi-title" id="yoshi-feed-title">Yoshi's Completions</div>
@@ -95,6 +80,21 @@
       </div>
     </div>
 
+    <div class="leaderboards-wrapper" id="boards-wrapper" style="display: none;">
+      <div class="leaderboard-column">
+        <div class="board-title yoshi-title">Yoshi's All-Time Top 25</div>
+        <div id="yoshi-list"></div>
+      </div>
+      <div class="leaderboard-column">
+        <div class="board-title combined-title">Combined All-Time (Out of 20)</div>
+        <div id="combined-list"></div>
+      </div>
+      <div class="leaderboard-column">
+        <div class="board-title apple-title">Apple's All-Time Top 25</div>
+        <div id="apple-list"></div>
+      </div>
+    </div>
+
   </div>
 
   <script src="nav.js"></script>
@@ -102,7 +102,6 @@
   <script>
     async function loadDashboardData() {
       try {
-        // --- FETCH ALL 3 DATABASES AT ONCE ---
         const [btyResponse, metaResponse, masterResponse] = await Promise.all([
           fetch('bty_data.json'),
           fetch('metadata_data.json'),
@@ -117,12 +116,11 @@
         const metaRows = metaData.values;
         const masterRows = masterData.values;
 
-        // Dynamic Year Title Generation
         const currentYear = new Date().getFullYear();
         document.getElementById('yoshi-feed-title').innerText = `Yoshi's ${currentYear} Completions`;
         document.getElementById('apple-feed-title').innerText = `Apple's ${currentYear} Completions`;
         
-        // --- 1. SMART GAME OF THE MONTH (From bty_data) ---
+        // --- 1. SMART GAME OF THE MONTH (bty_data.json) ---
         let currentMonthNum = new Date().getMonth() + 1; 
         let gotmArray = [];
 
@@ -173,155 +171,138 @@
           document.getElementById('gotm-container').style.display = 'block';
         }
 
-
-        // --- 2. LEADERBOARDS (From bty_data) ---
-        let yoshiGames = [];
-        let appleGames = [];
-
-        for (let i = 4; i <= 28; i++) {
-          if (!btyRows[i]) continue; 
-          let yGame = btyRows[i][9] || '';
-          if (yGame) yoshiGames.push({ rank: btyRows[i][7] || '', score: btyRows[i][8] || '', name: yGame });
-
-          let aGame = btyRows[i][13] || '';
-          if (aGame) appleGames.push({ rank: btyRows[i][11] || '', score: btyRows[i][12] || '', name: aGame });
-        }
-
-        let yoshiHTML = '';
-        yoshiGames.forEach(game => {
-          let rText = game.rank ? `#${game.rank}` : ''; 
-          let sHTML = game.score !== '' ? `<div class="score-badge">${game.score}</div>` : `<div class="score-empty">Unrated</div>`;
-          yoshiHTML += `<div class="game-card yoshi-card"><div class="rank-badge">${rText}</div><div class="game-name">${game.name}</div>${sHTML}</div>`;
-        });
-
-        let appleHTML = '';
-        appleGames.forEach(game => {
-          let rText = game.rank ? `#${game.rank}` : ''; 
-          let sHTML = game.score !== '' ? `<div class="score-badge">${game.score}</div>` : `<div class="score-empty">Unrated</div>`;
-          appleHTML += `<div class="game-card apple-card"><div class="rank-badge">${rText}</div><div class="game-name">${game.name}</div>${sHTML}</div>`;
-        });
-
-        let combinedGames = [];
-        yoshiGames.forEach(y => {
-          let yNum = parseFloat(y.score);
-          if (!isNaN(yNum)) {
-            let match = appleGames.find(a => a.name.toLowerCase().trim() === y.name.toLowerCase().trim());
-            if (match) {
-              let aNum = parseFloat(match.score);
-              if (!isNaN(aNum)) combinedGames.push({ name: y.name, totalScore: yNum + aNum });
-            }
-          }
-        });
-        combinedGames.sort((a, b) => b.totalScore - a.totalScore);
-
-        let combinedHTML = '';
-        if (combinedGames.length > 0) {
-          combinedGames.forEach((game, index) => {
-            let displayScore = Number.isInteger(game.totalScore) ? game.totalScore : game.totalScore.toFixed(1);
-            combinedHTML += `<div class="game-card combined-card"><div class="rank-badge">#${index + 1}</div><div class="game-name">${game.name}</div><div class="score-badge" style="background: #673AB7;">${displayScore} <span style="font-size:0.7em; color:#bbb;">/ 20</span></div></div>`;
-          });
-        } else {
-          combinedHTML = `<div class="score-empty" style="margin-top: 20px;">No shared rated games yet!</div>`;
-        }
-
-        document.getElementById('yoshi-list').innerHTML = yoshiHTML;
-        document.getElementById('apple-list').innerHTML = appleHTML;
-        document.getElementById('combined-list').innerHTML = combinedHTML;
-        document.getElementById('boards-wrapper').style.display = 'flex';
-
-
-        // --- 3. THE MULTI-DATABASE FEED ENGINE ---
-        
-        // YOSHI'S FEED (Parsed directly from master_data & metadata_data)
+        // --- 2. THE MULTI-DATABASE FEED ENGINE ---
         let yoshiActivities = [];
-
-        // Skip row 0 (Header row)
         for (let i = 1; i < masterRows.length; i++) {
           if (!masterRows[i]) continue;
-          let mDate = masterRows[i][1] || '';   // Column B
-          let mGame = masterRows[i][2] || '';   // Column C
-          let mStatus = masterRows[i][8] || ''; // Column I
+          let mDate = masterRows[i][1] || '';   
+          let mGame = masterRows[i][2] || '';   
+          let mStatus = masterRows[i][8] || ''; 
           
           if ((mStatus === 'Completed' || mStatus === 'M-Completed') && mDate.includes(currentYear.toString())) {
-            
-            // Format YYYY/MM/DD to MM/DD
             let shortDate = mDate;
-            let dateParts = mDate.split(/[-/]/); // Accounts for hyphens or slashes
-            if (dateParts.length >= 3) {
-              shortDate = `${dateParts[1]}/${dateParts[2]}`;
-            }
+            let dateParts = mDate.split(/[-/]/); 
+            if (dateParts.length >= 3) shortDate = `${dateParts[1]}/${dateParts[2]}`;
 
-            // Cross-reference metadata to grab Yoshi's score! (Column G = Index 6)
             let yScore = '';
             let metaMatch = metaRows.find(r => r && r[0] === mGame);
-            if (metaMatch) {
-              yScore = metaMatch[6] || ''; 
-            }
+            if (metaMatch) yScore = metaMatch[6] || ''; 
 
-            yoshiActivities.push({
-              rawDate: mDate,
-              displayDate: shortDate,
-              game: mGame,
-              score: yScore
-            });
+            yoshiActivities.push({ rawDate: mDate, displayDate: shortDate, game: mGame, score: yScore });
           }
         }
-
-        // Sort Yoshi's feed
         yoshiActivities.sort((a, b) => b.rawDate.localeCompare(a.rawDate));
 
         let yoshiFeedHTML = '';
         yoshiActivities.forEach(act => {
           let sBadge = act.score ? `<div class="score-badge">${act.score}</div>` : '';
-          yoshiFeedHTML += `
-            <div class="game-card yoshi-card">
-              <div class="rank-badge feed-date-badge">${act.displayDate}</div>
-              <div class="game-name">${act.game}</div>
-              ${sBadge}
-            </div>`;
+          yoshiFeedHTML += `<div class="game-card yoshi-card"><div class="rank-badge feed-date-badge">${act.displayDate}</div><div class="game-name">${act.game}</div>${sBadge}</div>`;
         });
 
-
-        // APPLE'S FEED (Parsed directly from metadata_data)
         let appleActivities = [];
-        
         for(let i = 1; i < metaRows.length; i++) {
           if (!metaRows[i]) continue;
-          let aGame = metaRows[i][0] || '';   // Column A 
-          let aScore = metaRows[i][7] || '';  // Column H 
-          let aDate = metaRows[i][8] || '';   // Column I 
+          let aGame = metaRows[i][0] || '';   
+          let aScore = metaRows[i][7] || '';  
+          let aDate = metaRows[i][8] || '';   
 
           if (aDate && aDate.trim() !== '' && aDate.startsWith(currentYear.toString())) {
               let parts = aDate.split('/');
               let shortDate = parts.length === 3 ? `${parts[1]}/${parts[2]}` : aDate;
-
-              appleActivities.push({
-                rawDate: aDate, 
-                displayDate: shortDate,
-                game: aGame,
-                score: aScore
-              });
+              appleActivities.push({ rawDate: aDate, displayDate: shortDate, game: aGame, score: aScore });
           }
         }
-
         appleActivities.sort((a, b) => b.rawDate.localeCompare(a.rawDate));
 
         let appleFeedHTML = '';
         appleActivities.forEach(act => {
           let sBadge = act.score ? `<div class="score-badge">${act.score}</div>` : '';
-          appleFeedHTML += `
-            <div class="game-card apple-card">
-              <div class="rank-badge feed-date-badge">${act.displayDate}</div>
-              <div class="game-name">${act.game}</div>
-              ${sBadge}
-            </div>`;
+          appleFeedHTML += `<div class="game-card apple-card"><div class="rank-badge feed-date-badge">${act.displayDate}</div><div class="game-name">${act.game}</div>${sBadge}</div>`;
         });
 
-        // Inject Feeds
         document.getElementById('yoshi-feed').innerHTML = yoshiFeedHTML || '<div class="score-empty"><br>No completions logged for this year yet.</div>';
         document.getElementById('apple-feed').innerHTML = appleFeedHTML || '<div class="score-empty"><br>No completions logged for this year yet.</div>';
         document.getElementById('activity-container').style.display = 'flex';
 
+
+        // --- 3. ALL-TIME TOP 25 LEADERBOARDS (Calculated purely from metadata_data.json!) ---
+        let allYoshiGames = [];
+        let allAppleGames = [];
+        let allCombinedGames = [];
+
+        for(let i = 1; i < metaRows.length; i++) {
+            if (!metaRows[i]) continue;
+            let gameName = metaRows[i][0] || '';
+            let yScoreRaw = metaRows[i][6] || '';
+            let aScoreRaw = metaRows[i][7] || '';
+
+            let yNum = parseFloat(yScoreRaw);
+            let aNum = parseFloat(aScoreRaw);
+
+            if (gameName) {
+                if (!isNaN(yNum)) allYoshiGames.push({ name: gameName, score: yNum });
+                if (!isNaN(aNum)) allAppleGames.push({ name: gameName, score: aNum });
+                if (!isNaN(yNum) && !isNaN(aNum)) allCombinedGames.push({ name: gameName, totalScore: yNum + aNum });
+            }
+        }
+
+        // Sorting logic (Highest score first. If tied, sort alphabetically)
+        const sortGames = (a, b) => {
+            let scoreDiff = b.score - a.score;
+            return scoreDiff !== 0 ? scoreDiff : a.name.localeCompare(b.name);
+        };
+        const sortCombined = (a, b) => {
+            let scoreDiff = b.totalScore - a.totalScore;
+            return scoreDiff !== 0 ? scoreDiff : a.name.localeCompare(b.name);
+        };
+
+        allYoshiGames.sort(sortGames);
+        allAppleGames.sort(sortGames);
+        allCombinedGames.sort(sortCombined);
+
+        // A dynamic ranking function that perfectly handles ties
+        function generateRankedCards(gamesArray, cardClass, isCombined) {
+          let html = '';
+          let currentRank = 1;
+          let actualPosition = 1;
+          let lastScore = -1;
+
+          // Only take the top 25 records
+          gamesArray.slice(0, 25).forEach((game) => {
+            let scoreToCompare = isCombined ? game.totalScore : game.score;
+            
+            // Standard competition ranking (e.g. 1, 2, 2, 4...)
+            if (scoreToCompare !== lastScore) {
+              currentRank = actualPosition;
+              lastScore = scoreToCompare;
+            }
+
+            let displayScore = isCombined ? 
+              (Number.isInteger(game.totalScore) ? game.totalScore : game.totalScore.toFixed(1)) : 
+              (Number.isInteger(game.score) ? game.score : game.score.toFixed(1));
+              
+            let badgeStyle = isCombined ? 'style="background: #673AB7;"' : '';
+            let outOf = isCombined ? ' <span style="font-size:0.7em; color:#bbb;">/ 20</span>' : '';
+
+            html += `
+              <div class="game-card ${cardClass}">
+                <div class="rank-badge">#${currentRank}</div>
+                <div class="game-name">${game.name}</div>
+                <div class="score-badge" ${badgeStyle}>${displayScore}${outOf}</div>
+              </div>`;
+              
+            actualPosition++;
+          });
+          
+          return html || '<div class="score-empty">No games rated yet.</div>';
+        }
+
+        // Generate and inject the Top 25 HTML
+        document.getElementById('yoshi-list').innerHTML = generateRankedCards(allYoshiGames, 'yoshi-card', false);
+        document.getElementById('apple-list').innerHTML = generateRankedCards(allAppleGames, 'apple-card', false);
+        document.getElementById('combined-list').innerHTML = generateRankedCards(allCombinedGames, 'combined-card', true);
+        
+        document.getElementById('boards-wrapper').style.display = 'flex';
         document.getElementById('loading-text').style.display = 'none';
 
       } catch (err) {
