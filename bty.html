@@ -25,7 +25,7 @@
       color: #111;
     }
 
-    /* --- GAME OF THE MONTH SHOWCASE STYLES --- */
+    /* --- GAME OF THE MONTH SHOWCASE --- */
     .gotm-section {
       background: #fff;
       border-radius: 12px;
@@ -42,8 +42,6 @@
       letter-spacing: 2px;
       margin-bottom: 20px;
     }
-    
-    /* The Big Hero Card for the Current Month */
     .hero-card {
       background: linear-gradient(135deg, #111, #333);
       color: #fff;
@@ -52,7 +50,7 @@
       text-align: center;
       margin-bottom: 20px;
       box-shadow: 0 8px 15px rgba(0,0,0,0.2);
-      border-top: 4px solid #FFD700; /* Gold accent */
+      border-top: 4px solid #FFD700; 
     }
     .hero-month {
       color: #FFD700;
@@ -76,8 +74,6 @@
       padding: 5px 20px;
       border-radius: 30px;
     }
-
-    /* The Smaller Cards for Past Months */
     .past-gotm-grid {
       display: flex;
       gap: 15px;
@@ -115,12 +111,13 @@
       display: inline-block;
     }
 
-    /* --- LEADERBOARD STYLES --- */
+    /* --- LEADERBOARDS --- */
     .leaderboards-wrapper {
       display: flex;
       flex-wrap: wrap;
       gap: 25px;
       justify-content: center;
+      margin-bottom: 40px;
     }
     .leaderboard-column {
       flex: 1;
@@ -152,41 +149,58 @@
       transition: transform 0.2s, box-shadow 0.2s;
       border-left: 5px solid #ccc;
     }
-    .game-card:hover {
-      transform: translateX(5px);
-      box-shadow: 0 4px 8px rgba(0,0,0,0.1);
-    }
+    .game-card:hover { transform: translateX(5px); box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
     .yoshi-card { border-left-color: #4CAF50; }
     .apple-card { border-left-color: #F44336; }
     .combined-card { border-left-color: #673AB7; }
 
-    .rank-badge {
-      font-weight: 900;
-      font-size: 1.2em;
-      color: #555;
-      min-width: 45px;
+    .rank-badge { font-weight: 900; font-size: 1.2em; color: #555; min-width: 45px; }
+    .game-name { flex: 1; font-weight: 600; color: #222; font-size: 1.05em; padding-right: 10px; }
+    .score-badge { background: #222; color: #fff; font-weight: bold; padding: 5px 10px; border-radius: 6px; font-size: 1.1em; white-space: nowrap; }
+    .score-empty { color: #999; font-style: italic; font-size: 0.9em; }
+
+    /* --- ACTIVITY FEED TIMELINE --- */
+    .activity-section {
+      background: #fff;
+      border-radius: 12px;
+      padding: 30px;
+      box-shadow: 0 10px 20px rgba(0,0,0,0.05);
     }
-    .game-name {
-      flex: 1;
-      font-weight: 600;
-      color: #222;
-      font-size: 1.05em;
+    .feed-container {
+      display: flex;
+      flex-direction: column;
+      gap: 15px;
+      max-height: 500px;
+      overflow-y: auto;
       padding-right: 10px;
     }
-    .score-badge {
-      background: #222;
-      color: #fff;
+    .feed-item {
+      display: flex;
+      align-items: center;
+      padding: 15px;
+      background: #fdfdfd;
+      border: 1px solid #eee;
+      border-radius: 8px;
+      border-left: 5px solid #ccc;
+    }
+    .feed-item.yoshi-feed { border-left-color: #4CAF50; }
+    .feed-item.apple-feed { border-left-color: #F44336; }
+    
+    .feed-date {
       font-weight: bold;
-      padding: 5px 10px;
-      border-radius: 6px;
+      color: #777;
+      min-width: 60px;
+      font-family: monospace;
       font-size: 1.1em;
-      white-space: nowrap;
     }
-    .score-empty {
-      color: #999;
-      font-style: italic;
-      font-size: 0.9em;
+    .feed-content {
+      flex: 1;
+      font-size: 1.05em;
+      color: #333;
     }
+    .feed-player { font-weight: 900; }
+    .yoshi-player { color: #2e7d32; }
+    .apple-player { color: #c62828; }
   </style>
 </head>
 <body>
@@ -218,6 +232,12 @@
         <div id="apple-list"></div>
       </div>
     </div>
+
+    <div id="activity-container" class="activity-section" style="display: none;">
+      <div class="gotm-header">Recent Completions</div>
+      <div id="activity-feed" class="feed-container"></div>
+    </div>
+
   </div>
 
   <script src="nav.js"></script>
@@ -229,58 +249,62 @@
         const data = await response.json();
         const rows = data.values;
         
-        // --- 1. PROCESS GAME OF THE MONTH ---
-        let heroHTML = '';
-        let pastHTML = '';
-        let foundFirstGotm = false;
+        // --- 1. SMART GAME OF THE MONTH ---
+        let currentMonthNum = new Date().getMonth() + 1; // Gets real-world month (1-12)
+        let gotmArray = [];
 
-        // Loop through GotM section (Rows 5 to 16 -> index 4 to 15)
         for (let i = 4; i <= 15; i++) {
           if (!rows[i]) continue;
-          let rawText = rows[i][1] || ''; // Col B
-          let score = rows[i][2] || '';   // Col C
+          let rawText = rows[i][1] || ''; 
+          let score = rows[i][2] || '';   
 
           if (rawText && rawText.includes('-')) {
-            // Split "04 (April) - Tunic" into parts
             let parts = rawText.split(' - ');
             let rawMonth = parts[0].trim();
             let gameName = parts[1].trim();
 
-            // Extract just the word "April" from "04 (April)"
-            let monthMatch = rawMonth.match(/\((.*?)\)/);
-            let cleanMonth = monthMatch ? monthMatch[1] : rawMonth;
+            // Extract month number from string like "04 (April)"
+            let numMatch = rawMonth.match(/^(\d{2})/);
+            if (numMatch) {
+              let mNum = parseInt(numMatch[1], 10);
+              let nameMatch = rawMonth.match(/\((.*?)\)/);
+              let cleanMonthName = nameMatch ? nameMatch[1] : rawMonth;
 
-            if (!foundFirstGotm) {
-              // The very first one we find becomes the giant Hero Card
-              heroHTML = `
-                <div class="hero-card">
-                  <div class="hero-month">${cleanMonth} Game of the Month</div>
-                  <div class="hero-game">${gameName}</div>
-                  <div class="hero-score">${score} / 10</div>
-                </div>
-              `;
-              foundFirstGotm = true;
-            } else {
-              // The rest become smaller scrollable cards below it
-              pastHTML += `
-                <div class="mini-gotm-card">
-                  <div class="mini-month">${cleanMonth}</div>
-                  <div class="mini-game">${gameName}</div>
-                  <div class="mini-score">${score}</div>
-                </div>
-              `;
+              // Only keep months that have happened or are happening
+              if (mNum <= currentMonthNum) {
+                gotmArray.push({ num: mNum, monthName: cleanMonthName, game: gameName, score: score });
+              }
             }
           }
         }
 
-        if (foundFirstGotm) {
-          document.getElementById('hero-gotm').innerHTML = heroHTML;
+        // Sort descending so the most recent valid month is first
+        gotmArray.sort((a, b) => b.num - a.num);
+
+        if (gotmArray.length > 0) {
+          let topGotm = gotmArray[0];
+          document.getElementById('hero-gotm').innerHTML = `
+            <div class="hero-card">
+              <div class="hero-month">${topGotm.monthName} Game of the Month</div>
+              <div class="hero-game">${topGotm.game}</div>
+              <div class="hero-score">${topGotm.score} / 10</div>
+            </div>`;
+
+          let pastHTML = '';
+          for (let j = 1; j < gotmArray.length; j++) {
+            pastHTML += `
+              <div class="mini-gotm-card">
+                <div class="mini-month">${gotmArray[j].monthName}</div>
+                <div class="mini-game">${gotmArray[j].game}</div>
+                <div class="mini-score">${gotmArray[j].score}</div>
+              </div>`;
+          }
           document.getElementById('past-gotm').innerHTML = pastHTML;
           document.getElementById('gotm-container').style.display = 'block';
         }
 
 
-        // --- 2. PROCESS LEADERBOARDS (Same as before) ---
+        // --- 2. LEADERBOARDS ---
         let yoshiGames = [];
         let appleGames = [];
 
@@ -334,8 +358,68 @@
         document.getElementById('apple-list').innerHTML = appleHTML;
         document.getElementById('combined-list').innerHTML = combinedHTML;
         
-        document.getElementById('loading-text').style.display = 'none';
         document.getElementById('boards-wrapper').style.display = 'flex';
+
+
+        // --- 3. THE UNIFIED ACTIVITY FEED ---
+        let activities = [];
+
+        // Scan from row 20 down to the very end of the sheet
+        for (let i = 19; i < rows.length; i++) {
+          if (!rows[i]) continue;
+
+          // Parse Yoshi's column (B / C)
+          let yCell = rows[i][1] || ''; 
+          let yScore = rows[i][2] || '';
+          if (yCell.match(/^\d{2}\/\d{2} - /)) {
+            let parts = yCell.split(' - ');
+            activities.push({
+              person: 'Yoshi',
+              date: parts[0].trim(),
+              game: parts.slice(1).join(' - ').trim(),
+              score: yScore
+            });
+          }
+
+          // Parse Apple's column (E / F)
+          let aCell = rows[i][4] || ''; 
+          let aScore = rows[i][5] || '';
+          if (aCell.match(/^\d{2}\/\d{2} - /)) {
+            let parts = aCell.split(' - ');
+            activities.push({
+              person: 'Apple',
+              date: parts[0].trim(),
+              game: parts.slice(1).join(' - ').trim(),
+              score: aScore
+            });
+          }
+        }
+
+        // Sort chronologically (Since format is MM/DD, alphabetical descending works perfectly)
+        activities.sort((a, b) => b.date.localeCompare(a.date));
+
+        let feedHTML = '';
+        activities.forEach(act => {
+          let pClass = act.person === 'Yoshi' ? 'yoshi-player' : 'apple-player';
+          let itemClass = act.person === 'Yoshi' ? 'yoshi-feed' : 'apple-feed';
+          let scoreBadge = act.score ? `<div class="score-badge">${act.score}</div>` : '';
+          
+          feedHTML += `
+            <div class="feed-item ${itemClass}">
+              <div class="feed-date">${act.date}</div>
+              <div class="feed-content">
+                <span class="feed-player ${pClass}">${act.person}</span> completed <em>${act.game}</em>
+              </div>
+              ${scoreBadge}
+            </div>`;
+        });
+
+        if (feedHTML) {
+          document.getElementById('activity-feed').innerHTML = feedHTML;
+          document.getElementById('activity-container').style.display = 'block';
+        }
+
+        document.getElementById('loading-text').style.display = 'none';
 
       } catch (err) {
         document.getElementById('loading-text').innerHTML = '<span style="color: red;">Error loading dashboard data.</span>';
