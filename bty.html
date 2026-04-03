@@ -11,21 +11,50 @@
     .bty-container { max-width: 1400px; margin: 40px auto; padding: 0 20px; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
     .dashboard-header { text-align: center; margin-bottom: 20px; font-size: 2.5em; font-weight: 900; text-transform: uppercase; letter-spacing: 2px; color: #111; }
 
-    /* GOTM SHOWCASE */
+    /* --- GOTM SHOWCASE (UPDATED FOR BOX ART) --- */
     .gotm-section { background: #fff; border-radius: 12px; padding: 30px; margin-bottom: 40px; box-shadow: 0 10px 20px rgba(0,0,0,0.05); }
     .gotm-header { text-align: center; font-size: 1.2em; font-weight: bold; color: #666; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 20px; }
-    .hero-card { background: linear-gradient(135deg, #111, #333); color: #fff; border-radius: 12px; padding: 30px; text-align: center; margin-bottom: 20px; box-shadow: 0 8px 15px rgba(0,0,0,0.2); border-top: 4px solid #FFD700; }
+    
+    .hero-card { 
+      background: linear-gradient(135deg, #111, #333); 
+      color: #fff; 
+      border-radius: 12px; 
+      padding: 30px; 
+      margin-bottom: 20px; 
+      box-shadow: 0 8px 15px rgba(0,0,0,0.2); 
+      border-top: 4px solid #FFD700; 
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 30px;
+      flex-wrap: wrap; /* Helps on mobile screens */
+    }
+    .hero-art { width: 160px; height: 220px; border-radius: 8px; object-fit: cover; box-shadow: 0 4px 15px rgba(0,0,0,0.6); }
+    .hero-details { text-align: left; }
+    @media (max-width: 600px) { .hero-details { text-align: center; } }
     .hero-month { color: #FFD700; font-weight: bold; letter-spacing: 2px; text-transform: uppercase; font-size: 0.9em; margin-bottom: 5px; }
     .hero-game { font-size: 2.5em; font-weight: 900; margin-bottom: 15px; }
     .hero-score { display: inline-block; background: #FFD700; color: #111; font-size: 1.5em; font-weight: 900; padding: 5px 20px; border-radius: 30px; }
     
-    .past-gotm-grid { display: flex; gap: 15px; overflow-x: auto; padding-bottom: 10px; }
-    .mini-gotm-card { flex: 0 0 auto; background: #f8f9fa; border: 1px solid #ddd; border-radius: 8px; padding: 15px; min-width: 200px; text-align: center; }
+    .past-gotm-grid { display: flex; gap: 15px; overflow-x: auto; padding-bottom: 15px; }
+    .mini-gotm-card { 
+      flex: 0 0 auto; 
+      background: #f8f9fa; 
+      border: 1px solid #ddd; 
+      border-radius: 8px; 
+      padding: 15px; 
+      min-width: 150px; 
+      text-align: center; 
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+    .mini-art { width: 100px; height: 140px; border-radius: 6px; object-fit: cover; margin-bottom: 12px; box-shadow: 0 2px 5px rgba(0,0,0,0.2); }
     .mini-month { font-size: 0.8em; color: #777; text-transform: uppercase; font-weight: bold; margin-bottom: 5px; }
     .mini-game { font-weight: 600; color: #222; margin-bottom: 10px; font-size: 1.1em; }
     .mini-score { background: #333; color: #fff; padding: 3px 10px; border-radius: 4px; font-weight: bold; display: inline-block; }
 
-    /* LEADERBOARDS & LISTS */
+    /* --- LEADERBOARDS & LISTS --- */
     .leaderboards-wrapper { display: flex; flex-wrap: wrap; gap: 25px; justify-content: center; margin-bottom: 40px; }
     .leaderboard-column { flex: 1; min-width: 320px; background: #fff; border-radius: 12px; padding: 20px; box-shadow: 0 10px 20px rgba(0,0,0,0.05); }
     .board-title { text-align: center; font-size: 1.5em; font-weight: bold; margin-bottom: 20px; padding-bottom: 10px; border-bottom: 2px solid #eee; }
@@ -41,16 +70,16 @@
 
     .rank-badge { font-weight: 900; font-size: 1.2em; color: #555; min-width: 45px; }
     .game-name { flex: 1; font-weight: 600; color: #222; font-size: 1.05em; padding-right: 10px; }
+    .completion-num { color: #888; font-size: 0.85em; font-style: italic; font-weight: normal; margin-left: 5px; }
     .score-badge { background: #222; color: #fff; font-weight: bold; padding: 5px 10px; border-radius: 6px; font-size: 1.1em; white-space: nowrap; }
     .score-empty { color: #999; font-style: italic; font-size: 0.9em; text-align: center; width: 100%; display: block;}
 
-    /* FEED EXTRAS */
+    /* --- FEED EXTRAS --- */
     .scrollable-feed { max-height: 500px; overflow-y: auto; padding-right: 10px; }
     .scrollable-feed::-webkit-scrollbar { width: 6px; }
     .scrollable-feed::-webkit-scrollbar-track { background: #f1f1f1; border-radius: 4px; }
     .scrollable-feed::-webkit-scrollbar-thumb { background: #ccc; border-radius: 4px; }
     .scrollable-feed::-webkit-scrollbar-thumb:hover { background: #999; }
-    
     .feed-date-badge { font-size: 1.05em; min-width: 65px; margin-right: 15px; color: #666; }
   </style>
 </head>
@@ -120,14 +149,18 @@
         document.getElementById('yoshi-feed-title').innerText = `Yoshi's ${currentYear} Completions`;
         document.getElementById('apple-feed-title').innerText = `Apple's ${currentYear} Completions`;
         
-        // --- 1. SMART GAME OF THE MONTH (bty_data.json) ---
+        // --- 1. SMART GAME OF THE MONTH WITH BOX ART ---
         let currentMonthNum = new Date().getMonth() + 1; 
         let gotmArray = [];
+
+        // Using a generic placeholder if you haven't added an image URL yet
+        const defaultImg = "https://via.placeholder.com/160x220/222/555?text=No+Art"; 
 
         for (let i = 4; i <= 15; i++) {
           if (!btyRows[i]) continue;
           let rawText = btyRows[i][1] || ''; 
           let score = btyRows[i][2] || '';   
+          let imgUrl = btyRows[i][3] || defaultImg; // Column D (Index 3) for the image link!
 
           if (rawText && rawText.includes('-')) {
             let parts = rawText.split(' - ');
@@ -141,7 +174,7 @@
               let cleanMonthName = nameMatch ? nameMatch[1] : rawMonth;
 
               if (mNum <= currentMonthNum) {
-                gotmArray.push({ num: mNum, monthName: cleanMonthName, game: gameName, score: score });
+                gotmArray.push({ num: mNum, monthName: cleanMonthName, game: gameName, score: score, img: imgUrl });
               }
             }
           }
@@ -153,15 +186,19 @@
           let topGotm = gotmArray[0];
           document.getElementById('hero-gotm').innerHTML = `
             <div class="hero-card">
-              <div class="hero-month">${topGotm.monthName} Game of the Month</div>
-              <div class="hero-game">${topGotm.game}</div>
-              <div class="hero-score">${topGotm.score} / 10</div>
+              <img src="${topGotm.img}" alt="Box Art" class="hero-art">
+              <div class="hero-details">
+                <div class="hero-month">${topGotm.monthName} Game of the Month</div>
+                <div class="hero-game">${topGotm.game}</div>
+                <div class="hero-score">${topGotm.score} / 10</div>
+              </div>
             </div>`;
 
           let pastHTML = '';
           for (let j = 1; j < gotmArray.length; j++) {
             pastHTML += `
               <div class="mini-gotm-card">
+                <img src="${gotmArray[j].img}" alt="Box Art" class="mini-art">
                 <div class="mini-month">${gotmArray[j].monthName}</div>
                 <div class="mini-game">${gotmArray[j].game}</div>
                 <div class="mini-score">${gotmArray[j].score}</div>
@@ -171,7 +208,7 @@
           document.getElementById('gotm-container').style.display = 'block';
         }
 
-        // --- 2. THE MULTI-DATABASE FEED ENGINE ---
+        // --- 2. THE MULTI-DATABASE FEED ENGINE (WITH COMPLETION COUNTERS) ---
         let yoshiActivities = [];
         for (let i = 1; i < masterRows.length; i++) {
           if (!masterRows[i]) continue;
@@ -191,14 +228,24 @@
             yoshiActivities.push({ rawDate: mDate, displayDate: shortDate, game: mGame, score: yScore });
           }
         }
+        
+        // Count them! Sort oldest first, assign number, then sort newest first for display
+        yoshiActivities.sort((a, b) => a.rawDate.localeCompare(b.rawDate));
+        yoshiActivities.forEach((act, index) => { act.compNum = index + 1; });
         yoshiActivities.sort((a, b) => b.rawDate.localeCompare(a.rawDate));
 
         let yoshiFeedHTML = '';
         yoshiActivities.forEach(act => {
           let sBadge = act.score ? `<div class="score-badge">${act.score}</div>` : '';
-          yoshiFeedHTML += `<div class="game-card yoshi-card"><div class="rank-badge feed-date-badge">${act.displayDate}</div><div class="game-name">${act.game}</div>${sBadge}</div>`;
+          yoshiFeedHTML += `
+            <div class="game-card yoshi-card">
+              <div class="rank-badge feed-date-badge">${act.displayDate}</div>
+              <div class="game-name">${act.game} <span class="completion-num">(#${act.compNum})</span></div>
+              ${sBadge}
+            </div>`;
         });
 
+        // Same for Apple
         let appleActivities = [];
         for(let i = 1; i < metaRows.length; i++) {
           if (!metaRows[i]) continue;
@@ -212,12 +259,20 @@
               appleActivities.push({ rawDate: aDate, displayDate: shortDate, game: aGame, score: aScore });
           }
         }
+        
+        appleActivities.sort((a, b) => a.rawDate.localeCompare(b.rawDate));
+        appleActivities.forEach((act, index) => { act.compNum = index + 1; });
         appleActivities.sort((a, b) => b.rawDate.localeCompare(a.rawDate));
 
         let appleFeedHTML = '';
         appleActivities.forEach(act => {
           let sBadge = act.score ? `<div class="score-badge">${act.score}</div>` : '';
-          appleFeedHTML += `<div class="game-card apple-card"><div class="rank-badge feed-date-badge">${act.displayDate}</div><div class="game-name">${act.game}</div>${sBadge}</div>`;
+          appleFeedHTML += `
+            <div class="game-card apple-card">
+              <div class="rank-badge feed-date-badge">${act.displayDate}</div>
+              <div class="game-name">${act.game} <span class="completion-num">(#${act.compNum})</span></div>
+              ${sBadge}
+            </div>`;
         });
 
         document.getElementById('yoshi-feed').innerHTML = yoshiFeedHTML || '<div class="score-empty"><br>No completions logged for this year yet.</div>';
@@ -225,7 +280,7 @@
         document.getElementById('activity-container').style.display = 'flex';
 
 
-        // --- 3. ALL-TIME TOP 25 LEADERBOARDS (Calculated purely from metadata_data.json!) ---
+        // --- 3. ALL-TIME TOP 25 LEADERBOARDS ---
         let allYoshiGames = [];
         let allAppleGames = [];
         let allCombinedGames = [];
@@ -246,7 +301,6 @@
             }
         }
 
-        // Sorting logic (Highest score first. If tied, sort alphabetically)
         const sortGames = (a, b) => {
             let scoreDiff = b.score - a.score;
             return scoreDiff !== 0 ? scoreDiff : a.name.localeCompare(b.name);
@@ -260,18 +314,15 @@
         allAppleGames.sort(sortGames);
         allCombinedGames.sort(sortCombined);
 
-        // A dynamic ranking function that perfectly handles ties
         function generateRankedCards(gamesArray, cardClass, isCombined) {
           let html = '';
           let currentRank = 1;
           let actualPosition = 1;
           let lastScore = -1;
 
-          // Only take the top 25 records
           gamesArray.slice(0, 25).forEach((game) => {
             let scoreToCompare = isCombined ? game.totalScore : game.score;
             
-            // Standard competition ranking (e.g. 1, 2, 2, 4...)
             if (scoreToCompare !== lastScore) {
               currentRank = actualPosition;
               lastScore = scoreToCompare;
@@ -297,7 +348,6 @@
           return html || '<div class="score-empty">No games rated yet.</div>';
         }
 
-        // Generate and inject the Top 25 HTML
         document.getElementById('yoshi-list').innerHTML = generateRankedCards(allYoshiGames, 'yoshi-card', false);
         document.getElementById('apple-list').innerHTML = generateRankedCards(allAppleGames, 'apple-card', false);
         document.getElementById('combined-list').innerHTML = generateRankedCards(allCombinedGames, 'combined-card', true);
@@ -306,7 +356,7 @@
         document.getElementById('loading-text').style.display = 'none';
 
       } catch (err) {
-        document.getElementById('loading-text').innerHTML = '<span style="color: red;">Error loading dashboard data. Ensure master_data.json, bty_data.json and metadata_data.json are uploaded!</span>';
+        document.getElementById('loading-text').innerHTML = '<span style="color: red;">Error loading dashboard data.</span>';
         console.error(err);
       }
     }
