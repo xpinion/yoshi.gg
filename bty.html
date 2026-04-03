@@ -111,7 +111,7 @@
       display: inline-block;
     }
 
-    /* --- LEADERBOARDS --- */
+    /* --- LEADERBOARDS & LISTS --- */
     .leaderboards-wrapper {
       display: flex;
       flex-wrap: wrap;
@@ -159,48 +159,17 @@
     .score-badge { background: #222; color: #fff; font-weight: bold; padding: 5px 10px; border-radius: 6px; font-size: 1.1em; white-space: nowrap; }
     .score-empty { color: #999; font-style: italic; font-size: 0.9em; }
 
-    /* --- ACTIVITY FEED TIMELINE --- */
-    .activity-section {
-      background: #fff;
-      border-radius: 12px;
-      padding: 30px;
-      box-shadow: 0 10px 20px rgba(0,0,0,0.05);
-    }
-    .feed-container {
-      display: flex;
-      flex-direction: column;
-      gap: 15px;
+    /* Feed Container (Allows internal scrolling) */
+    .scrollable-feed {
       max-height: 500px;
       overflow-y: auto;
       padding-right: 10px;
     }
-    .feed-item {
-      display: flex;
-      align-items: center;
-      padding: 15px;
-      background: #fdfdfd;
-      border: 1px solid #eee;
-      border-radius: 8px;
-      border-left: 5px solid #ccc;
-    }
-    .feed-item.yoshi-feed { border-left-color: #4CAF50; }
-    .feed-item.apple-feed { border-left-color: #F44336; }
-    
-    .feed-date {
-      font-weight: bold;
-      color: #777;
-      min-width: 60px;
-      font-family: monospace;
-      font-size: 1.1em;
-    }
-    .feed-content {
-      flex: 1;
-      font-size: 1.05em;
-      color: #333;
-    }
-    .feed-player { font-weight: 900; }
-    .yoshi-player { color: #2e7d32; }
-    .apple-player { color: #c62828; }
+    /* Custom Scrollbar for sleekness */
+    .scrollable-feed::-webkit-scrollbar { width: 6px; }
+    .scrollable-feed::-webkit-scrollbar-track { background: #f1f1f1; border-radius: 4px; }
+    .scrollable-feed::-webkit-scrollbar-thumb { background: #ccc; border-radius: 4px; }
+    .scrollable-feed::-webkit-scrollbar-thumb:hover { background: #999; }
   </style>
 </head>
 <body>
@@ -233,9 +202,15 @@
       </div>
     </div>
 
-    <div id="activity-container" class="activity-section" style="display: none;">
-      <div class="gotm-header">Recent Completions</div>
-      <div id="activity-feed" class="feed-container"></div>
+    <div id="activity-container" class="leaderboards-wrapper" style="display: none;">
+      <div class="leaderboard-column">
+        <div class="board-title yoshi-title">Yoshi's Completions</div>
+        <div id="yoshi-feed" class="scrollable-feed"></div>
+      </div>
+      <div class="leaderboard-column">
+        <div class="board-title apple-title">Apple's Completions</div>
+        <div id="apple-feed" class="scrollable-feed"></div>
+      </div>
     </div>
 
   </div>
@@ -250,7 +225,7 @@
         const rows = data.values;
         
         // --- 1. SMART GAME OF THE MONTH ---
-        let currentMonthNum = new Date().getMonth() + 1; // Gets real-world month (1-12)
+        let currentMonthNum = new Date().getMonth() + 1; 
         let gotmArray = [];
 
         for (let i = 4; i <= 15; i++) {
@@ -263,14 +238,12 @@
             let rawMonth = parts[0].trim();
             let gameName = parts[1].trim();
 
-            // Extract month number from string like "04 (April)"
             let numMatch = rawMonth.match(/^(\d{2})/);
             if (numMatch) {
               let mNum = parseInt(numMatch[1], 10);
               let nameMatch = rawMonth.match(/\((.*?)\)/);
               let cleanMonthName = nameMatch ? nameMatch[1] : rawMonth;
 
-              // Only keep months that have happened or are happening
               if (mNum <= currentMonthNum) {
                 gotmArray.push({ num: mNum, monthName: cleanMonthName, game: gameName, score: score });
               }
@@ -278,7 +251,6 @@
           }
         }
 
-        // Sort descending so the most recent valid month is first
         gotmArray.sort((a, b) => b.num - a.num);
 
         if (gotmArray.length > 0) {
@@ -357,66 +329,60 @@
         document.getElementById('yoshi-list').innerHTML = yoshiHTML;
         document.getElementById('apple-list').innerHTML = appleHTML;
         document.getElementById('combined-list').innerHTML = combinedHTML;
-        
         document.getElementById('boards-wrapper').style.display = 'flex';
 
 
-        // --- 3. THE UNIFIED ACTIVITY FEED ---
-        let activities = [];
+        // --- 3. SIDE-BY-SIDE ACTIVITY FEED ---
+        let yoshiFeedHTML = '';
+        let appleFeedHTML = '';
 
-        // Scan from row 20 down to the very end of the sheet
+        // Start scanning from row 20 to the very bottom
         for (let i = 19; i < rows.length; i++) {
           if (!rows[i]) continue;
 
-          // Parse Yoshi's column (B / C)
-          let yCell = rows[i][1] || ''; 
+          // Yoshi Parse (Col B = Index 1, Col C = Index 2)
+          let yCell = rows[i][1] || '';
           let yScore = rows[i][2] || '';
-          if (yCell.match(/^\d{2}\/\d{2} - /)) {
+          
+          // Loosened the rules to just look for a slash and a hyphen
+          if (yCell.includes('/') && yCell.includes(' - ')) {
             let parts = yCell.split(' - ');
-            activities.push({
-              person: 'Yoshi',
-              date: parts[0].trim(),
-              game: parts.slice(1).join(' - ').trim(),
-              score: yScore
-            });
+            let date = parts.shift().trim(); // Pulls out the date
+            let game = parts.join(' - ').trim(); // Puts the game name back together
+            let sBadge = yScore ? `<div class="score-badge">${yScore}</div>` : '';
+
+            yoshiFeedHTML += `
+              <div class="game-card yoshi-card">
+                <div class="rank-badge" style="font-size: 1em;">${date}</div>
+                <div class="game-name">${game}</div>
+                ${sBadge}
+              </div>`;
           }
 
-          // Parse Apple's column (E / F)
-          let aCell = rows[i][4] || ''; 
+          // Apple Parse (Col E = Index 4, Col F = Index 5)
+          let aCell = rows[i][4] || '';
           let aScore = rows[i][5] || '';
-          if (aCell.match(/^\d{2}\/\d{2} - /)) {
+          
+          if (aCell.includes('/') && aCell.includes(' - ')) {
             let parts = aCell.split(' - ');
-            activities.push({
-              person: 'Apple',
-              date: parts[0].trim(),
-              game: parts.slice(1).join(' - ').trim(),
-              score: aScore
-            });
+            let date = parts.shift().trim(); 
+            let game = parts.join(' - ').trim(); 
+            let sBadge = aScore ? `<div class="score-badge">${aScore}</div>` : '';
+
+            appleFeedHTML += `
+              <div class="game-card apple-card">
+                <div class="rank-badge" style="font-size: 1em;">${date}</div>
+                <div class="game-name">${game}</div>
+                ${sBadge}
+              </div>`;
           }
         }
 
-        // Sort chronologically (Since format is MM/DD, alphabetical descending works perfectly)
-        activities.sort((a, b) => b.date.localeCompare(a.date));
-
-        let feedHTML = '';
-        activities.forEach(act => {
-          let pClass = act.person === 'Yoshi' ? 'yoshi-player' : 'apple-player';
-          let itemClass = act.person === 'Yoshi' ? 'yoshi-feed' : 'apple-feed';
-          let scoreBadge = act.score ? `<div class="score-badge">${act.score}</div>` : '';
-          
-          feedHTML += `
-            <div class="feed-item ${itemClass}">
-              <div class="feed-date">${act.date}</div>
-              <div class="feed-content">
-                <span class="feed-player ${pClass}">${act.person}</span> completed <em>${act.game}</em>
-              </div>
-              ${scoreBadge}
-            </div>`;
-        });
-
-        if (feedHTML) {
-          document.getElementById('activity-feed').innerHTML = feedHTML;
-          document.getElementById('activity-container').style.display = 'block';
+        // Inject the feeds!
+        if (yoshiFeedHTML || appleFeedHTML) {
+          document.getElementById('yoshi-feed').innerHTML = yoshiFeedHTML || '<div class="score-empty">No completions yet.</div>';
+          document.getElementById('apple-feed').innerHTML = appleFeedHTML || '<div class="score-empty">No completions yet.</div>';
+          document.getElementById('activity-container').style.display = 'flex';
         }
 
         document.getElementById('loading-text').style.display = 'none';
