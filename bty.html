@@ -51,7 +51,6 @@
     .scrollable-feed::-webkit-scrollbar-thumb { background: #ccc; border-radius: 4px; }
     .scrollable-feed::-webkit-scrollbar-thumb:hover { background: #999; }
     
-    /* Forces the date badge to always maintain space from the game name */
     .feed-date-badge { font-size: 1.05em; min-width: 65px; margin-right: 15px; color: #666; }
   </style>
 </head>
@@ -62,7 +61,7 @@
   <div class="bty-container">
     <div class="dashboard-header">Collaborative Dashboard</div>
     
-    <div id="loading-text" style="text-align: center; font-family: Courier New;">Loading Multi-Database Dashboard...</div>
+    <div id="loading-text" style="text-align: center; font-family: Courier New;">Loading Dashboard Data...</div>
 
     <div id="gotm-container" class="gotm-section" style="display: none;">
       <div class="gotm-header">Game of the Month Showcase</div>
@@ -103,17 +102,20 @@
   <script>
     async function loadDashboardData() {
       try {
-        // Fetch BOTH JSON files simultaneously!
-        const [btyResponse, metaResponse] = await Promise.all([
+        // --- FETCH ALL 3 DATABASES AT ONCE ---
+        const [btyResponse, metaResponse, masterResponse] = await Promise.all([
           fetch('bty_data.json'),
-          fetch('metadata_data.json')
+          fetch('metadata_data.json'),
+          fetch('master_data.json')
         ]);
         
         const btyData = await btyResponse.json();
         const metaData = await metaResponse.json();
+        const masterData = await masterResponse.json();
         
         const btyRows = btyData.values;
         const metaRows = metaData.values;
+        const masterRows = masterData.values;
 
         // Dynamic Year Title Generation
         const currentYear = new Date().getFullYear();
@@ -228,60 +230,80 @@
         document.getElementById('boards-wrapper').style.display = 'flex';
 
 
-        // --- 3. THE FEED ENGINE ---
+        // --- 3. THE MULTI-DATABASE FEED ENGINE ---
         
-        // YOSHI'S FEED (Parsed from bty_data)
-        let yoshiFeedHTML = '';
-        for (let i = 19; i < btyRows.length; i++) {
-          if (!btyRows[i]) continue;
-          let yCell = btyRows[i][1] || '';
-          let yScore = btyRows[i][2] || '';
-          
-          if (yCell.includes('/') && yCell.includes(' - ')) {
-            let parts = yCell.split(' - ');
-            let date = parts.shift().trim(); 
-            let game = parts.join(' - ').trim(); 
-            let sBadge = yScore ? `<div class="score-badge">${yScore}</div>` : '';
+        // YOSHI'S FEED (Parsed directly from master_data & metadata_data)
+        let yoshiActivities = [];
 
-            // Using the new feed-date-badge class for guaranteed spacing
-            yoshiFeedHTML += `
-              <div class="game-card yoshi-card">
-                <div class="rank-badge feed-date-badge">${date}</div>
-                <div class="game-name">${game}</div>
-                ${sBadge}
-              </div>`;
+        // Skip row 0 (Header row)
+        for (let i = 1; i < masterRows.length; i++) {
+          if (!masterRows[i]) continue;
+          let mDate = masterRows[i][1] || '';   // Column B
+          let mGame = masterRows[i][2] || '';   // Column C
+          let mStatus = masterRows[i][8] || ''; // Column I
+          
+          if ((mStatus === 'Completed' || mStatus === 'M-Completed') && mDate.includes(currentYear.toString())) {
+            
+            // Format YYYY/MM/DD to MM/DD
+            let shortDate = mDate;
+            let dateParts = mDate.split(/[-/]/); // Accounts for hyphens or slashes
+            if (dateParts.length >= 3) {
+              shortDate = `${dateParts[1]}/${dateParts[2]}`;
+            }
+
+            // Cross-reference metadata to grab Yoshi's score! (Column G = Index 6)
+            let yScore = '';
+            let metaMatch = metaRows.find(r => r && r[0] === mGame);
+            if (metaMatch) {
+              yScore = metaMatch[6] || ''; 
+            }
+
+            yoshiActivities.push({
+              rawDate: mDate,
+              displayDate: shortDate,
+              game: mGame,
+              score: yScore
+            });
           }
         }
 
-        // APPLE'S FEED (Pulled directly from metadata_data.json!)
+        // Sort Yoshi's feed
+        yoshiActivities.sort((a, b) => b.rawDate.localeCompare(a.rawDate));
+
+        let yoshiFeedHTML = '';
+        yoshiActivities.forEach(act => {
+          let sBadge = act.score ? `<div class="score-badge">${act.score}</div>` : '';
+          yoshiFeedHTML += `
+            <div class="game-card yoshi-card">
+              <div class="rank-badge feed-date-badge">${act.displayDate}</div>
+              <div class="game-name">${act.game}</div>
+              ${sBadge}
+            </div>`;
+        });
+
+
+        // APPLE'S FEED (Parsed directly from metadata_data)
         let appleActivities = [];
         
-        // Loop through metadata (Start at 1 to skip header row)
         for(let i = 1; i < metaRows.length; i++) {
           if (!metaRows[i]) continue;
-          let aGame = metaRows[i][0] || '';   // Column A (Videogame)
-          let aScore = metaRows[i][7] || '';  // Column H (Apple Score)
-          let aDate = metaRows[i][8] || '';   // Column I (yyyy/mm/dd)
+          let aGame = metaRows[i][0] || '';   // Column A 
+          let aScore = metaRows[i][7] || '';  // Column H 
+          let aDate = metaRows[i][8] || '';   // Column I 
 
-          if (aDate && aDate.trim() !== '') {
-            // Check if the completion date is in the current year
-            if (aDate.startsWith(currentYear.toString())) {
-              
-              // Convert "2026/03/21" into "03/21" to match Yoshi's format
+          if (aDate && aDate.trim() !== '' && aDate.startsWith(currentYear.toString())) {
               let parts = aDate.split('/');
               let shortDate = parts.length === 3 ? `${parts[1]}/${parts[2]}` : aDate;
 
               appleActivities.push({
-                rawDate: aDate, // Stored for accurate sorting
+                rawDate: aDate, 
                 displayDate: shortDate,
                 game: aGame,
                 score: aScore
               });
-            }
           }
         }
 
-        // Sort Apple's feed chronologically descending (Newest first)
         appleActivities.sort((a, b) => b.rawDate.localeCompare(a.rawDate));
 
         let appleFeedHTML = '';
@@ -303,7 +325,7 @@
         document.getElementById('loading-text').style.display = 'none';
 
       } catch (err) {
-        document.getElementById('loading-text').innerHTML = '<span style="color: red;">Error loading dashboard data. Make sure both bty_data.json and metadata_data.json are uploaded!</span>';
+        document.getElementById('loading-text').innerHTML = '<span style="color: red;">Error loading dashboard data. Ensure master_data.json, bty_data.json and metadata_data.json are uploaded!</span>';
         console.error(err);
       }
     }
