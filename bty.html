@@ -9,6 +9,27 @@
 
   <style>
     .bty-container { max-width: 1400px; margin: 40px auto; padding: 0 20px; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+    
+    /* --- ASCII ART STYLING --- */
+    .ascii-wrapper {
+      display: flex;
+      justify-content: center;
+      width: 100%;
+      overflow-x: auto;
+      margin-bottom: 10px;
+    }
+    .ascii-art {
+      font-family: 'Courier New', Courier, monospace;
+      font-weight: bold;
+      color: #111;
+      font-size: 14px;
+      line-height: 1.1;
+      text-align: left;
+    }
+    @media (max-width: 768px) {
+      .ascii-art { font-size: 8px; } /* Scales down so it doesn't break mobile screens! */
+    }
+
     .dashboard-header { text-align: center; margin-bottom: 20px; font-size: 2.5em; font-weight: 900; text-transform: uppercase; letter-spacing: 2px; color: #111; }
 
     /* --- GOTM SHOWCASE --- */
@@ -75,6 +96,23 @@
   <div id="main-header"></div>
 
   <div class="bty-container">
+    
+    <div class="ascii-wrapper">
+<pre class="ascii-art">
+  ____       _   _               _____ _                   
+ | __ )  ___| |_| |_ ___ _ __   |_   _| |__   __ _ _ __    
+ |  _ \ / _ \ __| __/ _ \ '__|    | | | '_ \ / _` | '_ \   
+ | |_) |  __/ |_| ||  __/ |       | | | | | | (_| | | | |  
+ |____/ \___|\__|\__\___|_|       |_| |_| |_|\__,_|_| |_|  
+ __   __           ____                 _                  
+ \ \ / /__  _   _ / ___| __ _ _ __ ___ (_)_ __   __ _      
+  \ V / _ \| | | | |  _ / _` | '_ ` _ \| | '_ \ / _` |     
+   | | (_) | |_| | |_| | (_| | | | | | | | | | | (_| |     
+   |_|\___/ \__,_|\____|\__,_|_| |_| |_|_|_| |_|\__, |     
+                                                |___/      
+</pre>
+    </div>
+
     <div class="dashboard-header">Collaborative Dashboard</div>
     
     <div id="loading-text" style="text-align: center; font-family: Courier New;">Loading Interactive Dashboard...</div>
@@ -187,7 +225,6 @@
         let yoshiCompletionYearsSet = new Set();
         let appleCompletionYearsSet = new Set();
 
-        // Parse Yoshi Completions (For Activity Feed)
         for (let i = 1; i < masterRows.length; i++) {
           if (!masterRows[i]) continue;
           let mDate = masterRows[i][1] || ''; let mGame = masterRows[i][2] || ''; let mSystem = masterRows[i][3] || ''; let mStatus = masterRows[i][8] || ''; 
@@ -199,7 +236,6 @@
           }
         }
 
-        // Parse Apple Completions (For Activity Feed)
         for(let i = 1; i < metaRows.length; i++) {
           if (!metaRows[i]) continue;
           let aGame = metaRows[i][0] || ''; let aScore = metaRows[i][7] || ''; let aDate = metaRows[i][8] || ''; let aSystem = metaRows[i][9] || '';   
@@ -210,7 +246,6 @@
           }
         }
 
-        // Parse All-Time Scores & RELEASE YEARS (For Top 25 Leaderboards)
         let allYoshiGames = []; 
         let allAppleGames = []; 
         let allCombinedGames = [];
@@ -219,7 +254,7 @@
         for(let i = 1; i < metaRows.length; i++) {
             if (!metaRows[i]) continue;
             let gameName = metaRows[i][0] || ''; 
-            let releaseYear = metaRows[i][1] ? metaRows[i][1].toString() : ''; // Column B 
+            let releaseYear = metaRows[i][1] ? metaRows[i][1].toString() : '';
             let yNum = parseFloat(metaRows[i][6] || ''); 
             let aNum = parseFloat(metaRows[i][7] || '');
 
@@ -240,11 +275,9 @@
         const buildOptions = (years) => `<option value="All-Time">All-Time</option>` + years.map(y => `<option value="${y}">${y}</option>`).join('');
         const buildFeedOptions = (years) => years.map(y => `<option value="${y}">${y}</option>`).join('');
 
-        // Feed dropdowns use Completion Years
         document.getElementById('y-feed-select').innerHTML = buildFeedOptions(yFeedYearsArray);
         document.getElementById('a-feed-select').innerHTML = buildFeedOptions(aFeedYearsArray);
         
-        // Top 25 dropdowns use Release Years
         document.getElementById('y-top-select').innerHTML = buildOptions(releaseYearsArray);
         document.getElementById('a-top-select').innerHTML = buildOptions(releaseYearsArray);
         document.getElementById('c-top-select').innerHTML = buildOptions(releaseYearsArray);
@@ -291,7 +324,6 @@
           let aYear = document.getElementById('a-top-select').value;
           let cYear = document.getElementById('c-top-select').value;
 
-          // Filter by Release Year instead of Completion Year!
           let yData = yYear === 'All-Time' ? allYoshiGames : allYoshiGames.filter(g => g.releaseYear === yYear);
           yData.sort((a, b) => (b.score - a.score) !== 0 ? (b.score - a.score) : a.name.localeCompare(b.name));
           
