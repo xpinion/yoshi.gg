@@ -184,58 +184,70 @@
         // --- 2. DATA EXTRACTION ---
         let allYoshiCompletions = [];
         let allAppleCompletions = [];
-        let yoshiYearsSet = new Set();
-        let appleYearsSet = new Set();
+        let yoshiCompletionYearsSet = new Set();
+        let appleCompletionYearsSet = new Set();
 
-        // Parse Yoshi Completions
+        // Parse Yoshi Completions (For Activity Feed)
         for (let i = 1; i < masterRows.length; i++) {
           if (!masterRows[i]) continue;
           let mDate = masterRows[i][1] || ''; let mGame = masterRows[i][2] || ''; let mSystem = masterRows[i][3] || ''; let mStatus = masterRows[i][8] || ''; 
           if ((mStatus === 'Completed' || mStatus === 'M-Completed') && mDate.length >= 4) {
-            let year = mDate.substring(0,4); yoshiYearsSet.add(year);
+            let year = mDate.substring(0,4); yoshiCompletionYearsSet.add(year);
             let dateParts = mDate.split(/[-/]/); let shortDate = dateParts.length >= 3 ? `${dateParts[1]}/${dateParts[2]}` : mDate;
             let yScore = ''; let metaMatch = metaRows.find(r => r && r[0] === mGame); if (metaMatch) yScore = metaMatch[6] || ''; 
             allYoshiCompletions.push({ rawDate: mDate, displayDate: shortDate, game: mGame, score: yScore, system: mSystem, year: year, rowIndex: i });
           }
         }
 
-        // Parse Apple Completions
+        // Parse Apple Completions (For Activity Feed)
         for(let i = 1; i < metaRows.length; i++) {
           if (!metaRows[i]) continue;
           let aGame = metaRows[i][0] || ''; let aScore = metaRows[i][7] || ''; let aDate = metaRows[i][8] || ''; let aSystem = metaRows[i][9] || '';   
           if (aDate && aDate.trim() !== '' && aDate.length >= 4) {
-            let year = aDate.substring(0,4); appleYearsSet.add(year);
+            let year = aDate.substring(0,4); appleCompletionYearsSet.add(year);
             let parts = aDate.split('/'); let shortDate = parts.length === 3 ? `${parts[1]}/${parts[2]}` : aDate;
             allAppleCompletions.push({ rawDate: aDate, displayDate: shortDate, game: aGame, score: aScore, system: aSystem, year: year, rowIndex: i });
           }
         }
 
-        // Parse All-Time Scores (For All-Time Leaderboards)
-        let allYoshiGames = []; let allAppleGames = []; let allCombinedGames = [];
+        // Parse All-Time Scores & RELEASE YEARS (For Top 25 Leaderboards)
+        let allYoshiGames = []; 
+        let allAppleGames = []; 
+        let allCombinedGames = [];
+        let releaseYearsSet = new Set();
+
         for(let i = 1; i < metaRows.length; i++) {
             if (!metaRows[i]) continue;
-            let gameName = metaRows[i][0] || ''; let yNum = parseFloat(metaRows[i][6] || ''); let aNum = parseFloat(metaRows[i][7] || '');
+            let gameName = metaRows[i][0] || ''; 
+            let releaseYear = metaRows[i][1] ? metaRows[i][1].toString() : ''; // Column B 
+            let yNum = parseFloat(metaRows[i][6] || ''); 
+            let aNum = parseFloat(metaRows[i][7] || '');
+
             if (gameName) {
-                if (!isNaN(yNum)) allYoshiGames.push({ name: gameName, score: yNum });
-                if (!isNaN(aNum)) allAppleGames.push({ name: gameName, score: aNum });
-                if (!isNaN(yNum) && !isNaN(aNum)) allCombinedGames.push({ name: gameName, totalScore: yNum + aNum });
+                if (releaseYear && (!isNaN(yNum) || !isNaN(aNum))) releaseYearsSet.add(releaseYear);
+
+                if (!isNaN(yNum)) allYoshiGames.push({ name: gameName, score: yNum, releaseYear: releaseYear });
+                if (!isNaN(aNum)) allAppleGames.push({ name: gameName, score: aNum, releaseYear: releaseYear });
+                if (!isNaN(yNum) && !isNaN(aNum)) allCombinedGames.push({ name: gameName, totalScore: yNum + aNum, releaseYear: releaseYear });
             }
         }
 
         // --- 3. POPULATE DROPDOWNS ---
-        let yYearsArray = Array.from(yoshiYearsSet).sort().reverse();
-        let aYearsArray = Array.from(appleYearsSet).sort().reverse();
-        let combinedYearsArray = Array.from(new Set([...yYearsArray, ...aYearsArray])).sort().reverse();
+        let yFeedYearsArray = Array.from(yoshiCompletionYearsSet).sort().reverse();
+        let aFeedYearsArray = Array.from(appleCompletionYearsSet).sort().reverse();
+        let releaseYearsArray = Array.from(releaseYearsSet).sort().reverse();
 
         const buildOptions = (years) => `<option value="All-Time">All-Time</option>` + years.map(y => `<option value="${y}">${y}</option>`).join('');
         const buildFeedOptions = (years) => years.map(y => `<option value="${y}">${y}</option>`).join('');
 
-        document.getElementById('y-feed-select').innerHTML = buildFeedOptions(yYearsArray);
-        document.getElementById('a-feed-select').innerHTML = buildFeedOptions(aYearsArray);
+        // Feed dropdowns use Completion Years
+        document.getElementById('y-feed-select').innerHTML = buildFeedOptions(yFeedYearsArray);
+        document.getElementById('a-feed-select').innerHTML = buildFeedOptions(aFeedYearsArray);
         
-        document.getElementById('y-top-select').innerHTML = buildOptions(yYearsArray);
-        document.getElementById('a-top-select').innerHTML = buildOptions(aYearsArray);
-        document.getElementById('c-top-select').innerHTML = buildOptions(combinedYearsArray);
+        // Top 25 dropdowns use Release Years
+        document.getElementById('y-top-select').innerHTML = buildOptions(releaseYearsArray);
+        document.getElementById('a-top-select').innerHTML = buildOptions(releaseYearsArray);
+        document.getElementById('c-top-select').innerHTML = buildOptions(releaseYearsArray);
 
 
         // --- 4. RENDER FUNCTIONS ---
@@ -279,20 +291,14 @@
           let aYear = document.getElementById('a-top-select').value;
           let cYear = document.getElementById('c-top-select').value;
 
-          // Yoshi
-          let yData = yYear === 'All-Time' ? allYoshiGames : Array.from(new Map(allYoshiCompletions.filter(c => c.year === yYear && c.score !== '').map(c => [c.game, {name: c.game, score: parseFloat(c.score)}])).values()).filter(c => !isNaN(c.score));
+          // Filter by Release Year instead of Completion Year!
+          let yData = yYear === 'All-Time' ? allYoshiGames : allYoshiGames.filter(g => g.releaseYear === yYear);
           yData.sort((a, b) => (b.score - a.score) !== 0 ? (b.score - a.score) : a.name.localeCompare(b.name));
           
-          // Apple
-          let aData = aYear === 'All-Time' ? allAppleGames : Array.from(new Map(allAppleCompletions.filter(c => c.year === aYear && c.score !== '').map(c => [c.game, {name: c.game, score: parseFloat(c.score)}])).values()).filter(c => !isNaN(c.score));
+          let aData = aYear === 'All-Time' ? allAppleGames : allAppleGames.filter(g => g.releaseYear === aYear);
           aData.sort((a, b) => (b.score - a.score) !== 0 ? (b.score - a.score) : a.name.localeCompare(b.name));
 
-          // Combined (Games beaten by EITHER player in that year, where BOTH have a score)
-          let cData = allCombinedGames;
-          if (cYear !== 'All-Time') {
-            let validGames = new Set([...allYoshiCompletions.filter(c => c.year === cYear).map(c => c.game), ...allAppleCompletions.filter(c => c.year === cYear).map(c => c.game)]);
-            cData = allCombinedGames.filter(g => validGames.has(g.name));
-          }
+          let cData = cYear === 'All-Time' ? allCombinedGames : allCombinedGames.filter(g => g.releaseYear === cYear);
           cData.sort((a, b) => (b.totalScore - a.totalScore) !== 0 ? (b.totalScore - a.totalScore) : a.name.localeCompare(b.name));
 
           document.getElementById('yoshi-list').innerHTML = generateRankedCards(yData, 'yoshi-card', false);
@@ -303,6 +309,7 @@
         // --- 5. INITIALIZE & LISTEN ---
         document.getElementById('y-feed-select').addEventListener('change', renderFeeds);
         document.getElementById('a-feed-select').addEventListener('change', renderFeeds);
+        
         document.getElementById('y-top-select').addEventListener('change', renderLeaderboards);
         document.getElementById('a-top-select').addEventListener('change', renderLeaderboards);
         document.getElementById('c-top-select').addEventListener('change', renderLeaderboards);
