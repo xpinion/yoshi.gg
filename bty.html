@@ -3,13 +3,13 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Better Than You | yoshi.gg</title>
+  <title>Co-op Dashboard | yoshi.gg</title>
   
   <link rel="stylesheet" href="style.css">
 
   <style>
     .bty-container {
-      max-width: 1200px;
+      max-width: 1400px;
       margin: 40px auto;
       padding: 0 20px;
       font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -28,13 +28,13 @@
     .leaderboards-wrapper {
       display: flex;
       flex-wrap: wrap;
-      gap: 30px;
+      gap: 25px;
       justify-content: center;
     }
 
     .leaderboard-column {
       flex: 1;
-      min-width: 300px;
+      min-width: 320px;
       background: #fff;
       border-radius: 12px;
       padding: 20px;
@@ -52,6 +52,7 @@
 
     .yoshi-title { color: #2e7d32; }
     .apple-title { color: #c62828; }
+    .combined-title { color: #673AB7; } /* A nice collaborative purple */
 
     /* The sleek UI Card for each game */
     .game-card {
@@ -72,19 +73,21 @@
 
     .yoshi-card { border-left-color: #4CAF50; }
     .apple-card { border-left-color: #F44336; }
+    .combined-card { border-left-color: #673AB7; }
 
     /* Card internal elements */
     .rank-badge {
       font-weight: 900;
       font-size: 1.2em;
       color: #555;
-      width: 40px;
+      min-width: 45px; /* Ensures text stays aligned even if badge is empty */
     }
     .game-name {
       flex: 1;
       font-weight: 600;
       color: #222;
       font-size: 1.05em;
+      padding-right: 10px;
     }
     .score-badge {
       background: #222;
@@ -93,6 +96,7 @@
       padding: 5px 10px;
       border-radius: 6px;
       font-size: 1.1em;
+      white-space: nowrap;
     }
     .score-empty {
       color: #999;
@@ -106,7 +110,7 @@
   <div id="main-header"></div>
 
   <div class="bty-container">
-    <div class="dashboard-header">Rivalry Dashboard</div>
+    <div class="dashboard-header">Collaborative Dashboard</div>
     
     <div id="loading-text" style="text-align: center; font-family: Courier New;">Loading Top 25 Data...</div>
 
@@ -115,6 +119,11 @@
       <div class="leaderboard-column">
         <div class="board-title yoshi-title">Yoshi's Top 25</div>
         <div id="yoshi-list"></div>
+      </div>
+
+      <div class="leaderboard-column">
+        <div class="board-title combined-title">Combined (Out of 20)</div>
+        <div id="combined-list"></div>
       </div>
 
       <div class="leaderboard-column">
@@ -134,49 +143,104 @@
         const data = await response.json();
         const rows = data.values;
         
-        let yoshiHTML = '';
-        let appleHTML = '';
+        let yoshiGames = [];
+        let appleGames = [];
 
-        // Loop through rows 5 to 29 (which are indexes 4 through 28 in the array)
+        // 1. Data Gathering Phase
         for (let i = 4; i <= 28; i++) {
-          
-          // Protect against empty rows at the bottom
           if (!rows[i]) continue; 
 
-          // --- EXTRACT YOSHI'S DATA (Cols H=7, I=8, J=9) ---
-          let yRank = rows[i][7] || '';
-          let yScore = rows[i][8] || '';
+          // Yoshi
           let yGame = rows[i][9] || '';
-
-          if (yRank) {
-            let scoreHTML = yScore ? `<div class="score-badge">${yScore}</div>` : `<div class="score-empty">Unrated</div>`;
-            yoshiHTML += `
-              <div class="game-card yoshi-card">
-                <div class="rank-badge">#${yRank}</div>
-                <div class="game-name">${yGame}</div>
-                ${scoreHTML}
-              </div>`;
+          if (yGame) {
+            yoshiGames.push({
+              rank: rows[i][7] || '',
+              score: rows[i][8] || '',
+              name: yGame
+            });
           }
 
-          // --- EXTRACT APPLE'S DATA (Cols L=11, M=12, N=13) ---
-          let aRank = rows[i][11] || '';
-          let aScore = rows[i][12] || '';
+          // Apple
           let aGame = rows[i][13] || '';
-
-          if (aRank) {
-            let scoreHTML = aScore ? `<div class="score-badge">${aScore}</div>` : `<div class="score-empty">Unrated</div>`;
-            appleHTML += `
-              <div class="game-card apple-card">
-                <div class="rank-badge">#${aRank}</div>
-                <div class="game-name">${aGame}</div>
-                ${scoreHTML}
-              </div>`;
+          if (aGame) {
+            appleGames.push({
+              rank: rows[i][11] || '',
+              score: rows[i][12] || '',
+              name: aGame
+            });
           }
         }
 
-        // Inject HTML and hide the loading text
+        // 2. Generate Yoshi's HTML
+        let yoshiHTML = '';
+        yoshiGames.forEach(game => {
+          let rText = game.rank ? `#${game.rank}` : ''; // Leave blank if it's a tie
+          let sHTML = game.score !== '' ? `<div class="score-badge">${game.score}</div>` : `<div class="score-empty">Unrated</div>`;
+          yoshiHTML += `
+            <div class="game-card yoshi-card">
+              <div class="rank-badge">${rText}</div>
+              <div class="game-name">${game.name}</div>
+              ${sHTML}
+            </div>`;
+        });
+
+        // 3. Generate Apple's HTML
+        let appleHTML = '';
+        appleGames.forEach(game => {
+          let rText = game.rank ? `#${game.rank}` : ''; 
+          let sHTML = game.score !== '' ? `<div class="score-badge">${game.score}</div>` : `<div class="score-empty">Unrated</div>`;
+          appleHTML += `
+            <div class="game-card apple-card">
+              <div class="rank-badge">${rText}</div>
+              <div class="game-name">${game.name}</div>
+              ${sHTML}
+            </div>`;
+        });
+
+        // 4. Calculate Combined Scores dynamically
+        let combinedGames = [];
+        yoshiGames.forEach(y => {
+          let yNum = parseFloat(y.score);
+          if (!isNaN(yNum)) {
+            // Look for this exact game in Apple's list (ignoring upper/lower case)
+            let match = appleGames.find(a => a.name.toLowerCase().trim() === y.name.toLowerCase().trim());
+            if (match) {
+              let aNum = parseFloat(match.score);
+              if (!isNaN(aNum)) {
+                combinedGames.push({
+                  name: y.name,
+                  totalScore: yNum + aNum
+                });
+              }
+            }
+          }
+        });
+
+        // Sort the combined list from highest to lowest score
+        combinedGames.sort((a, b) => b.totalScore - a.totalScore);
+
+        // Generate Combined HTML
+        let combinedHTML = '';
+        if (combinedGames.length > 0) {
+          combinedGames.forEach((game, index) => {
+            // Keep decimals clean (e.g. 18.5 or 19)
+            let displayScore = Number.isInteger(game.totalScore) ? game.totalScore : game.totalScore.toFixed(1);
+            combinedHTML += `
+              <div class="game-card combined-card">
+                <div class="rank-badge">#${index + 1}</div>
+                <div class="game-name">${game.name}</div>
+                <div class="score-badge" style="background: #673AB7;">${displayScore} <span style="font-size:0.7em; color:#bbb;">/ 20</span></div>
+              </div>`;
+          });
+        } else {
+          combinedHTML = `<div class="score-empty" style="text-align: center; margin-top: 20px;">No shared rated games yet!</div>`;
+        }
+
+        // 5. Inject everything into the page
         document.getElementById('yoshi-list').innerHTML = yoshiHTML;
         document.getElementById('apple-list').innerHTML = appleHTML;
+        document.getElementById('combined-list').innerHTML = combinedHTML;
+        
         document.getElementById('loading-text').style.display = 'none';
         document.getElementById('boards-wrapper').style.display = 'flex';
 
@@ -186,7 +250,6 @@
       }
     }
 
-    // Fire it up!
     loadDashboardData();
   </script>
 </body>
