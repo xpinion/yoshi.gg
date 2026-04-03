@@ -58,9 +58,27 @@
     .leaderboards-wrapper { display: flex; flex-wrap: wrap; gap: 25px; justify-content: center; margin-bottom: 40px; }
     .leaderboard-column { flex: 1; min-width: 320px; background: #fff; border-radius: 12px; padding: 20px; box-shadow: 0 10px 20px rgba(0,0,0,0.05); }
     .board-title { text-align: center; font-size: 1.5em; font-weight: bold; margin-bottom: 20px; padding-bottom: 10px; border-bottom: 2px solid #eee; }
+    
     .yoshi-title { color: #2e7d32; }
     .apple-title { color: #c62828; }
     .combined-title { color: #673AB7; } 
+
+    /* Interactive Dropdown Styling */
+    .year-dropdown {
+      font-size: 1em;
+      font-weight: 900;
+      color: inherit; /* Inherits the green or red from the title! */
+      background: transparent;
+      border: none;
+      border-bottom: 3px solid rgba(0,0,0,0.1);
+      cursor: pointer;
+      outline: none;
+      font-family: inherit;
+      padding: 0 5px;
+      transition: all 0.2s;
+    }
+    .year-dropdown:hover { border-bottom: 3px solid inherit; opacity: 0.8; }
+    .year-dropdown option { color: #111; font-weight: normal; }
 
     .game-card { display: flex; align-items: center; background: #f8f9fa; margin-bottom: 10px; border-radius: 8px; padding: 12px 15px; transition: transform 0.2s, box-shadow 0.2s; border-left: 5px solid #ccc; }
     .game-card:hover { transform: translateX(5px); box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
@@ -100,11 +118,15 @@
 
     <div id="activity-container" class="leaderboards-wrapper" style="display: none;">
       <div class="leaderboard-column">
-        <div class="board-title yoshi-title" id="yoshi-feed-title">Yoshi's Completions</div>
+        <div class="board-title yoshi-title">
+          Yoshi's <select id="yoshi-year-select" class="year-dropdown"></select> Completions
+        </div>
         <div id="yoshi-feed" class="scrollable-feed"></div>
       </div>
       <div class="leaderboard-column">
-        <div class="board-title apple-title" id="apple-feed-title">Apple's Completions</div>
+        <div class="board-title apple-title">
+          Apple's <select id="apple-year-select" class="year-dropdown"></select> Completions
+        </div>
         <div id="apple-feed" class="scrollable-feed"></div>
       </div>
     </div>
@@ -145,10 +167,6 @@
         const metaRows = metaData.values;
         const masterRows = masterData.values;
 
-        const currentYear = new Date().getFullYear();
-        document.getElementById('yoshi-feed-title').innerText = `Yoshi's ${currentYear} Completions`;
-        document.getElementById('apple-feed-title').innerText = `Apple's ${currentYear} Completions`;
-        
         // --- 1. SMART GAME OF THE MONTH WITH BOX ART ---
         let currentMonthNum = new Date().getMonth() + 1; 
         let gotmArray = [];
@@ -206,115 +224,149 @@
           document.getElementById('gotm-container').style.display = 'block';
         }
 
-        // --- 2. THE MULTI-DATABASE FEED ENGINE ---
+        // --- 2. INTERACTIVE MULTI-DATABASE FEED ENGINE ---
         
-        // YOSHI'S COMPLETIONS
-        let yoshiActivities = [];
+        // Data Storage
+        let allYoshiCompletions = [];
+        let allAppleCompletions = [];
+        let yoshiYearsSet = new Set();
+        let appleYearsSet = new Set();
+
+        // PARSE YOSHI ALL-TIME
         for (let i = 1; i < masterRows.length; i++) {
           if (!masterRows[i]) continue;
-          let mDate = masterRows[i][1] || '';   // Column B
-          let mGame = masterRows[i][2] || '';   // Column C
-          let mSystem = masterRows[i][3] || ''; // Column D (System)
-          let mStatus = masterRows[i][8] || ''; // Column I
+          let mDate = masterRows[i][1] || '';   
+          let mGame = masterRows[i][2] || '';   
+          let mSystem = masterRows[i][3] || ''; 
+          let mStatus = masterRows[i][8] || ''; 
           
-          if ((mStatus === 'Completed' || mStatus === 'M-Completed') && mDate.includes(currentYear.toString())) {
-            let shortDate = mDate;
-            let dateParts = mDate.split(/[-/]/); 
-            if (dateParts.length >= 3) shortDate = `${dateParts[1]}/${dateParts[2]}`;
+          if ((mStatus === 'Completed' || mStatus === 'M-Completed') && mDate.length >= 4) {
+            let yearMatch = mDate.match(/^(\d{4})/);
+            if (yearMatch) {
+              let year = yearMatch[1];
+              yoshiYearsSet.add(year); // Save this year to the list
 
-            let yScore = '';
-            let metaMatch = metaRows.find(r => r && r[0] === mGame);
-            if (metaMatch) yScore = metaMatch[6] || ''; 
+              let shortDate = mDate;
+              let dateParts = mDate.split(/[-/]/); 
+              if (dateParts.length >= 3) shortDate = `${dateParts[1]}/${dateParts[2]}`;
 
-            yoshiActivities.push({ 
-              rawDate: mDate, 
-              displayDate: shortDate, 
-              game: mGame, 
-              score: yScore, 
-              system: mSystem, 
-              rowIndex: i // Used for tie-breaking!
-            });
+              let yScore = '';
+              let metaMatch = metaRows.find(r => r && r[0] === mGame);
+              if (metaMatch) yScore = metaMatch[6] || ''; 
+
+              allYoshiCompletions.push({ 
+                rawDate: mDate, displayDate: shortDate, game: mGame, 
+                score: yScore, system: mSystem, year: year, rowIndex: i 
+              });
+            }
           }
         }
-        
-        // Smart Sort: Oldest to newest (Tie-breaker: spreadsheet row number)
-        yoshiActivities.sort((a, b) => {
-          let dateDiff = a.rawDate.localeCompare(b.rawDate);
-          return dateDiff !== 0 ? dateDiff : a.rowIndex - b.rowIndex;
-        });
-        
-        // Assign sequential completion numbers
-        yoshiActivities.forEach((act, index) => { act.compNum = index + 1; });
-        
-        // Final Sort: Newest to oldest (Tie-breaker: highest completion number on top)
-        yoshiActivities.sort((a, b) => {
-          let dateDiff = b.rawDate.localeCompare(a.rawDate);
-          return dateDiff !== 0 ? dateDiff : b.compNum - a.compNum;
-        });
 
-        let yoshiFeedHTML = '';
-        yoshiActivities.forEach(act => {
-          let sBadge = act.score ? `<div class="score-badge">${act.score}</div>` : '';
-          let sysText = act.system ? ` (${act.system})` : '';
-          yoshiFeedHTML += `
-            <div class="game-card yoshi-card">
-              <div class="rank-badge feed-date-badge">${act.displayDate}</div>
-              <div class="game-name">${act.game}${sysText} <span class="completion-num">(#${act.compNum})</span></div>
-              ${sBadge}
-            </div>`;
-        });
-
-
-        // APPLE'S COMPLETIONS
-        let appleActivities = [];
+        // PARSE APPLE ALL-TIME
         for(let i = 1; i < metaRows.length; i++) {
           if (!metaRows[i]) continue;
-          let aGame = metaRows[i][0] || '';     // Column A 
-          let aScore = metaRows[i][7] || '';    // Column H 
-          let aDate = metaRows[i][8] || '';     // Column I 
-          let aSystem = metaRows[i][9] || '';   // Column J (System)
+          let aGame = metaRows[i][0] || '';     
+          let aScore = metaRows[i][7] || '';    
+          let aDate = metaRows[i][8] || '';     
+          let aSystem = metaRows[i][9] || '';   
 
-          if (aDate && aDate.trim() !== '' && aDate.startsWith(currentYear.toString())) {
+          if (aDate && aDate.trim() !== '' && aDate.length >= 4) {
+            let yearMatch = aDate.match(/^(\d{4})/);
+            if (yearMatch) {
+              let year = yearMatch[1];
+              appleYearsSet.add(year); // Save this year to the list
+
               let parts = aDate.split('/');
               let shortDate = parts.length === 3 ? `${parts[1]}/${parts[2]}` : aDate;
-              appleActivities.push({ 
-                rawDate: aDate, 
-                displayDate: shortDate, 
-                game: aGame, 
-                score: aScore, 
-                system: aSystem, 
-                rowIndex: i 
+
+              allAppleCompletions.push({ 
+                rawDate: aDate, displayDate: shortDate, game: aGame, 
+                score: aScore, system: aSystem, year: year, rowIndex: i 
               });
+            }
           }
         }
-        
-        // Smart Sort
-        appleActivities.sort((a, b) => {
-          let dateDiff = a.rawDate.localeCompare(b.rawDate);
-          return dateDiff !== 0 ? dateDiff : a.rowIndex - b.rowIndex;
-        });
-        
-        appleActivities.forEach((act, index) => { act.compNum = index + 1; });
-        
-        appleActivities.sort((a, b) => {
-          let dateDiff = b.rawDate.localeCompare(a.rawDate);
-          return dateDiff !== 0 ? dateDiff : b.compNum - a.compNum;
-        });
 
-        let appleFeedHTML = '';
-        appleActivities.forEach(act => {
-          let sBadge = act.score ? `<div class="score-badge">${act.score}</div>` : '';
-          let sysText = act.system ? ` (${act.system})` : '';
-          appleFeedHTML += `
-            <div class="game-card apple-card">
-              <div class="rank-badge feed-date-badge">${act.displayDate}</div>
-              <div class="game-name">${act.game}${sysText} <span class="completion-num">(#${act.compNum})</span></div>
-              ${sBadge}
-            </div>`;
-        });
+        // POPULATE DROPDOWNS
+        const yoshiSelect = document.getElementById('yoshi-year-select');
+        const appleSelect = document.getElementById('apple-year-select');
+        
+        let yYearsArray = Array.from(yoshiYearsSet).sort().reverse();
+        let aYearsArray = Array.from(appleYearsSet).sort().reverse();
+        
+        // Failsafe in case of empty lists
+        if (yYearsArray.length === 0) yYearsArray.push(new Date().getFullYear().toString());
+        if (aYearsArray.length === 0) aYearsArray.push(new Date().getFullYear().toString());
 
-        document.getElementById('yoshi-feed').innerHTML = yoshiFeedHTML || '<div class="score-empty"><br>No completions logged for this year yet.</div>';
-        document.getElementById('apple-feed').innerHTML = appleFeedHTML || '<div class="score-empty"><br>No completions logged for this year yet.</div>';
+        yoshiSelect.innerHTML = yYearsArray.map(y => `<option value="${y}">${y}</option>`).join('');
+        appleSelect.innerHTML = aYearsArray.map(y => `<option value="${y}">${y}</option>`).join('');
+
+        // RENDERING FUNCTIONS
+        function renderYoshiFeed(targetYear) {
+          let filtered = allYoshiCompletions.filter(act => act.year === targetYear);
+          
+          filtered.sort((a, b) => {
+            let dateDiff = a.rawDate.localeCompare(b.rawDate);
+            return dateDiff !== 0 ? dateDiff : a.rowIndex - b.rowIndex;
+          });
+          
+          filtered.forEach((act, index) => { act.compNum = index + 1; });
+          
+          filtered.sort((a, b) => {
+            let dateDiff = b.rawDate.localeCompare(a.rawDate);
+            return dateDiff !== 0 ? dateDiff : b.compNum - a.compNum;
+          });
+
+          let html = '';
+          filtered.forEach(act => {
+            let sBadge = act.score ? `<div class="score-badge">${act.score}</div>` : '';
+            let sysText = act.system ? ` (${act.system})` : '';
+            html += `
+              <div class="game-card yoshi-card">
+                <div class="rank-badge feed-date-badge">${act.displayDate}</div>
+                <div class="game-name">${act.game}${sysText} <span class="completion-num">(#${act.compNum})</span></div>
+                ${sBadge}
+              </div>`;
+          });
+          document.getElementById('yoshi-feed').innerHTML = html || `<div class="score-empty"><br>No completions logged for ${targetYear}.</div>`;
+        }
+
+        function renderAppleFeed(targetYear) {
+          let filtered = allAppleCompletions.filter(act => act.year === targetYear);
+          
+          filtered.sort((a, b) => {
+            let dateDiff = a.rawDate.localeCompare(b.rawDate);
+            return dateDiff !== 0 ? dateDiff : a.rowIndex - b.rowIndex;
+          });
+          
+          filtered.forEach((act, index) => { act.compNum = index + 1; });
+          
+          filtered.sort((a, b) => {
+            let dateDiff = b.rawDate.localeCompare(a.rawDate);
+            return dateDiff !== 0 ? dateDiff : b.compNum - a.compNum;
+          });
+
+          let html = '';
+          filtered.forEach(act => {
+            let sBadge = act.score ? `<div class="score-badge">${act.score}</div>` : '';
+            let sysText = act.system ? ` (${act.system})` : '';
+            html += `
+              <div class="game-card apple-card">
+                <div class="rank-badge feed-date-badge">${act.displayDate}</div>
+                <div class="game-name">${act.game}${sysText} <span class="completion-num">(#${act.compNum})</span></div>
+                ${sBadge}
+              </div>`;
+          });
+          document.getElementById('apple-feed').innerHTML = html || `<div class="score-empty"><br>No completions logged for ${targetYear}.</div>`;
+        }
+
+        // ADD EVENT LISTENERS FOR INTERACTIVITY
+        yoshiSelect.addEventListener('change', (e) => renderYoshiFeed(e.target.value));
+        appleSelect.addEventListener('change', (e) => renderAppleFeed(e.target.value));
+
+        // INITIAL RENDER
+        renderYoshiFeed(yoshiSelect.value);
+        renderAppleFeed(appleSelect.value);
         document.getElementById('activity-container').style.display = 'flex';
 
 
