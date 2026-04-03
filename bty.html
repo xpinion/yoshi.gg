@@ -17,7 +17,7 @@
     
     .dashboard-header {
       text-align: center;
-      margin-bottom: 40px;
+      margin-bottom: 20px;
       font-size: 2.5em;
       font-weight: 900;
       text-transform: uppercase;
@@ -25,13 +25,103 @@
       color: #111;
     }
 
+    /* --- GAME OF THE MONTH SHOWCASE STYLES --- */
+    .gotm-section {
+      background: #fff;
+      border-radius: 12px;
+      padding: 30px;
+      margin-bottom: 40px;
+      box-shadow: 0 10px 20px rgba(0,0,0,0.05);
+    }
+    .gotm-header {
+      text-align: center;
+      font-size: 1.2em;
+      font-weight: bold;
+      color: #666;
+      text-transform: uppercase;
+      letter-spacing: 2px;
+      margin-bottom: 20px;
+    }
+    
+    /* The Big Hero Card for the Current Month */
+    .hero-card {
+      background: linear-gradient(135deg, #111, #333);
+      color: #fff;
+      border-radius: 12px;
+      padding: 30px;
+      text-align: center;
+      margin-bottom: 20px;
+      box-shadow: 0 8px 15px rgba(0,0,0,0.2);
+      border-top: 4px solid #FFD700; /* Gold accent */
+    }
+    .hero-month {
+      color: #FFD700;
+      font-weight: bold;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      font-size: 0.9em;
+      margin-bottom: 5px;
+    }
+    .hero-game {
+      font-size: 2.5em;
+      font-weight: 900;
+      margin-bottom: 15px;
+    }
+    .hero-score {
+      display: inline-block;
+      background: #FFD700;
+      color: #111;
+      font-size: 1.5em;
+      font-weight: 900;
+      padding: 5px 20px;
+      border-radius: 30px;
+    }
+
+    /* The Smaller Cards for Past Months */
+    .past-gotm-grid {
+      display: flex;
+      gap: 15px;
+      overflow-x: auto;
+      padding-bottom: 10px;
+    }
+    .mini-gotm-card {
+      flex: 0 0 auto;
+      background: #f8f9fa;
+      border: 1px solid #ddd;
+      border-radius: 8px;
+      padding: 15px;
+      min-width: 200px;
+      text-align: center;
+    }
+    .mini-month {
+      font-size: 0.8em;
+      color: #777;
+      text-transform: uppercase;
+      font-weight: bold;
+      margin-bottom: 5px;
+    }
+    .mini-game {
+      font-weight: 600;
+      color: #222;
+      margin-bottom: 10px;
+      font-size: 1.1em;
+    }
+    .mini-score {
+      background: #333;
+      color: #fff;
+      padding: 3px 10px;
+      border-radius: 4px;
+      font-weight: bold;
+      display: inline-block;
+    }
+
+    /* --- LEADERBOARD STYLES --- */
     .leaderboards-wrapper {
       display: flex;
       flex-wrap: wrap;
       gap: 25px;
       justify-content: center;
     }
-
     .leaderboard-column {
       flex: 1;
       min-width: 320px;
@@ -40,7 +130,6 @@
       padding: 20px;
       box-shadow: 0 10px 20px rgba(0,0,0,0.05);
     }
-
     .board-title {
       text-align: center;
       font-size: 1.5em;
@@ -49,12 +138,10 @@
       padding-bottom: 10px;
       border-bottom: 2px solid #eee;
     }
-
     .yoshi-title { color: #2e7d32; }
     .apple-title { color: #c62828; }
-    .combined-title { color: #673AB7; } /* A nice collaborative purple */
+    .combined-title { color: #673AB7; } 
 
-    /* The sleek UI Card for each game */
     .game-card {
       display: flex;
       align-items: center;
@@ -65,22 +152,19 @@
       transition: transform 0.2s, box-shadow 0.2s;
       border-left: 5px solid #ccc;
     }
-
     .game-card:hover {
       transform: translateX(5px);
       box-shadow: 0 4px 8px rgba(0,0,0,0.1);
     }
-
     .yoshi-card { border-left-color: #4CAF50; }
     .apple-card { border-left-color: #F44336; }
     .combined-card { border-left-color: #673AB7; }
 
-    /* Card internal elements */
     .rank-badge {
       font-weight: 900;
       font-size: 1.2em;
       color: #555;
-      min-width: 45px; /* Ensures text stays aligned even if badge is empty */
+      min-width: 45px;
     }
     .game-name {
       flex: 1;
@@ -112,25 +196,27 @@
   <div class="bty-container">
     <div class="dashboard-header">Collaborative Dashboard</div>
     
-    <div id="loading-text" style="text-align: center; font-family: Courier New;">Loading Top 25 Data...</div>
+    <div id="loading-text" style="text-align: center; font-family: Courier New;">Loading Dashboard Data...</div>
+
+    <div id="gotm-container" class="gotm-section" style="display: none;">
+      <div class="gotm-header">Game of the Month Showcase</div>
+      <div id="hero-gotm"></div>
+      <div id="past-gotm" class="past-gotm-grid"></div>
+    </div>
 
     <div class="leaderboards-wrapper" id="boards-wrapper" style="display: none;">
-      
       <div class="leaderboard-column">
         <div class="board-title yoshi-title">Yoshi's Top 25</div>
         <div id="yoshi-list"></div>
       </div>
-
       <div class="leaderboard-column">
         <div class="board-title combined-title">Combined (Out of 20)</div>
         <div id="combined-list"></div>
       </div>
-
       <div class="leaderboard-column">
         <div class="board-title apple-title">Apple's Top 25</div>
         <div id="apple-list"></div>
       </div>
-
     </div>
   </div>
 
@@ -143,100 +229,107 @@
         const data = await response.json();
         const rows = data.values;
         
-        let yoshiGames = [];
-        let appleGames = [];
+        // --- 1. PROCESS GAME OF THE MONTH ---
+        let heroHTML = '';
+        let pastHTML = '';
+        let foundFirstGotm = false;
 
-        // 1. Data Gathering Phase
-        for (let i = 4; i <= 28; i++) {
-          if (!rows[i]) continue; 
+        // Loop through GotM section (Rows 5 to 16 -> index 4 to 15)
+        for (let i = 4; i <= 15; i++) {
+          if (!rows[i]) continue;
+          let rawText = rows[i][1] || ''; // Col B
+          let score = rows[i][2] || '';   // Col C
 
-          // Yoshi
-          let yGame = rows[i][9] || '';
-          if (yGame) {
-            yoshiGames.push({
-              rank: rows[i][7] || '',
-              score: rows[i][8] || '',
-              name: yGame
-            });
-          }
+          if (rawText && rawText.includes('-')) {
+            // Split "04 (April) - Tunic" into parts
+            let parts = rawText.split(' - ');
+            let rawMonth = parts[0].trim();
+            let gameName = parts[1].trim();
 
-          // Apple
-          let aGame = rows[i][13] || '';
-          if (aGame) {
-            appleGames.push({
-              rank: rows[i][11] || '',
-              score: rows[i][12] || '',
-              name: aGame
-            });
+            // Extract just the word "April" from "04 (April)"
+            let monthMatch = rawMonth.match(/\((.*?)\)/);
+            let cleanMonth = monthMatch ? monthMatch[1] : rawMonth;
+
+            if (!foundFirstGotm) {
+              // The very first one we find becomes the giant Hero Card
+              heroHTML = `
+                <div class="hero-card">
+                  <div class="hero-month">${cleanMonth} Game of the Month</div>
+                  <div class="hero-game">${gameName}</div>
+                  <div class="hero-score">${score} / 10</div>
+                </div>
+              `;
+              foundFirstGotm = true;
+            } else {
+              // The rest become smaller scrollable cards below it
+              pastHTML += `
+                <div class="mini-gotm-card">
+                  <div class="mini-month">${cleanMonth}</div>
+                  <div class="mini-game">${gameName}</div>
+                  <div class="mini-score">${score}</div>
+                </div>
+              `;
+            }
           }
         }
 
-        // 2. Generate Yoshi's HTML
+        if (foundFirstGotm) {
+          document.getElementById('hero-gotm').innerHTML = heroHTML;
+          document.getElementById('past-gotm').innerHTML = pastHTML;
+          document.getElementById('gotm-container').style.display = 'block';
+        }
+
+
+        // --- 2. PROCESS LEADERBOARDS (Same as before) ---
+        let yoshiGames = [];
+        let appleGames = [];
+
+        for (let i = 4; i <= 28; i++) {
+          if (!rows[i]) continue; 
+          let yGame = rows[i][9] || '';
+          if (yGame) yoshiGames.push({ rank: rows[i][7] || '', score: rows[i][8] || '', name: yGame });
+
+          let aGame = rows[i][13] || '';
+          if (aGame) appleGames.push({ rank: rows[i][11] || '', score: rows[i][12] || '', name: aGame });
+        }
+
         let yoshiHTML = '';
         yoshiGames.forEach(game => {
-          let rText = game.rank ? `#${game.rank}` : ''; // Leave blank if it's a tie
+          let rText = game.rank ? `#${game.rank}` : ''; 
           let sHTML = game.score !== '' ? `<div class="score-badge">${game.score}</div>` : `<div class="score-empty">Unrated</div>`;
-          yoshiHTML += `
-            <div class="game-card yoshi-card">
-              <div class="rank-badge">${rText}</div>
-              <div class="game-name">${game.name}</div>
-              ${sHTML}
-            </div>`;
+          yoshiHTML += `<div class="game-card yoshi-card"><div class="rank-badge">${rText}</div><div class="game-name">${game.name}</div>${sHTML}</div>`;
         });
 
-        // 3. Generate Apple's HTML
         let appleHTML = '';
         appleGames.forEach(game => {
           let rText = game.rank ? `#${game.rank}` : ''; 
           let sHTML = game.score !== '' ? `<div class="score-badge">${game.score}</div>` : `<div class="score-empty">Unrated</div>`;
-          appleHTML += `
-            <div class="game-card apple-card">
-              <div class="rank-badge">${rText}</div>
-              <div class="game-name">${game.name}</div>
-              ${sHTML}
-            </div>`;
+          appleHTML += `<div class="game-card apple-card"><div class="rank-badge">${rText}</div><div class="game-name">${game.name}</div>${sHTML}</div>`;
         });
 
-        // 4. Calculate Combined Scores dynamically
         let combinedGames = [];
         yoshiGames.forEach(y => {
           let yNum = parseFloat(y.score);
           if (!isNaN(yNum)) {
-            // Look for this exact game in Apple's list (ignoring upper/lower case)
             let match = appleGames.find(a => a.name.toLowerCase().trim() === y.name.toLowerCase().trim());
             if (match) {
               let aNum = parseFloat(match.score);
-              if (!isNaN(aNum)) {
-                combinedGames.push({
-                  name: y.name,
-                  totalScore: yNum + aNum
-                });
-              }
+              if (!isNaN(aNum)) combinedGames.push({ name: y.name, totalScore: yNum + aNum });
             }
           }
         });
-
-        // Sort the combined list from highest to lowest score
         combinedGames.sort((a, b) => b.totalScore - a.totalScore);
 
-        // Generate Combined HTML
         let combinedHTML = '';
         if (combinedGames.length > 0) {
           combinedGames.forEach((game, index) => {
-            // Keep decimals clean (e.g. 18.5 or 19)
             let displayScore = Number.isInteger(game.totalScore) ? game.totalScore : game.totalScore.toFixed(1);
-            combinedHTML += `
-              <div class="game-card combined-card">
-                <div class="rank-badge">#${index + 1}</div>
-                <div class="game-name">${game.name}</div>
-                <div class="score-badge" style="background: #673AB7;">${displayScore} <span style="font-size:0.7em; color:#bbb;">/ 20</span></div>
-              </div>`;
+            combinedHTML += `<div class="game-card combined-card"><div class="rank-badge">#${index + 1}</div><div class="game-name">${game.name}</div><div class="score-badge" style="background: #673AB7;">${displayScore} <span style="font-size:0.7em; color:#bbb;">/ 20</span></div></div>`;
           });
         } else {
           combinedHTML = `<div class="score-empty" style="text-align: center; margin-top: 20px;">No shared rated games yet!</div>`;
         }
 
-        // 5. Inject everything into the page
         document.getElementById('yoshi-list').innerHTML = yoshiHTML;
         document.getElementById('apple-list').innerHTML = appleHTML;
         document.getElementById('combined-list').innerHTML = combinedHTML;
