@@ -36,6 +36,27 @@
     .mini-game { font-weight: 600; color: #222; margin-bottom: 10px; font-size: 1.1em; }
     .mini-score { background: #333; color: #fff; padding: 3px 10px; border-radius: 4px; font-weight: bold; display: inline-block; }
 
+    /* NEW: OVER-THE-TOP SPIRIT METER */
+    .spirit-container { background: #111; color: #fff; padding: 25px; border-radius: 12px; margin-bottom: 20px; text-align: center; box-shadow: 0 10px 30px rgba(0,0,0,0.3); border: 2px solid #FFD700; overflow: hidden; position: relative; }
+    .spirit-title { font-weight: 900; color: #FFD700; letter-spacing: 4px; margin-bottom: 15px; font-size: 1.5em; text-transform: uppercase; text-shadow: 0 2px 5px rgba(255, 215, 0, 0.4); }
+    .spirit-bar-bg { background: #222; height: 30px; border-radius: 20px; margin: 0 auto 20px auto; width: 85%; position: relative; border: 3px solid #444; box-shadow: inset 0 0 10px rgba(0,0,0,0.8); }
+    .spirit-bar-fill { 
+      background: linear-gradient(90deg, #F44336, #FFEB3B, #4CAF50, #00BCD4, #9C27B0, #FFEB3B); 
+      background-size: 200% 200%;
+      height: 100%; 
+      border-radius: 20px; 
+      width: 115%; /* Intentionally breaking past 100% */
+      animation: rainbow-surge 2s ease infinite, shake-bar 0.5s infinite; 
+      box-shadow: 0 0 20px #FFEB3B, 0 0 40px #FF5722;
+      display: flex; align-items: center; justify-content: flex-end; padding-right: 15px;
+      font-weight: 900; color: #111; font-style: italic; letter-spacing: 1px;
+    }
+    @keyframes rainbow-surge { 0% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } 100% { background-position: 0% 50%; } }
+    @keyframes shake-bar { 0% { transform: translate(1px, 1px) rotate(0deg); } 25% { transform: translate(-1px, -2px) rotate(-1deg); } 50% { transform: translate(-3px, 0px) rotate(1deg); } 75% { transform: translate(3px, 2px) rotate(0deg); } 100% { transform: translate(1px, -1px) rotate(0deg); } }
+    .spirit-stats { font-size: 1.1em; color: #ccc; line-height: 1.6; }
+    .stat-highlight { color: #fff; font-weight: 900; font-size: 1.3em; color: #FFD700; text-shadow: 0 0 5px rgba(255, 215, 0, 0.5); }
+    .stat-flavor { font-style: italic; color: #888; font-size: 0.9em; display: block; margin-top: 10px; }
+
     /* SCORE LEGEND */
     .score-legend { display: flex; flex-wrap: wrap; justify-content: center; gap: 15px; margin-bottom: 40px; padding: 15px; background: #fff; border-radius: 8px; box-shadow: 0 4px 10px rgba(0,0,0,0.03); font-size: 0.85em; color: #555; }
     .legend-item { display: flex; align-items: center; gap: 6px; }
@@ -106,6 +127,8 @@
       <div id="hero-gotm"></div>
       <div id="past-gotm" class="past-gotm-grid"></div>
     </div>
+
+    <div id="spirit-container" class="spirit-container" style="display: none;"></div>
 
     <div class="score-legend" id="score-legend" style="display: none;">
       <div class="legend-item"><span class="legend-num">10</span> Perfect</div>
@@ -219,7 +242,6 @@
         const metaRows = metaData.values;
         const masterRows = masterData.values;
 
-        // --- Bulletproof Date Formatter ---
         function formatShortDate(dateStr) {
           let cleanStr = dateStr.trim().split('T')[0].split(' ')[0];
           let parts = cleanStr.split(/[-/]/); 
@@ -230,13 +252,14 @@
           return cleanStr; 
         }
 
-        // --- 1. GAME OF THE MONTH (PULLED FROM METADATA) ---
+        // --- 1. GAME OF THE MONTH ---
         let gotmArray = [];
         const defaultImg = "https://via.placeholder.com/160x220/222/555?text=No+Art"; 
         const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 
         let today = new Date();
-        let currentYYYYMM = today.getFullYear() + "-" + String(today.getMonth() + 1).padStart(2, '0');
+        let currentYearStr = today.getFullYear().toString();
+        let currentYYYYMM = currentYearStr + "-" + String(today.getMonth() + 1).padStart(2, '0');
 
         for (let i = 1; i < metaRows.length; i++) {
           if (!metaRows[i]) continue;
@@ -316,6 +339,31 @@
           }
         }
 
+        // --- NEW: CALCULATE GAMER SPIRIT METER ---
+        let yoshiCurrentTotal = allYoshiCompletions.filter(c => c.year === currentYearStr).length;
+        let appleCurrentTotal = allAppleCompletions.filter(c => c.year === currentYearStr).length;
+        let combinedCurrentTotal = yoshiCurrentTotal + appleCurrentTotal;
+        
+        let globalShare = (combinedCurrentTotal * 14.37).toFixed(1);
+        let powerLevelNum = combinedCurrentTotal > 0 ? (combinedCurrentTotal * 420) + 69 : 0;
+        let grassStatus = combinedCurrentTotal > 0 ? "Critically Low" : "Untouched";
+
+        document.getElementById('spirit-container').innerHTML = `
+          <div class="spirit-title">⚡ ${currentYearStr} Co-Op Spirit Meter ⚡</div>
+          <div class="spirit-bar-bg">
+            <div class="spirit-bar-fill">OVER 9000%</div>
+          </div>
+          <div class="spirit-stats">
+            Games Conquered: <span class="stat-highlight">${combinedCurrentTotal}</span> | 
+            Global Market Share: <span class="stat-highlight">${globalShare}%</span> | 
+            Power Level: <span class="stat-highlight">${powerLevelNum.toLocaleString()}</span> | 
+            Grass Touched: <span class="stat-highlight">${grassStatus}</span>
+            <span class="stat-flavor">The gaming industry is struggling to keep up with your current pace. Please slow down.</span>
+          </div>
+        `;
+        document.getElementById('spirit-container').style.display = 'block';
+
+
         // Parse All-Time Scores, Release Years, SERIES, and GENRE
         let allYoshiGames = []; let allAppleGames = []; let allCombinedGames = [];
         let releaseYearsSet = new Set(); let seriesSet = new Set(); let genreSet = new Set();
@@ -369,7 +417,6 @@
         document.getElementById('a-genre-select').innerHTML = genreOptionsHTML;
         document.getElementById('c-genre-select').innerHTML = genreOptionsHTML;
 
-        // Auto-select Legend of Zelda
         let defaultSeries = seriesArray.find(s => s.toLowerCase().includes('zelda')) || seriesArray[0];
         if (defaultSeries) {
           document.getElementById('y-series-select').value = defaultSeries;
@@ -377,7 +424,6 @@
           document.getElementById('c-series-select').value = defaultSeries;
         }
 
-        // Auto-select 2D Platformer
         let defaultGenre = genreArray.find(g => g.toLowerCase().includes('2d platformer')) || (genreArray.length > 0 ? genreArray[0] : '');
         if (defaultGenre) {
           document.getElementById('y-genre-select').value = defaultGenre;
