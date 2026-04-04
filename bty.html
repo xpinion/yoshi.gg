@@ -36,7 +36,7 @@
     .mini-game { font-weight: 600; color: #222; margin-bottom: 10px; font-size: 1.1em; }
     .mini-score { background: #333; color: #fff; padding: 3px 10px; border-radius: 4px; font-weight: bold; display: inline-block; }
 
-    /* NEW: OVER-THE-TOP SPIRIT METER */
+    /* OVER-THE-TOP SPIRIT METER */
     .spirit-container { background: #111; color: #fff; padding: 25px; border-radius: 12px; margin-bottom: 20px; text-align: center; box-shadow: 0 10px 30px rgba(0,0,0,0.3); border: 2px solid #FFD700; overflow: hidden; position: relative; }
     .spirit-title { font-weight: 900; color: #FFD700; letter-spacing: 4px; margin-bottom: 15px; font-size: 1.5em; text-transform: uppercase; text-shadow: 0 2px 5px rgba(255, 215, 0, 0.4); }
     .spirit-bar-bg { background: #222; height: 30px; border-radius: 20px; margin: 0 auto 20px auto; width: 85%; position: relative; border: 3px solid #444; box-shadow: inset 0 0 10px rgba(0,0,0,0.8); }
@@ -45,7 +45,7 @@
       background-size: 200% 200%;
       height: 100%; 
       border-radius: 20px; 
-      width: 115%; /* Intentionally breaking past 100% */
+      width: 115%; 
       animation: rainbow-surge 2s ease infinite, shake-bar 0.5s infinite; 
       box-shadow: 0 0 20px #FFEB3B, 0 0 40px #FF5722;
       display: flex; align-items: center; justify-content: flex-end; padding-right: 15px;
@@ -149,13 +149,13 @@
         <div class="board-title yoshi-title">
           Yoshi's <select id="y-feed-select" class="year-dropdown"></select> Completions
         </div>
-        <div id="yoshi-feed" class="scrollable-feed"></div>
+        <div id="yoshi-feed"></div>
       </div>
       <div class="leaderboard-column">
         <div class="board-title apple-title">
           Apple's <select id="a-feed-select" class="year-dropdown"></select> Completions
         </div>
-        <div id="apple-feed" class="scrollable-feed"></div>
+        <div id="apple-feed"></div>
       </div>
     </div>
 
@@ -164,19 +164,19 @@
         <div class="board-title yoshi-title">
           Yoshi's <select id="y-top-select" class="year-dropdown"></select> Top 25
         </div>
-        <div id="yoshi-list"></div>
+        <div id="yoshi-list" class="scrollable-feed"></div>
       </div>
       <div class="leaderboard-column">
         <div class="board-title combined-title">
           Combined <select id="c-top-select" class="year-dropdown"></select> Top 25
         </div>
-        <div id="combined-list"></div>
+        <div id="combined-list" class="scrollable-feed"></div>
       </div>
       <div class="leaderboard-column">
         <div class="board-title apple-title">
           Apple's <select id="a-top-select" class="year-dropdown"></select> Top 25
         </div>
-        <div id="apple-list"></div>
+        <div id="apple-list" class="scrollable-feed"></div>
       </div>
     </div>
 
@@ -339,14 +339,15 @@
           }
         }
 
-        // --- NEW: CALCULATE GAMER SPIRIT METER ---
+        // --- CALC GAMER SPIRIT METER ---
         let yoshiCurrentTotal = allYoshiCompletions.filter(c => c.year === currentYearStr).length;
         let appleCurrentTotal = allAppleCompletions.filter(c => c.year === currentYearStr).length;
         let combinedCurrentTotal = yoshiCurrentTotal + appleCurrentTotal;
         
         let globalShare = (combinedCurrentTotal * 14.37).toFixed(1);
         let powerLevelNum = combinedCurrentTotal > 0 ? (combinedCurrentTotal * 420) + 69 : 0;
-        let grassStatus = combinedCurrentTotal > 0 ? "Critically Low" : "Untouched";
+        let sleepDebtNum = combinedCurrentTotal * 14; 
+        let sleepDebtStatus = combinedCurrentTotal > 0 ? `${sleepDebtNum} Hours` : "Fully Rested";
 
         document.getElementById('spirit-container').innerHTML = `
           <div class="spirit-title">⚡ ${currentYearStr} Co-Op Spirit Meter ⚡</div>
@@ -357,7 +358,7 @@
             Games Conquered: <span class="stat-highlight">${combinedCurrentTotal}</span> | 
             Global Market Share: <span class="stat-highlight">${globalShare}%</span> | 
             Power Level: <span class="stat-highlight">${powerLevelNum.toLocaleString()}</span> | 
-            Grass Touched: <span class="stat-highlight">${grassStatus}</span>
+            Sleep Debt: <span class="stat-highlight">${sleepDebtStatus}</span>
             <span class="stat-flavor">The gaming industry is struggling to keep up with your current pace. Please slow down.</span>
           </div>
         `;
