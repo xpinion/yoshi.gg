@@ -94,7 +94,7 @@
 
     <div class="dashboard-header">Collaborative Dashboard</div>
     
-    <div id="loading-text" style="text-align: center; font-family: Courier New;">Loading Interactive Dashboard...</div>
+    <div id="loading-text" style="text-align: center; font-family: Courier New;">Loading Pure Database Dashboard...</div>
 
     <div id="gotm-container" class="gotm-section" style="display: none;">
       <div class="gotm-header">Game of the Month Showcase</div>
@@ -167,17 +167,15 @@
   <script>
     async function loadDashboardData() {
       try {
-        const [btyResponse, metaResponse, masterResponse] = await Promise.all([
-          fetch('bty_data.json'),
+        // ONLY FETCHING METADATA AND MASTER NOW! Goodbye, bty.
+        const [metaResponse, masterResponse] = await Promise.all([
           fetch('metadata_data.json'),
           fetch('master_data.json')
         ]);
         
-        const btyData = await btyResponse.json();
         const metaData = await metaResponse.json();
         const masterData = await masterResponse.json();
         
-        const btyRows = btyData.values;
         const metaRows = metaData.values;
         const masterRows = masterData.values;
 
@@ -192,49 +190,50 @@
           return cleanStr; 
         }
 
-        // --- 1. SMART GAME OF THE MONTH ---
-        let currentMonthNum = new Date().getMonth() + 1; 
+        // --- 1. GAME OF THE MONTH (NOW PULLED ENTIRELY FROM METADATA) ---
         let gotmArray = [];
         const defaultImg = "https://via.placeholder.com/160x220/222/555?text=No+Art"; 
+        const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 
-        for (let i = 4; i <= 15; i++) {
-          if (!btyRows[i]) continue;
-          let rawText = btyRows[i][1] || ''; let btyScore = btyRows[i][2] || ''; let imgUrl = btyRows[i][3] || defaultImg; 
+        for (let i = 1; i < metaRows.length; i++) {
+          if (!metaRows[i]) continue;
           
-          if (rawText && rawText.includes('-')) {
-            let parts = rawText.split(' - '); let rawMonth = parts[0].trim(); let gameName = parts[1].trim();
-            
-            // Auto-fetch the freshest score directly from Metadata!
-            let finalScore = btyScore;
-            let metaMatch = metaRows.find(r => r && r[0].toLowerCase().trim() === gameName.toLowerCase().trim());
-            if (metaMatch && metaMatch[6]) {
-              finalScore = metaMatch[6]; // Grab Yoshi's live score from Column G
-            }
+          let gameName = metaRows[i][0] || ''; 
+          let yScore = metaRows[i][6] || ''; 
+          let gotmTag = metaRows[i][10] || ''; // Column K (Index 10)
+          let imgUrl = metaRows[i][11] || defaultImg; // Column L (Index 11)
 
-            let numMatch = rawMonth.match(/^(\d{2})/);
-            if (numMatch) {
-              let mNum = parseInt(numMatch[1], 10);
-              let cleanMonthName = (rawMonth.match(/\((.*?)\)/) || [])[1] || rawMonth;
-              if (mNum <= currentMonthNum) gotmArray.push({ num: mNum, monthName: cleanMonthName, game: gameName, score: finalScore, img: imgUrl });
-            }
+          if (gotmTag && gotmTag.match(/^\d{4}-\d{2}$/)) {
+            let parts = gotmTag.split('-');
+            let yearStr = parts[0];
+            let monthNum = parseInt(parts[1], 10);
+            
+            // Translate "04" to "April"
+            let monthName = monthNames[monthNum - 1];
+
+            // Use the raw YYYY-MM tag to perfectly sort them chronologically
+            gotmArray.push({ sortKey: gotmTag, year: yearStr, monthName: monthName, game: gameName, score: yScore, img: imgUrl });
           }
         }
 
-        gotmArray.sort((a, b) => b.num - a.num);
+        // Sort descending (Newest first)
+        gotmArray.sort((a, b) => b.sortKey.localeCompare(a.sortKey));
+
         if (gotmArray.length > 0) {
           let topGotm = gotmArray[0];
           document.getElementById('hero-gotm').innerHTML = `
             <div class="hero-card">
               <img src="${topGotm.img}" alt="Box Art" class="hero-art">
               <div class="hero-details">
-                <div class="hero-month">${topGotm.monthName} Game of the Month</div>
+                <div class="hero-month">${topGotm.monthName} ${topGotm.year} Game of the Month</div>
                 <div class="hero-game">${topGotm.game}</div>
                 <div class="hero-score">${topGotm.score} / 10</div>
               </div>
             </div>`;
+            
           let pastHTML = '';
           for (let j = 1; j < gotmArray.length; j++) {
-            pastHTML += `<div class="mini-gotm-card"><img src="${gotmArray[j].img}" alt="Box Art" class="mini-art"><div class="mini-month">${gotmArray[j].monthName}</div><div class="mini-game">${gotmArray[j].game}</div><div class="mini-score">${gotmArray[j].score}</div></div>`;
+            pastHTML += `<div class="mini-gotm-card"><img src="${gotmArray[j].img}" alt="Box Art" class="mini-art"><div class="mini-month">${gotmArray[j].monthName} ${gotmArray[j].year}</div><div class="mini-game">${gotmArray[j].game}</div><div class="mini-score">${gotmArray[j].score}</div></div>`;
           }
           document.getElementById('past-gotm').innerHTML = pastHTML;
           document.getElementById('gotm-container').style.display = 'block';
