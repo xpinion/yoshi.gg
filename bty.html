@@ -18,7 +18,7 @@
     .section-header { text-align: center; margin: 60px 0 30px 0; font-size: 2em; font-weight: 900; text-transform: uppercase; letter-spacing: 2px; color: #111; border-bottom: 3px solid #eee; padding-bottom: 10px;}
 
     /* GOTM SHOWCASE */
-    .gotm-section { background: #fff; border-radius: 12px; padding: 30px; margin-bottom: 40px; box-shadow: 0 10px 20px rgba(0,0,0,0.05); }
+    .gotm-section { background: #fff; border-radius: 12px; padding: 30px; margin-bottom: 20px; box-shadow: 0 10px 20px rgba(0,0,0,0.05); }
     .gotm-header { text-align: center; font-size: 1.2em; font-weight: bold; color: #666; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 20px; }
     
     .hero-card { background: linear-gradient(135deg, #111, #333); color: #fff; border-radius: 12px; padding: 30px; margin-bottom: 20px; box-shadow: 0 8px 15px rgba(0,0,0,0.2); border-top: 4px solid #FFD700; display: flex; align-items: center; justify-content: center; gap: 30px; flex-wrap: wrap; }
@@ -35,6 +35,11 @@
     .mini-month { font-size: 0.8em; color: #777; text-transform: uppercase; font-weight: bold; margin-bottom: 5px; }
     .mini-game { font-weight: 600; color: #222; margin-bottom: 10px; font-size: 1.1em; }
     .mini-score { background: #333; color: #fff; padding: 3px 10px; border-radius: 4px; font-weight: bold; display: inline-block; }
+
+    /* NEW: SCORE LEGEND */
+    .score-legend { display: flex; flex-wrap: wrap; justify-content: center; gap: 15px; margin-bottom: 40px; padding: 15px; background: #fff; border-radius: 8px; box-shadow: 0 4px 10px rgba(0,0,0,0.03); font-size: 0.85em; color: #555; }
+    .legend-item { display: flex; align-items: center; gap: 6px; }
+    .legend-num { font-weight: 900; color: #111; background: #eee; padding: 3px 7px; border-radius: 4px; font-size: 1.1em; }
 
     /* LEADERBOARDS & LISTS */
     .leaderboards-wrapper { display: flex; flex-wrap: wrap; gap: 25px; justify-content: center; margin-bottom: 40px; }
@@ -102,6 +107,20 @@
       <div id="past-gotm" class="past-gotm-grid"></div>
     </div>
 
+    <div class="score-legend" id="score-legend" style="display: none;">
+      <div class="legend-item"><span class="legend-num">10</span> Perfect</div>
+      <div class="legend-item"><span class="legend-num">9</span> Excellent</div>
+      <div class="legend-item"><span class="legend-num">8</span> Great</div>
+      <div class="legend-item"><span class="legend-num">7</span> Good</div>
+      <div class="legend-item"><span class="legend-num">6</span> Above Average</div>
+      <div class="legend-item"><span class="legend-num">5</span> Average</div>
+      <div class="legend-item"><span class="legend-num">4</span> Below Average</div>
+      <div class="legend-item"><span class="legend-num">3</span> Bad</div>
+      <div class="legend-item"><span class="legend-num">2</span> Terrible</div>
+      <div class="legend-item"><span class="legend-num">1</span> Abysmal</div>
+      <div class="legend-item"><span class="legend-num">0</span> Unplayable</div>
+    </div>
+
     <div id="activity-container" class="leaderboards-wrapper" style="display: none;">
       <div class="leaderboard-column">
         <div class="board-title yoshi-title">
@@ -160,6 +179,28 @@
       </div>
     </div>
 
+    <div class="section-header" id="genre-header" style="display: none;">Genre Rankings</div>
+    <div class="leaderboards-wrapper" id="genre-wrapper" style="display: none;">
+      <div class="leaderboard-column">
+        <div class="board-title yoshi-title">
+          Yoshi's <select id="y-genre-select" class="year-dropdown"></select>
+        </div>
+        <div id="yoshi-genre-list" class="scrollable-feed"></div>
+      </div>
+      <div class="leaderboard-column">
+        <div class="board-title combined-title">
+          Combined <select id="c-genre-select" class="year-dropdown"></select>
+        </div>
+        <div id="combined-genre-list" class="scrollable-feed"></div>
+      </div>
+      <div class="leaderboard-column">
+        <div class="board-title apple-title">
+          Apple's <select id="a-genre-select" class="year-dropdown"></select>
+        </div>
+        <div id="apple-genre-list" class="scrollable-feed"></div>
+      </div>
+    </div>
+
   </div>
 
   <script src="nav.js"></script>
@@ -167,7 +208,6 @@
   <script>
     async function loadDashboardData() {
       try {
-        // ONLY FETCHING METADATA AND MASTER NOW! Goodbye, bty.
         const [metaResponse, masterResponse] = await Promise.all([
           fetch('metadata_data.json'),
           fetch('master_data.json')
@@ -190,7 +230,7 @@
           return cleanStr; 
         }
 
-        // --- 1. GAME OF THE MONTH (NOW PULLED ENTIRELY FROM METADATA) ---
+        // --- 1. GAME OF THE MONTH (PULLED FROM METADATA) ---
         let gotmArray = [];
         const defaultImg = "https://via.placeholder.com/160x220/222/555?text=No+Art"; 
         const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
@@ -200,23 +240,19 @@
           
           let gameName = metaRows[i][0] || ''; 
           let yScore = metaRows[i][6] || ''; 
-          let gotmTag = metaRows[i][10] || ''; // Column K (Index 10)
-          let imgUrl = metaRows[i][11] || defaultImg; // Column L (Index 11)
+          let gotmTag = metaRows[i][10] || ''; // Column K
+          let imgUrl = metaRows[i][11] || defaultImg; // Column L
 
           if (gotmTag && gotmTag.match(/^\d{4}-\d{2}$/)) {
             let parts = gotmTag.split('-');
             let yearStr = parts[0];
             let monthNum = parseInt(parts[1], 10);
-            
-            // Translate "04" to "April"
             let monthName = monthNames[monthNum - 1];
 
-            // Use the raw YYYY-MM tag to perfectly sort them chronologically
             gotmArray.push({ sortKey: gotmTag, year: yearStr, monthName: monthName, game: gameName, score: yScore, img: imgUrl });
           }
         }
 
-        // Sort descending (Newest first)
         gotmArray.sort((a, b) => b.sortKey.localeCompare(a.sortKey));
 
         if (gotmArray.length > 0) {
@@ -238,6 +274,9 @@
           document.getElementById('past-gotm').innerHTML = pastHTML;
           document.getElementById('gotm-container').style.display = 'block';
         }
+
+        // Unhide Legend once data is successfully processing
+        document.getElementById('score-legend').style.display = 'flex';
 
         // --- 2. DATA EXTRACTION ---
         let allYoshiCompletions = []; let allAppleCompletions = [];
@@ -275,14 +314,16 @@
           }
         }
 
-        // Parse All-Time Scores, Release Years, AND SERIES
+        // Parse All-Time Scores, Release Years, SERIES, and GENRE
         let allYoshiGames = []; let allAppleGames = []; let allCombinedGames = [];
-        let releaseYearsSet = new Set(); let seriesSet = new Set();
+        let releaseYearsSet = new Set(); let seriesSet = new Set(); let genreSet = new Set();
 
         for(let i = 1; i < metaRows.length; i++) {
             if (!metaRows[i]) continue;
             let gameName = metaRows[i][0] || ''; 
             let releaseYear = metaRows[i][1] ? metaRows[i][1].toString() : '';
+            let genreVal = metaRows[i][2];
+            let genreName = (genreVal === undefined || genreVal === null) ? '' : String(genreVal).trim();
             let seriesVal = metaRows[i][5];
             let seriesName = (seriesVal === undefined || seriesVal === null) ? '' : String(seriesVal).trim();
             let yNum = parseFloat(metaRows[i][6] || ''); 
@@ -291,10 +332,11 @@
             if (gameName) {
                 if (releaseYear && (!isNaN(yNum) || !isNaN(aNum))) releaseYearsSet.add(releaseYear);
                 if (seriesName && (!isNaN(yNum) || !isNaN(aNum))) seriesSet.add(seriesName);
+                if (genreName && (!isNaN(yNum) || !isNaN(aNum))) genreSet.add(genreName);
 
-                if (!isNaN(yNum)) allYoshiGames.push({ name: gameName, score: yNum, releaseYear: releaseYear, series: seriesName });
-                if (!isNaN(aNum)) allAppleGames.push({ name: gameName, score: aNum, releaseYear: releaseYear, series: seriesName });
-                if (!isNaN(yNum) && !isNaN(aNum)) allCombinedGames.push({ name: gameName, totalScore: yNum + aNum, releaseYear: releaseYear, series: seriesName });
+                if (!isNaN(yNum)) allYoshiGames.push({ name: gameName, score: yNum, releaseYear: releaseYear, series: seriesName, genre: genreName });
+                if (!isNaN(aNum)) allAppleGames.push({ name: gameName, score: aNum, releaseYear: releaseYear, series: seriesName, genre: genreName });
+                if (!isNaN(yNum) && !isNaN(aNum)) allCombinedGames.push({ name: gameName, totalScore: yNum + aNum, releaseYear: releaseYear, series: seriesName, genre: genreName });
             }
         }
 
@@ -303,6 +345,7 @@
         let aFeedYearsArray = Array.from(appleCompletionYearsSet).sort().reverse();
         let releaseYearsArray = Array.from(releaseYearsSet).sort().reverse();
         let seriesArray = Array.from(seriesSet).sort(); 
+        let genreArray = Array.from(genreSet).sort(); 
 
         const buildOptions = (items, includeAllTime = true) => (includeAllTime ? `<option value="All-Time">All-Time</option>` : '') + items.map(y => `<option value="${y}">${y}</option>`).join('');
         const buildFeedOptions = (years) => years.map(y => `<option value="${y}">${y}</option>`).join('');
@@ -319,11 +362,23 @@
         document.getElementById('a-series-select').innerHTML = seriesOptionsHTML;
         document.getElementById('c-series-select').innerHTML = seriesOptionsHTML;
 
+        let genreOptionsHTML = buildOptions(genreArray, false);
+        document.getElementById('y-genre-select').innerHTML = genreOptionsHTML;
+        document.getElementById('a-genre-select').innerHTML = genreOptionsHTML;
+        document.getElementById('c-genre-select').innerHTML = genreOptionsHTML;
+
         let defaultSeries = seriesArray.find(s => s.toLowerCase().includes('zelda')) || seriesArray[0];
         if (defaultSeries) {
           document.getElementById('y-series-select').value = defaultSeries;
           document.getElementById('a-series-select').value = defaultSeries;
           document.getElementById('c-series-select').value = defaultSeries;
+        }
+
+        let defaultGenre = genreArray.length > 0 ? genreArray[0] : '';
+        if (defaultGenre) {
+          document.getElementById('y-genre-select').value = defaultGenre;
+          document.getElementById('a-genre-select').value = defaultGenre;
+          document.getElementById('c-genre-select').value = defaultGenre;
         }
 
         // --- 4. RENDER FUNCTIONS ---
@@ -351,12 +406,18 @@
         }
 
         function generateRankedCards(gamesArray, cardClass, isCombined, maxLimit = 25) {
-          let html = ''; let currentRank = 1; let actualPosition = 1; let lastScore = -1;
+          let html = ''; let actualPosition = 1; let lastScore = -1;
           gamesArray.slice(0, maxLimit).forEach(game => {
             let scoreToCompare = isCombined ? game.totalScore : game.score;
-            if (scoreToCompare !== lastScore) { currentRank = actualPosition; lastScore = scoreToCompare; }
+            let rankText = ''; 
+            
+            if (scoreToCompare !== lastScore) { 
+              rankText = `#${actualPosition}`; 
+              lastScore = scoreToCompare; 
+            }
+
             let displayScore = isCombined ? (Number.isInteger(game.totalScore) ? game.totalScore : game.totalScore.toFixed(1)) : (Number.isInteger(game.score) ? game.score : game.score.toFixed(1));
-            html += `<div class="game-card ${cardClass}"><div class="rank-badge">#${currentRank}</div><div class="game-name">${game.name}</div><div class="score-badge" ${isCombined ? 'style="background: #673AB7;"' : ''}>${displayScore}${isCombined ? ' <span style="font-size:0.7em; color:#bbb;">/ 20</span>' : ''}</div></div>`;
+            html += `<div class="game-card ${cardClass}"><div class="rank-badge">${rankText}</div><div class="game-name">${game.name}</div><div class="score-badge" ${isCombined ? 'style="background: #673AB7;"' : ''}>${displayScore}${isCombined ? ' <span style="font-size:0.7em; color:#bbb;">/ 20</span>' : ''}</div></div>`;
             actualPosition++;
           });
           return html || '<div class="score-empty"><br>No rated games found for this filter.</div>';
@@ -400,6 +461,25 @@
           document.getElementById('combined-series-list').innerHTML = generateRankedCards(cData, 'combined-card', true, 1000);
         }
 
+        function renderGenreLeaderboards() {
+          let yGenre = document.getElementById('y-genre-select').value;
+          let aGenre = document.getElementById('a-genre-select').value;
+          let cGenre = document.getElementById('c-genre-select').value;
+
+          let yData = allYoshiGames.filter(g => g.genre === yGenre);
+          yData.sort((a, b) => (b.score - a.score) !== 0 ? (b.score - a.score) : a.name.localeCompare(b.name));
+          
+          let aData = allAppleGames.filter(g => g.genre === aGenre);
+          aData.sort((a, b) => (b.score - a.score) !== 0 ? (b.score - a.score) : a.name.localeCompare(b.name));
+
+          let cData = allCombinedGames.filter(g => g.genre === cGenre);
+          cData.sort((a, b) => (b.totalScore - a.totalScore) !== 0 ? (b.totalScore - a.totalScore) : a.name.localeCompare(b.name));
+
+          document.getElementById('yoshi-genre-list').innerHTML = generateRankedCards(yData, 'yoshi-card', false, 1000);
+          document.getElementById('apple-genre-list').innerHTML = generateRankedCards(aData, 'apple-card', false, 1000);
+          document.getElementById('combined-genre-list').innerHTML = generateRankedCards(cData, 'combined-card', true, 1000);
+        }
+
         // --- 5. INITIALIZE & LISTEN ---
         document.getElementById('y-feed-select').addEventListener('change', renderFeeds);
         document.getElementById('a-feed-select').addEventListener('change', renderFeeds);
@@ -412,14 +492,21 @@
         document.getElementById('a-series-select').addEventListener('change', renderSeriesLeaderboards);
         document.getElementById('c-series-select').addEventListener('change', renderSeriesLeaderboards);
 
+        document.getElementById('y-genre-select').addEventListener('change', renderGenreLeaderboards);
+        document.getElementById('a-genre-select').addEventListener('change', renderGenreLeaderboards);
+        document.getElementById('c-genre-select').addEventListener('change', renderGenreLeaderboards);
+
         renderFeeds();
         renderLeaderboards();
         renderSeriesLeaderboards();
+        renderGenreLeaderboards();
         
         document.getElementById('activity-container').style.display = 'flex';
         document.getElementById('boards-wrapper').style.display = 'flex';
         document.getElementById('series-header').style.display = 'block';
         document.getElementById('series-wrapper').style.display = 'flex';
+        document.getElementById('genre-header').style.display = 'block';
+        document.getElementById('genre-wrapper').style.display = 'flex';
         document.getElementById('loading-text').style.display = 'none';
 
       } catch (err) {
