@@ -18,7 +18,7 @@
     .section-header { text-align: center; margin: 60px 0 30px 0; font-size: 2em; font-weight: 900; text-transform: uppercase; letter-spacing: 2px; color: #111; border-bottom: 3px solid #eee; padding-bottom: 10px;}
 
     /* GOTM SHOWCASE */
-    .gotm-section { background: #fff; border-radius: 12px; padding: 30px; margin-bottom: 20px; box-shadow: 0 10px 20px rgba(0,0,0,0.05); }
+    .gotm-section { background: #fff; border-radius: 12px; padding: 30px; margin-bottom: 40px; box-shadow: 0 10px 20px rgba(0,0,0,0.05); }
     .gotm-header { text-align: center; font-size: 1.2em; font-weight: bold; color: #666; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 20px; }
     
     .hero-card { background: linear-gradient(135deg, #111, #333); color: #fff; border-radius: 12px; padding: 30px; margin-bottom: 20px; box-shadow: 0 8px 15px rgba(0,0,0,0.2); border-top: 4px solid #FFD700; display: flex; align-items: center; justify-content: center; gap: 30px; flex-wrap: wrap; }
@@ -36,7 +36,7 @@
     .mini-game { font-weight: 600; color: #222; margin-bottom: 10px; font-size: 1.1em; }
     .mini-score { background: #333; color: #fff; padding: 3px 10px; border-radius: 4px; font-weight: bold; display: inline-block; }
 
-    /* NEW: SCORE LEGEND */
+    /* SCORE LEGEND */
     .score-legend { display: flex; flex-wrap: wrap; justify-content: center; gap: 15px; margin-bottom: 40px; padding: 15px; background: #fff; border-radius: 8px; box-shadow: 0 4px 10px rgba(0,0,0,0.03); font-size: 0.85em; color: #555; }
     .legend-item { display: flex; align-items: center; gap: 6px; }
     .legend-num { font-weight: 900; color: #111; background: #eee; padding: 3px 7px; border-radius: 4px; font-size: 1.1em; }
@@ -235,15 +235,18 @@
         const defaultImg = "https://via.placeholder.com/160x220/222/555?text=No+Art"; 
         const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 
+        let today = new Date();
+        let currentYYYYMM = today.getFullYear() + "-" + String(today.getMonth() + 1).padStart(2, '0');
+
         for (let i = 1; i < metaRows.length; i++) {
           if (!metaRows[i]) continue;
           
           let gameName = metaRows[i][0] || ''; 
           let yScore = metaRows[i][6] || ''; 
-          let gotmTag = metaRows[i][10] || ''; // Column K
-          let imgUrl = metaRows[i][11] || defaultImg; // Column L
+          let gotmTag = metaRows[i][10] || ''; 
+          let imgUrl = metaRows[i][11] || defaultImg; 
 
-          if (gotmTag && gotmTag.match(/^\d{4}-\d{2}$/)) {
+          if (gotmTag && gotmTag.match(/^\d{4}-\d{2}$/) && gotmTag <= currentYYYYMM) {
             let parts = gotmTag.split('-');
             let yearStr = parts[0];
             let monthNum = parseInt(parts[1], 10);
@@ -275,7 +278,6 @@
           document.getElementById('gotm-container').style.display = 'block';
         }
 
-        // Unhide Legend once data is successfully processing
         document.getElementById('score-legend').style.display = 'flex';
 
         // --- 2. DATA EXTRACTION ---
@@ -367,6 +369,7 @@
         document.getElementById('a-genre-select').innerHTML = genreOptionsHTML;
         document.getElementById('c-genre-select').innerHTML = genreOptionsHTML;
 
+        // Auto-select Legend of Zelda
         let defaultSeries = seriesArray.find(s => s.toLowerCase().includes('zelda')) || seriesArray[0];
         if (defaultSeries) {
           document.getElementById('y-series-select').value = defaultSeries;
@@ -374,7 +377,8 @@
           document.getElementById('c-series-select').value = defaultSeries;
         }
 
-        let defaultGenre = genreArray.length > 0 ? genreArray[0] : '';
+        // Auto-select 2D Platformer
+        let defaultGenre = genreArray.find(g => g.toLowerCase().includes('2d platformer')) || (genreArray.length > 0 ? genreArray[0] : '');
         if (defaultGenre) {
           document.getElementById('y-genre-select').value = defaultGenre;
           document.getElementById('a-genre-select').value = defaultGenre;
