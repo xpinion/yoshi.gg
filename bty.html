@@ -10,36 +10,17 @@
   <style>
     .bty-container { max-width: 1400px; margin: 40px auto; padding: 0 20px; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
     
-    /* --- ASCII ART STYLING --- */
-    .ascii-wrapper {
-      display: flex;
-      justify-content: center;
-      width: 100%;
-      overflow-x: auto;
-      margin-bottom: 10px;
-    }
-    .ascii-art {
-      font-family: 'Courier New', Courier, monospace;
-      font-weight: bold;
-      color: #111;
-      font-size: 14px;
-      line-height: 1.1;
-      text-align: left;
-    }
-    @media (max-width: 768px) {
-      .ascii-art { font-size: 8px; } 
-    }
+    .ascii-wrapper { display: flex; justify-content: center; width: 100%; overflow-x: auto; margin-bottom: 10px; }
+    .ascii-art { font-family: 'Courier New', Courier, monospace; font-weight: bold; color: #111; font-size: 14px; line-height: 1.1; text-align: left; }
+    @media (max-width: 768px) { .ascii-art { font-size: 8px; } }
 
     .dashboard-header { text-align: center; margin-bottom: 20px; font-size: 2.5em; font-weight: 900; text-transform: uppercase; letter-spacing: 2px; color: #111; }
 
-    /* --- GOTM SHOWCASE --- */
+    /* GOTM SHOWCASE */
     .gotm-section { background: #fff; border-radius: 12px; padding: 30px; margin-bottom: 40px; box-shadow: 0 10px 20px rgba(0,0,0,0.05); }
     .gotm-header { text-align: center; font-size: 1.2em; font-weight: bold; color: #666; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 20px; }
     
-    .hero-card { 
-      background: linear-gradient(135deg, #111, #333); color: #fff; border-radius: 12px; padding: 30px; margin-bottom: 20px; box-shadow: 0 8px 15px rgba(0,0,0,0.2); border-top: 4px solid #FFD700; 
-      display: flex; align-items: center; justify-content: center; gap: 30px; flex-wrap: wrap; 
-    }
+    .hero-card { background: linear-gradient(135deg, #111, #333); color: #fff; border-radius: 12px; padding: 30px; margin-bottom: 20px; box-shadow: 0 8px 15px rgba(0,0,0,0.2); border-top: 4px solid #FFD700; display: flex; align-items: center; justify-content: center; gap: 30px; flex-wrap: wrap; }
     .hero-art { width: 160px; height: 220px; border-radius: 8px; object-fit: cover; box-shadow: 0 4px 15px rgba(0,0,0,0.6); }
     .hero-details { text-align: left; }
     @media (max-width: 600px) { .hero-details { text-align: center; } }
@@ -54,7 +35,7 @@
     .mini-game { font-weight: 600; color: #222; margin-bottom: 10px; font-size: 1.1em; }
     .mini-score { background: #333; color: #fff; padding: 3px 10px; border-radius: 4px; font-weight: bold; display: inline-block; }
 
-    /* --- LEADERBOARDS & LISTS --- */
+    /* LEADERBOARDS & LISTS */
     .leaderboards-wrapper { display: flex; flex-wrap: wrap; gap: 25px; justify-content: center; margin-bottom: 40px; }
     .leaderboard-column { flex: 1; min-width: 320px; background: #fff; border-radius: 12px; padding: 20px; box-shadow: 0 10px 20px rgba(0,0,0,0.05); }
     .board-title { text-align: center; font-size: 1.5em; font-weight: bold; margin-bottom: 20px; padding-bottom: 10px; border-bottom: 2px solid #eee; }
@@ -63,10 +44,7 @@
     .apple-title { color: #c62828; }
     .combined-title { color: #673AB7; } 
 
-    /* Interactive Dropdown Styling */
-    .year-dropdown {
-      font-size: 1em; font-weight: 900; color: inherit; background: transparent; border: none; border-bottom: 3px solid rgba(0,0,0,0.1); cursor: pointer; outline: none; font-family: inherit; padding: 0 5px; transition: all 0.2s;
-    }
+    .year-dropdown { font-size: 1em; font-weight: 900; color: inherit; background: transparent; border: none; border-bottom: 3px solid rgba(0,0,0,0.1); cursor: pointer; outline: none; font-family: inherit; padding: 0 5px; transition: all 0.2s; }
     .year-dropdown:hover { border-bottom: 3px solid inherit; opacity: 0.8; }
     .year-dropdown option { color: #111; font-weight: normal; }
 
@@ -82,7 +60,7 @@
     .score-badge { background: #222; color: #fff; font-weight: bold; padding: 5px 10px; border-radius: 6px; font-size: 1.1em; white-space: nowrap; }
     .score-empty { color: #999; font-style: italic; font-size: 0.9em; text-align: center; width: 100%; display: block;}
 
-    /* --- FEED EXTRAS --- */
+    /* FEED EXTRAS */
     .scrollable-feed { max-height: 500px; overflow-y: auto; padding-right: 10px; }
     .scrollable-feed::-webkit-scrollbar { width: 6px; }
     .scrollable-feed::-webkit-scrollbar-track { background: #f1f1f1; border-radius: 4px; }
@@ -180,6 +158,18 @@
         const metaRows = metaData.values;
         const masterRows = masterData.values;
 
+        // --- Bulletproof Date Formatter ---
+        function formatShortDate(dateStr) {
+          // Removes any Google ISO timestamp garbage (like T05:00:00Z)
+          let cleanStr = dateStr.trim().split('T')[0].split(' ')[0];
+          let parts = cleanStr.split(/[-/]/); 
+          if (parts.length >= 3) {
+            if (parts[0].length === 4) return `${parts[1].padStart(2, '0')}/${parts[2].substring(0,2).padStart(2, '0')}`;
+            if (parts[2].length === 4) return `${parts[0].padStart(2, '0')}/${parts[1].padStart(2, '0')}`;
+          }
+          return cleanStr; 
+        }
+
         // --- 1. GAME OF THE MONTH ---
         let currentMonthNum = new Date().getMonth() + 1; 
         let gotmArray = [];
@@ -225,24 +215,28 @@
         let yoshiCompletionYearsSet = new Set();
         let appleCompletionYearsSet = new Set();
         
-        // Memory Filters to block duplicates per year!
         let yoshiSeenCompletions = new Set();
         let appleSeenCompletions = new Set();
 
         for (let i = 1; i < masterRows.length; i++) {
           if (!masterRows[i]) continue;
           let mDate = masterRows[i][1] || ''; let mGame = masterRows[i][2] || ''; let mSystem = masterRows[i][3] || ''; let mStatus = masterRows[i][8] || ''; 
-          if ((mStatus === 'Completed' || mStatus === 'M-Completed') && mDate.length >= 4) {
-            let year = mDate.substring(0,4); 
-            let uniqueKey = year + "||" + mGame; // Creates a key like "2026||Mario Kart World"
+          if (mStatus === 'Completed' || mStatus === 'M-Completed') {
             
-            // Only proceed if we haven't logged this game for this year yet
-            if (!yoshiSeenCompletions.has(uniqueKey)) {
-              yoshiSeenCompletions.add(uniqueKey);
-              yoshiCompletionYearsSet.add(year);
-              let dateParts = mDate.split(/[-/]/); let shortDate = dateParts.length >= 3 ? `${dateParts[1]}/${dateParts[2]}` : mDate;
-              let yScore = ''; let metaMatch = metaRows.find(r => r && r[0] === mGame); if (metaMatch) yScore = metaMatch[6] || ''; 
-              allYoshiCompletions.push({ rawDate: mDate, displayDate: shortDate, game: mGame, score: yScore, system: mSystem, year: year, rowIndex: i });
+            let yearMatch = mDate.match(/\d{4}/);
+            if (yearMatch) {
+              let year = yearMatch[0];
+              // Added toLowerCase and trim for absolute safety against typos!
+              let uniqueKey = year + "||" + mGame.toLowerCase().trim(); 
+              
+              if (!yoshiSeenCompletions.has(uniqueKey)) {
+                yoshiSeenCompletions.add(uniqueKey);
+                yoshiCompletionYearsSet.add(year);
+                
+                let shortDate = formatShortDate(mDate);
+                let yScore = ''; let metaMatch = metaRows.find(r => r && r[0] === mGame); if (metaMatch) yScore = metaMatch[6] || ''; 
+                allYoshiCompletions.push({ rawDate: mDate, displayDate: shortDate, game: mGame, score: yScore, system: mSystem, year: year, rowIndex: i });
+              }
             }
           }
         }
@@ -250,14 +244,17 @@
         for(let i = 1; i < metaRows.length; i++) {
           if (!metaRows[i]) continue;
           let aGame = metaRows[i][0] || ''; let aScore = metaRows[i][7] || ''; let aDate = metaRows[i][8] || ''; let aSystem = metaRows[i][9] || '';   
-          if (aDate && aDate.trim() !== '' && aDate.length >= 4) {
-            let year = aDate.substring(0,4); 
-            let uniqueKey = year + "||" + aGame;
+          
+          let yearMatch = aDate.match(/\d{4}/);
+          if (yearMatch) {
+            let year = yearMatch[0]; 
+            let uniqueKey = year + "||" + aGame.toLowerCase().trim();
             
             if (!appleSeenCompletions.has(uniqueKey)) {
               appleSeenCompletions.add(uniqueKey);
               appleCompletionYearsSet.add(year);
-              let parts = aDate.split('/'); let shortDate = parts.length === 3 ? `${parts[1]}/${parts[2]}` : aDate;
+              
+              let shortDate = formatShortDate(aDate);
               allAppleCompletions.push({ rawDate: aDate, displayDate: shortDate, game: aGame, score: aScore, system: aSystem, year: year, rowIndex: i });
             }
           }
