@@ -192,21 +192,30 @@
           return cleanStr; 
         }
 
-        // --- 1. GAME OF THE MONTH ---
+        // --- 1. SMART GAME OF THE MONTH ---
         let currentMonthNum = new Date().getMonth() + 1; 
         let gotmArray = [];
         const defaultImg = "https://via.placeholder.com/160x220/222/555?text=No+Art"; 
 
         for (let i = 4; i <= 15; i++) {
           if (!btyRows[i]) continue;
-          let rawText = btyRows[i][1] || ''; let score = btyRows[i][2] || ''; let imgUrl = btyRows[i][3] || defaultImg; 
+          let rawText = btyRows[i][1] || ''; let btyScore = btyRows[i][2] || ''; let imgUrl = btyRows[i][3] || defaultImg; 
+          
           if (rawText && rawText.includes('-')) {
             let parts = rawText.split(' - '); let rawMonth = parts[0].trim(); let gameName = parts[1].trim();
+            
+            // Auto-fetch the freshest score directly from Metadata!
+            let finalScore = btyScore;
+            let metaMatch = metaRows.find(r => r && r[0].toLowerCase().trim() === gameName.toLowerCase().trim());
+            if (metaMatch && metaMatch[6]) {
+              finalScore = metaMatch[6]; // Grab Yoshi's live score from Column G
+            }
+
             let numMatch = rawMonth.match(/^(\d{2})/);
             if (numMatch) {
               let mNum = parseInt(numMatch[1], 10);
               let cleanMonthName = (rawMonth.match(/\((.*?)\)/) || [])[1] || rawMonth;
-              if (mNum <= currentMonthNum) gotmArray.push({ num: mNum, monthName: cleanMonthName, game: gameName, score: score, img: imgUrl });
+              if (mNum <= currentMonthNum) gotmArray.push({ num: mNum, monthName: cleanMonthName, game: gameName, score: finalScore, img: imgUrl });
             }
           }
         }
@@ -275,11 +284,8 @@
             if (!metaRows[i]) continue;
             let gameName = metaRows[i][0] || ''; 
             let releaseYear = metaRows[i][1] ? metaRows[i][1].toString() : '';
-            
-            // Safely grab Column F (Index 5)
             let seriesVal = metaRows[i][5];
             let seriesName = (seriesVal === undefined || seriesVal === null) ? '' : String(seriesVal).trim();
-            
             let yNum = parseFloat(metaRows[i][6] || ''); 
             let aNum = parseFloat(metaRows[i][7] || '');
 
@@ -314,7 +320,6 @@
         document.getElementById('a-series-select').innerHTML = seriesOptionsHTML;
         document.getElementById('c-series-select').innerHTML = seriesOptionsHTML;
 
-        // Auto-select "Legend of Zelda" if it exists
         let defaultSeries = seriesArray.find(s => s.toLowerCase().includes('zelda')) || seriesArray[0];
         if (defaultSeries) {
           document.getElementById('y-series-select').value = defaultSeries;
@@ -391,7 +396,6 @@
           let cData = allCombinedGames.filter(g => g.series === cSeries);
           cData.sort((a, b) => (b.totalScore - a.totalScore) !== 0 ? (b.totalScore - a.totalScore) : a.name.localeCompare(b.name));
 
-          // No 25-game limit! Pass 1000 so it renders the entire franchise.
           document.getElementById('yoshi-series-list').innerHTML = generateRankedCards(yData, 'yoshi-card', false, 1000);
           document.getElementById('apple-series-list').innerHTML = generateRankedCards(aData, 'apple-card', false, 1000);
           document.getElementById('combined-series-list').innerHTML = generateRankedCards(cData, 'combined-card', true, 1000);
@@ -413,7 +417,6 @@
         renderLeaderboards();
         renderSeriesLeaderboards();
         
-        // Un-hide everything once it is done loading!
         document.getElementById('activity-container').style.display = 'flex';
         document.getElementById('boards-wrapper').style.display = 'flex';
         document.getElementById('series-header').style.display = 'block';
