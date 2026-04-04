@@ -15,6 +15,7 @@
     @media (max-width: 768px) { .ascii-art { font-size: 8px; } }
 
     .dashboard-header { text-align: center; margin-bottom: 20px; font-size: 2.5em; font-weight: 900; text-transform: uppercase; letter-spacing: 2px; color: #111; }
+    .section-header { text-align: center; margin: 60px 0 30px 0; font-size: 2em; font-weight: 900; text-transform: uppercase; letter-spacing: 2px; color: #111; border-bottom: 3px solid #eee; padding-bottom: 10px;}
 
     /* GOTM SHOWCASE */
     .gotm-section { background: #fff; border-radius: 12px; padding: 30px; margin-bottom: 40px; box-shadow: 0 10px 20px rgba(0,0,0,0.05); }
@@ -137,22 +138,23 @@
       </div>
     </div>
 
+    <div class="section-header" id="series-header" style="display: none;">Franchise Rankings</div>
     <div class="leaderboards-wrapper" id="series-wrapper" style="display: none;">
       <div class="leaderboard-column">
         <div class="board-title yoshi-title">
-          <select id="y-series-select" class="year-dropdown"></select>
+          Yoshi's <select id="y-series-select" class="year-dropdown"></select>
         </div>
         <div id="yoshi-series-list" class="scrollable-feed"></div>
       </div>
       <div class="leaderboard-column">
         <div class="board-title combined-title">
-          <select id="c-series-select" class="year-dropdown"></select>
+          Combined <select id="c-series-select" class="year-dropdown"></select>
         </div>
         <div id="combined-series-list" class="scrollable-feed"></div>
       </div>
       <div class="leaderboard-column">
         <div class="board-title apple-title">
-          <select id="a-series-select" class="year-dropdown"></select>
+          Apple's <select id="a-series-select" class="year-dropdown"></select>
         </div>
         <div id="apple-series-list" class="scrollable-feed"></div>
       </div>
@@ -273,7 +275,11 @@
             if (!metaRows[i]) continue;
             let gameName = metaRows[i][0] || ''; 
             let releaseYear = metaRows[i][1] ? metaRows[i][1].toString() : '';
-            let seriesName = metaRows[i][5] ? metaRows[i][5].toString().trim() : ''; // Column F (Index 5)
+            
+            // Safely grab Column F (Index 5)
+            let seriesVal = metaRows[i][5];
+            let seriesName = (seriesVal === undefined || seriesVal === null) ? '' : String(seriesVal).trim();
+            
             let yNum = parseFloat(metaRows[i][6] || ''); 
             let aNum = parseFloat(metaRows[i][7] || '');
 
@@ -291,18 +297,18 @@
         let yFeedYearsArray = Array.from(yoshiCompletionYearsSet).sort().reverse();
         let aFeedYearsArray = Array.from(appleCompletionYearsSet).sort().reverse();
         let releaseYearsArray = Array.from(releaseYearsSet).sort().reverse();
-        let seriesArray = Array.from(seriesSet).sort(); // Alphabetical sort for Series!
+        let seriesArray = Array.from(seriesSet).sort(); 
 
         const buildOptions = (items, includeAllTime = true) => (includeAllTime ? `<option value="All-Time">All-Time</option>` : '') + items.map(y => `<option value="${y}">${y}</option>`).join('');
+        const buildFeedOptions = (years) => years.map(y => `<option value="${y}">${y}</option>`).join('');
 
-        document.getElementById('y-feed-select').innerHTML = buildOptions(yFeedYearsArray, false);
-        document.getElementById('a-feed-select').innerHTML = buildOptions(aFeedYearsArray, false);
+        document.getElementById('y-feed-select').innerHTML = buildFeedOptions(yFeedYearsArray);
+        document.getElementById('a-feed-select').innerHTML = buildFeedOptions(aFeedYearsArray);
         
         document.getElementById('y-top-select').innerHTML = buildOptions(releaseYearsArray);
         document.getElementById('a-top-select').innerHTML = buildOptions(releaseYearsArray);
         document.getElementById('c-top-select').innerHTML = buildOptions(releaseYearsArray);
 
-        // Populate Series Dropdowns
         let seriesOptionsHTML = buildOptions(seriesArray, false);
         document.getElementById('y-series-select').innerHTML = seriesOptionsHTML;
         document.getElementById('a-series-select').innerHTML = seriesOptionsHTML;
@@ -315,7 +321,6 @@
           document.getElementById('a-series-select').value = defaultSeries;
           document.getElementById('c-series-select').value = defaultSeries;
         }
-
 
         // --- 4. RENDER FUNCTIONS ---
         function renderFeeds() {
@@ -341,7 +346,6 @@
           `).join('') || `<div class="score-empty"><br>No completions logged.</div>`;
         }
 
-        // Updated to accept a maxLimit (25 for Top Lists, Infinity for Series)
         function generateRankedCards(gamesArray, cardClass, isCombined, maxLimit = 25) {
           let html = ''; let currentRank = 1; let actualPosition = 1; let lastScore = -1;
           gamesArray.slice(0, maxLimit).forEach(game => {
@@ -351,7 +355,7 @@
             html += `<div class="game-card ${cardClass}"><div class="rank-badge">#${currentRank}</div><div class="game-name">${game.name}</div><div class="score-badge" ${isCombined ? 'style="background: #673AB7;"' : ''}>${displayScore}${isCombined ? ' <span style="font-size:0.7em; color:#bbb;">/ 20</span>' : ''}</div></div>`;
             actualPosition++;
           });
-          return html || '<div class="score-empty"><br>No rated games found.</div>';
+          return html || '<div class="score-empty"><br>No rated games found for this filter.</div>';
         }
 
         function renderLeaderboards() {
@@ -368,7 +372,6 @@
           let cData = cYear === 'All-Time' ? allCombinedGames : allCombinedGames.filter(g => g.releaseYear === cYear);
           cData.sort((a, b) => (b.totalScore - a.totalScore) !== 0 ? (b.totalScore - a.totalScore) : a.name.localeCompare(b.name));
 
-          // Capped at 25 items
           document.getElementById('yoshi-list').innerHTML = generateRankedCards(yData, 'yoshi-card', false, 25);
           document.getElementById('apple-list').innerHTML = generateRankedCards(aData, 'apple-card', false, 25);
           document.getElementById('combined-list').innerHTML = generateRankedCards(cData, 'combined-card', true, 25);
@@ -410,8 +413,10 @@
         renderLeaderboards();
         renderSeriesLeaderboards();
         
+        // Un-hide everything once it is done loading!
         document.getElementById('activity-container').style.display = 'flex';
         document.getElementById('boards-wrapper').style.display = 'flex';
+        document.getElementById('series-header').style.display = 'block';
         document.getElementById('series-wrapper').style.display = 'flex';
         document.getElementById('loading-text').style.display = 'none';
 
