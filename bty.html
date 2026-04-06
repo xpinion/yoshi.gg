@@ -298,7 +298,7 @@
           return score !== undefined && score !== null && score !== '' && score !== 'N';
         }
 
-        // --- 1. GAME OF THE MONTH ---
+// --- 1. GAME OF THE MONTH ---
         let gotmArray = [];
         const defaultImg = "https://via.placeholder.com/160x220/222/555?text=No+Art"; 
         const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
@@ -311,8 +311,15 @@
           if (!metaRows[i]) continue;
           
           let gameName = metaRows[i][META_GAME] || ''; 
+          
+          // Get Yoshi's Score
           let rawYScore = metaRows[i][META_YOSCORE]; 
           let yScore = isScoreValid(rawYScore) ? rawYScore : ''; 
+          
+          // Get Apple's Score
+          let rawAScore = metaRows[i][META_ASCORE]; 
+          let aScore = isScoreValid(rawAScore) ? rawAScore : ''; 
+          
           let gotmTag = metaRows[i][META_GOTM] || ''; 
           let imgUrl = metaRows[i][META_ART] || defaultImg; 
 
@@ -322,7 +329,8 @@
             let monthNum = parseInt(parts[1], 10);
             let monthName = monthNames[monthNum - 1];
 
-            gotmArray.push({ sortKey: gotmTag, year: yearStr, monthName: monthName, game: gameName, score: yScore, img: imgUrl });
+            // Push both scores to the array
+            gotmArray.push({ sortKey: gotmTag, year: yearStr, monthName: monthName, game: gameName, yScore: yScore, aScore: aScore, img: imgUrl });
           }
         }
 
@@ -330,19 +338,34 @@
 
         if (gotmArray.length > 0) {
           let topGotm = gotmArray[0];
+          
+          // Build Hero Score Badges (Side by Side)
+          let heroScoresHTML = '';
+          if (topGotm.yScore) heroScoresHTML += `<div class="hero-score" style="background: #4CAF50; color: #fff; font-size: 1.2em;">Y: ${topGotm.yScore}</div>`;
+          if (topGotm.aScore) heroScoresHTML += `<div class="hero-score" style="background: #F44336; color: #fff; font-size: 1.2em;">A: ${topGotm.aScore}</div>`;
+
           document.getElementById('hero-gotm').innerHTML = `
             <div class="hero-card">
               <img src="${topGotm.img}" alt="Box Art" class="hero-art">
               <div class="hero-details">
                 <div class="hero-month">${topGotm.monthName} ${topGotm.year} Game of the Month</div>
                 <div class="hero-game">${topGotm.game}</div>
-                ${topGotm.score ? `<div class="hero-score">${topGotm.score} / 10</div>` : ''}
+                <div style="display: flex; gap: 10px; flex-wrap: wrap; justify-content: inherit;">
+                  ${heroScoresHTML}
+                </div>
               </div>
             </div>`;
             
+          // Build Past GOTM Cards
           let pastHTML = '';
           for (let j = 1; j < gotmArray.length; j++) {
-            pastHTML += `<div class="mini-gotm-card"><img src="${gotmArray[j].img}" alt="Box Art" class="mini-art"><div class="mini-month">${gotmArray[j].monthName} ${gotmArray[j].year}</div><div class="mini-game">${gotmArray[j].game}</div>${gotmArray[j].score ? `<div class="mini-score">${gotmArray[j].score}</div>` : ''}</div>`;
+            let miniScoresHTML = '';
+            if (gotmArray[j].yScore) miniScoresHTML += `<span style="color: #4CAF50;">Y:${gotmArray[j].yScore}</span>`;
+            if (gotmArray[j].aScore) miniScoresHTML += (miniScoresHTML ? ' <span style="color:#666;">|</span> ' : '') + `<span style="color: #F44336;">A:${gotmArray[j].aScore}</span>`;
+            
+            let scoreBlock = miniScoresHTML ? `<div class="mini-score" style="background: #222; width: 100%; box-sizing: border-box;">${miniScoresHTML}</div>` : '';
+
+            pastHTML += `<div class="mini-gotm-card"><img src="${gotmArray[j].img}" alt="Box Art" class="mini-art"><div class="mini-month">${gotmArray[j].monthName} ${gotmArray[j].year}</div><div class="mini-game">${gotmArray[j].game}</div>${scoreBlock}</div>`;
           }
           document.getElementById('past-gotm').innerHTML = pastHTML;
           document.getElementById('gotm-container').style.display = 'block';
