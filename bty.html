@@ -574,10 +574,19 @@ function renderFeeds() {
             let normalizedGame = yAct.game.toLowerCase().trim();
             if (aGamesSet.has(normalizedGame)) {
               let aAct = aFiltered.find(a => a.game.toLowerCase().trim() === normalizedGame);
-              // Calculate which date is newer so we can sort the shared feed accurately
+              // Calculate which date is newer so we know exactly when it became a "Shared" completion
               let latestRawDate = yAct.rawDate > aAct.rawDate ? yAct.rawDate : aAct.rawDate;
+              
+              // Handle the System tag (Combine them if they are different)
+              let sysStr = yAct.system;
+              if (yAct.system !== aAct.system) {
+                  sysStr = (yAct.system && aAct.system) ? `${yAct.system} / ${aAct.system}` : (yAct.system || aAct.system);
+              }
+
               sharedCompletions.push({ 
-                game: yAct.game, latestRaw: latestRawDate, 
+                game: yAct.game, 
+                system: sysStr,
+                latestRaw: latestRawDate, 
                 yDate: yAct.displayDate, yNum: yAct.compNum, 
                 aDate: aAct.displayDate, aNum: aAct.compNum 
               });
@@ -590,7 +599,11 @@ function renderFeeds() {
             if (!yGamesSet.has(aAct.game.toLowerCase().trim())) aSolo.push(aAct);
           });
 
-          // Sort shared array by the most recent completion date
+          // Sort shared array ASCENDING by latest completion date to assign the Shared Number
+          sharedCompletions.sort((a, b) => a.latestRaw.localeCompare(b.latestRaw));
+          sharedCompletions.forEach((act, idx) => act.sharedNum = idx + 1);
+
+          // Sort shared array DESCENDING for the final feed display
           sharedCompletions.sort((a, b) => b.latestRaw.localeCompare(a.latestRaw));
 
           // Render Yoshi Solo
@@ -601,7 +614,9 @@ function renderFeeds() {
           // Render Shared Middle Column
           document.getElementById('shared-feed').innerHTML = sharedCompletions.map(act => `
             <div class="game-card combined-card" style="flex-direction: column; align-items: flex-start; gap: 5px;">
-              <div class="game-name" style="width: 100%; text-align: center; font-size: 1.15em; padding: 0;">${act.game}</div>
+              <div class="game-name" style="width: 100%; text-align: center; font-size: 1.15em; padding: 0;">
+                ${act.game}${act.system ? ` (${act.system})` : ''} <span class="completion-num">(#${act.sharedNum})</span>
+              </div>
               <div style="width: 100%; display: flex; justify-content: space-around; font-size: 0.9em; font-weight: bold; background: #eee; padding: 4px; border-radius: 4px;">
                 <span style="color: #4CAF50;">Y: ${act.yDate} (#${act.yNum})</span>
                 <span style="color: #F44336;">A: ${act.aDate} (#${act.aNum})</span>
