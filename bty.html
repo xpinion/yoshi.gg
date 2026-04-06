@@ -87,14 +87,13 @@
     .score-badge { background: #222; color: #fff; font-weight: bold; padding: 5px 10px; border-radius: 6px; font-size: 1.1em; white-space: nowrap; }
     .score-empty { color: #999; font-style: italic; font-size: 0.9em; text-align: center; width: 100%; display: block;}
 
-    /* FEED EXTRAS (Standard Leaderboards - 500px) */
+    /* FEED EXTRAS */
     .scrollable-feed { max-height: 500px; overflow-y: auto; padding-right: 10px; }
     .scrollable-feed::-webkit-scrollbar { width: 6px; }
     .scrollable-feed::-webkit-scrollbar-track { background: #f1f1f1; border-radius: 4px; }
     .scrollable-feed::-webkit-scrollbar-thumb { background: #ccc; border-radius: 4px; }
     .scrollable-feed::-webkit-scrollbar-thumb:hover { background: #999; }
     
-    /* FEED EXTRAS (Tall Feed - 750px so it perfectly clips inside normal monitors) */
     .scrollable-feed-tall { max-height: 750px; overflow-y: auto; padding-right: 10px; }
     .scrollable-feed-tall::-webkit-scrollbar { width: 6px; }
     .scrollable-feed-tall::-webkit-scrollbar-track { background: #f1f1f1; border-radius: 4px; }
@@ -112,17 +111,17 @@
     
     <div class="ascii-wrapper">
 <pre class="ascii-art">
-  ____       _   _               _____ _                   
- | __ )  ___| |_| |_ ___ _ __   |_   _| |__   __ _ _ __    
- |  _ \ / _ \ __| __/ _ \ '__|    | | | '_ \ / _` | '_ \   
- | |_) |  __/ |_| ||  __/ |       | | | | | | (_| | | | |  
- |____/ \___|\__|\__\___|_|       |_| |_| |_|\__,_|_| |_|  
- __   __              ____                 _                  
- \ \ / /__  _   _    / ___| __ _ _ __ ___ (_)_ __   __ _      
-  \ V / _ \| | | |  | |  _ / _` | '_ ` _ \| | '_ \ / _` |     
-   | | (_) | |_| |  | |_| | (_| | | | | | | | | | | (_| |     
-   |_|\___/ \__,_|   \____|\__,_|_| |_| |_|_|_| |_|\__, |     
-                                                   |___/      
+  ____       _   _                _____ _                   
+ | __ )  ___| |_| |_ ___ _ __    |_   _| |__   __ _ _ __    
+ |  _ \ / _ \ __| __/ _ \ '__|     | | | '_ \ / _` | '_ \   
+ | |_) |  __/ |_| ||  __/ |        | | | | | | (_| | | | |  
+ |____/ \___|\__|\__\___|_|        |_| |_| |_|\__,_|_| |_|  
+ __   __             ____                  _                
+ \ \ / /__  _   _   / ___| __ _ _ __ ___ (_)_ __   __ _     
+  \ V / _ \| | | |  | |  _ / _` | '_ ` _ \| | '_ \ / _` |   
+   | | (_) | |_| |  | |_| | (_| | | | | | | | | | | (_| |   
+   |_|\___/ \__,_|   \____|\__,_|_| |_| |_|_|_| |_|\__, |   
+                                                   |___/    
 </pre>
     </div>
 
@@ -237,6 +236,25 @@
   <script src="nav.js"></script>
 
   <script>
+    // --- COLUMN CONSTANTS ---
+    // Metadata Sheet Columns
+    const META_GAME = 0;
+    const META_RELEASE_YEAR = 1;
+    const META_GENRE = 2;
+    const META_SERIES = 5;
+    const META_YOSCORE = 6;
+    const META_ASCORE = 7;
+    const META_ADATE = 8;
+    const META_ASYSTEM = 9;
+    const META_GOTM = 10;
+    const META_ART = 11;
+
+    // Master Sheet Columns
+    const MASTER_DATE = 1;
+    const MASTER_GAME = 2;
+    const MASTER_SYSTEM = 3;
+    const MASTER_STATUS = 8;
+
     async function loadDashboardData() {
       try {
         const [metaResponse, masterResponse] = await Promise.all([
@@ -247,8 +265,24 @@
         const metaData = await metaResponse.json();
         const masterData = await masterResponse.json();
         
+        // --- DATA SAFETY CHECK ---
+        if (!metaData.values || !masterData.values) {
+          document.getElementById('loading-text').innerHTML = '<span style="color: red;">Error: Database structure invalid or empty. Check Google Sheet JSON outputs.</span>';
+          return;
+        }
+
         const metaRows = metaData.values;
         const masterRows = masterData.values;
+
+        // --- PERFORMANCE: BUILD METADATA MAP ---
+        const metaMap = new Map();
+        for (let i = 1; i < metaRows.length; i++) {
+          if (!metaRows[i]) continue;
+          let gameName = metaRows[i][META_GAME] || '';
+          if (gameName) {
+            metaMap.set(gameName, metaRows[i]);
+          }
+        }
 
         function formatShortDate(dateStr) {
           let cleanStr = dateStr.trim().split('T')[0].split(' ')[0];
@@ -258,6 +292,10 @@
             if (parts[2].length === 4) return `${parts[0].padStart(2, '0')}/${parts[1].padStart(2, '0')}`;
           }
           return cleanStr; 
+        }
+
+        function isScoreValid(score) {
+          return score !== undefined && score !== null && score !== '' && score !== 'N';
         }
 
         // --- 1. GAME OF THE MONTH ---
@@ -272,10 +310,11 @@
         for (let i = 1; i < metaRows.length; i++) {
           if (!metaRows[i]) continue;
           
-          let gameName = metaRows[i][0] || ''; 
-          let yScore = metaRows[i][6] || ''; 
-          let gotmTag = metaRows[i][10] || ''; 
-          let imgUrl = metaRows[i][11] || defaultImg; 
+          let gameName = metaRows[i][META_GAME] || ''; 
+          let rawYScore = metaRows[i][META_YOSCORE]; 
+          let yScore = isScoreValid(rawYScore) ? rawYScore : ''; 
+          let gotmTag = metaRows[i][META_GOTM] || ''; 
+          let imgUrl = metaRows[i][META_ART] || defaultImg; 
 
           if (gotmTag && gotmTag.match(/^\d{4}-\d{2}$/) && gotmTag <= currentYYYYMM) {
             let parts = gotmTag.split('-');
@@ -297,13 +336,13 @@
               <div class="hero-details">
                 <div class="hero-month">${topGotm.monthName} ${topGotm.year} Game of the Month</div>
                 <div class="hero-game">${topGotm.game}</div>
-                <div class="hero-score">${topGotm.score} / 10</div>
+                ${topGotm.score ? `<div class="hero-score">${topGotm.score} / 10</div>` : ''}
               </div>
             </div>`;
             
           let pastHTML = '';
           for (let j = 1; j < gotmArray.length; j++) {
-            pastHTML += `<div class="mini-gotm-card"><img src="${gotmArray[j].img}" alt="Box Art" class="mini-art"><div class="mini-month">${gotmArray[j].monthName} ${gotmArray[j].year}</div><div class="mini-game">${gotmArray[j].game}</div><div class="mini-score">${gotmArray[j].score}</div></div>`;
+            pastHTML += `<div class="mini-gotm-card"><img src="${gotmArray[j].img}" alt="Box Art" class="mini-art"><div class="mini-month">${gotmArray[j].monthName} ${gotmArray[j].year}</div><div class="mini-game">${gotmArray[j].game}</div>${gotmArray[j].score ? `<div class="mini-score">${gotmArray[j].score}</div>` : ''}</div>`;
           }
           document.getElementById('past-gotm').innerHTML = pastHTML;
           document.getElementById('gotm-container').style.display = 'block';
@@ -316,9 +355,14 @@
         let yoshiCompletionYearsSet = new Set(); let appleCompletionYearsSet = new Set();
         let yoshiSeenCompletions = new Set(); let appleSeenCompletions = new Set();
 
+        // Process Master Sheet for Yoshi Completions
         for (let i = 1; i < masterRows.length; i++) {
           if (!masterRows[i]) continue;
-          let mDate = masterRows[i][1] || ''; let mGame = masterRows[i][2] || ''; let mSystem = masterRows[i][3] || ''; let mStatus = masterRows[i][8] || ''; 
+          let mDate = masterRows[i][MASTER_DATE] || ''; 
+          let mGame = masterRows[i][MASTER_GAME] || ''; 
+          let mSystem = masterRows[i][MASTER_SYSTEM] || ''; 
+          let mStatus = masterRows[i][MASTER_STATUS] || ''; 
+
           if (mStatus === 'Completed' || mStatus === 'M-Completed') {
             let yearMatch = mDate.match(/\d{4}/);
             if (yearMatch) {
@@ -326,16 +370,28 @@
               if (!yoshiSeenCompletions.has(uniqueKey)) {
                 yoshiSeenCompletions.add(uniqueKey); yoshiCompletionYearsSet.add(year);
                 let shortDate = formatShortDate(mDate);
-                let yScore = ''; let metaMatch = metaRows.find(r => r && r[0] === mGame); if (metaMatch) yScore = metaMatch[6] || ''; 
+                
+                let yScore = ''; 
+                let metaMatch = metaMap.get(mGame); 
+                if (metaMatch && isScoreValid(metaMatch[META_YOSCORE])) {
+                  yScore = metaMatch[META_YOSCORE];
+                }
+                
                 allYoshiCompletions.push({ rawDate: mDate, displayDate: shortDate, game: mGame, score: yScore, system: mSystem, year: year, rowIndex: i });
               }
             }
           }
         }
 
+        // Process Metadata Sheet for Apple Completions
         for(let i = 1; i < metaRows.length; i++) {
           if (!metaRows[i]) continue;
-          let aGame = metaRows[i][0] || ''; let aScore = metaRows[i][7] || ''; let aDate = metaRows[i][8] || ''; let aSystem = metaRows[i][9] || '';   
+          let aGame = metaRows[i][META_GAME] || ''; 
+          let rawAScore = metaRows[i][META_ASCORE];
+          let aScore = isScoreValid(rawAScore) ? rawAScore : ''; 
+          let aDate = metaRows[i][META_ADATE] || ''; 
+          let aSystem = metaRows[i][META_ASYSTEM] || '';   
+
           let yearMatch = aDate.match(/\d{4}/);
           if (yearMatch) {
             let year = yearMatch[0]; let uniqueKey = year + "||" + aGame.toLowerCase().trim();
@@ -379,14 +435,20 @@
 
         for(let i = 1; i < metaRows.length; i++) {
             if (!metaRows[i]) continue;
-            let gameName = metaRows[i][0] || ''; 
-            let releaseYear = metaRows[i][1] ? metaRows[i][1].toString() : '';
-            let genreVal = metaRows[i][2];
+            let gameName = metaRows[i][META_GAME] || ''; 
+            let releaseYear = metaRows[i][META_RELEASE_YEAR] ? metaRows[i][META_RELEASE_YEAR].toString() : '';
+            
+            let genreVal = metaRows[i][META_GENRE];
             let genreName = (genreVal === undefined || genreVal === null) ? '' : String(genreVal).trim();
-            let seriesVal = metaRows[i][5];
+            
+            let seriesVal = metaRows[i][META_SERIES];
             let seriesName = (seriesVal === undefined || seriesVal === null) ? '' : String(seriesVal).trim();
-            let yNum = parseFloat(metaRows[i][6] || ''); 
-            let aNum = parseFloat(metaRows[i][7] || '');
+            
+            let rawY = metaRows[i][META_YOSCORE];
+            let rawA = metaRows[i][META_ASCORE];
+            
+            let yNum = isScoreValid(rawY) ? parseFloat(rawY) : NaN;
+            let aNum = isScoreValid(rawA) ? parseFloat(rawA) : NaN;
 
             if (gameName) {
                 if (releaseYear && (!isNaN(yNum) || !isNaN(aNum))) releaseYearsSet.add(releaseYear);
@@ -539,21 +601,26 @@
           document.getElementById('combined-genre-list').innerHTML = generateRankedCards(cData, 'combined-card', true, 1000);
         }
 
-        // --- 5. INITIALIZE & LISTEN ---
-        document.getElementById('y-feed-select').addEventListener('change', renderFeeds);
-        document.getElementById('a-feed-select').addEventListener('change', renderFeeds);
-        
-        document.getElementById('y-top-select').addEventListener('change', renderLeaderboards);
-        document.getElementById('a-top-select').addEventListener('change', renderLeaderboards);
-        document.getElementById('c-top-select').addEventListener('change', renderLeaderboards);
+        // --- 5. INITIALIZE & LISTEN (WITH SYNCING) ---
+        function setupSync(group, renderFunc) {
+          group.forEach(id => {
+            document.getElementById(id).addEventListener('change', (e) => {
+              let val = e.target.value;
+              group.forEach(targetId => {
+                if (targetId !== id) {
+                  let el = document.getElementById(targetId);
+                  if(el) el.value = val;
+                }
+              });
+              renderFunc();
+            });
+          });
+        }
 
-        document.getElementById('y-series-select').addEventListener('change', renderSeriesLeaderboards);
-        document.getElementById('a-series-select').addEventListener('change', renderSeriesLeaderboards);
-        document.getElementById('c-series-select').addEventListener('change', renderSeriesLeaderboards);
-
-        document.getElementById('y-genre-select').addEventListener('change', renderGenreLeaderboards);
-        document.getElementById('a-genre-select').addEventListener('change', renderGenreLeaderboards);
-        document.getElementById('c-genre-select').addEventListener('change', renderGenreLeaderboards);
+        setupSync(['y-feed-select', 'a-feed-select'], renderFeeds);
+        setupSync(['y-top-select', 'a-top-select', 'c-top-select'], renderLeaderboards);
+        setupSync(['y-series-select', 'a-series-select', 'c-series-select'], renderSeriesLeaderboards);
+        setupSync(['y-genre-select', 'a-genre-select', 'c-genre-select'], renderGenreLeaderboards);
 
         renderFeeds();
         renderLeaderboards();
@@ -569,7 +636,7 @@
         document.getElementById('loading-text').style.display = 'none';
 
       } catch (err) {
-        document.getElementById('loading-text').innerHTML = '<span style="color: red;">Error loading dashboard data.</span>';
+        document.getElementById('loading-text').innerHTML = '<span style="color: red;">Error loading dashboard data. Check console for details.</span>';
         console.error(err);
       }
     }
