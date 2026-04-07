@@ -872,23 +872,6 @@ function renderFeeds() {
             ? (sharedRated.reduce((sum, g) => sum + g.absDiff, 0) / sharedRated.length).toFixed(2) 
             : 0;
 
-          function renderBottomOfTheBarrel() {
-          // Copy the arrays using the spread operator [...] so we don't accidentally reverse the Top 25 lists
-          let yData = [...allYoshiGames];
-          let aData = [...allAppleGames];
-          let cData = [...allCombinedGames];
-
-          // Sort ascending (lowest scores first)
-          yData.sort((a, b) => (a.score - b.score) !== 0 ? (a.score - b.score) : a.name.localeCompare(b.name));
-          aData.sort((a, b) => (a.score - b.score) !== 0 ? (a.score - b.score) : a.name.localeCompare(b.name));
-          cData.sort((a, b) => (a.totalScore - b.totalScore) !== 0 ? (a.totalScore - b.totalScore) : a.name.localeCompare(b.name));
-
-          // We can reuse the generateRankedCards function perfectly here! Rank #1 will naturally go to the lowest score.
-          document.getElementById('yoshi-bottom-list').innerHTML = generateRankedCards(yData, 'yoshi-card', false, 25);
-          document.getElementById('apple-bottom-list').innerHTML = generateRankedCards(aData, 'apple-card', false, 25);
-          document.getElementById('combined-bottom-list').innerHTML = generateRankedCards(cData, 'combined-card', true, 25);
-        }
-
           // Custom card builder to show the individual scores inside the list item
           function buildDeltaCards(gamesArray, cardClass, maxLimit = 25) {
             let html = ''; 
@@ -952,6 +935,24 @@ function renderFeeds() {
               <div style="font-size: 0.8em; color: #777; margin-top: 10px; font-style: italic;">Lifetime average score given out of 10</div>
             </div>
           `;
+        }
+
+        // MOVED OUTSIDE OF THE GREAT DIVIDE FUNCTION
+        function renderBottomOfTheBarrel() {
+          // Copy the arrays using the spread operator [...] so we don't accidentally reverse the Top 25 lists
+          let yData = [...allYoshiGames];
+          let aData = [...allAppleGames];
+          let cData = [...allCombinedGames];
+
+          // Sort ascending (lowest scores first)
+          yData.sort((a, b) => (a.score - b.score) !== 0 ? (a.score - b.score) : a.name.localeCompare(b.name));
+          aData.sort((a, b) => (a.score - b.score) !== 0 ? (a.score - b.score) : a.name.localeCompare(b.name));
+          cData.sort((a, b) => (a.totalScore - b.totalScore) !== 0 ? (a.totalScore - b.totalScore) : a.name.localeCompare(b.name));
+
+          // We can reuse the generateRankedCards function perfectly here! Rank #1 will naturally go to the lowest score.
+          document.getElementById('yoshi-bottom-list').innerHTML = generateRankedCards(yData, 'yoshi-card', false, 25);
+          document.getElementById('apple-bottom-list').innerHTML = generateRankedCards(aData, 'apple-card', false, 25);
+          document.getElementById('combined-bottom-list').innerHTML = generateRankedCards(cData, 'combined-card', true, 25);
         }
 
         // --- 5. INITIALIZE & LISTEN (WITH SYNCING) ---
