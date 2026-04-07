@@ -108,6 +108,11 @@
     .chart-label { width: 45%; font-weight: 600; color: #555; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding-right: 10px; text-align: right; }
     .chart-bar-wrap { width: 55%; background: #ddd; border-radius: 10px; height: 16px; overflow: hidden; box-shadow: inset 0 1px 3px rgba(0,0,0,0.2); }
     .chart-bar { height: 100%; border-radius: 10px; display: flex; align-items: center; justify-content: flex-end; padding-right: 8px; color: white; font-size: 0.8em; font-weight: bold; transition: width 0.5s ease; min-width: 20px;}
+    /* THE GREAT DIVIDE / SYNERGY STATS */
+    .delta-badge { background: #333; color: #FFD700; font-weight: bold; padding: 5px 10px; border-radius: 6px; font-size: 1.1em; white-space: nowrap; margin-left: 10px; border: 1px solid #FFD700; box-shadow: 0 2px 4px rgba(0,0,0,0.2); }
+    .synergy-box { background: #f8f9fa; border-radius: 12px; padding: 25px 20px; text-align: center; margin-bottom: 15px; border: 1px solid #eee; box-shadow: inset 0 2px 5px rgba(0,0,0,0.02); }
+    .synergy-num { font-size: 3em; font-weight: 900; color: #673AB7; margin: 10px 0; text-shadow: 2px 2px 0px rgba(103,58,183,0.1); }
+    .synergy-label { font-size: 0.95em; font-weight: bold; color: #888; text-transform: uppercase; letter-spacing: 2px; }
   </style>
 </head>
 <body>
@@ -266,7 +271,31 @@
       </div>
       
     </div>
+<div class="section-header" id="divide-header" style="display: none;">The Great Divide</div>
+    <div class="leaderboards-wrapper" id="divide-wrapper" style="display: none;">
+      
+      <div class="leaderboard-column">
+        <div class="board-title yoshi-title">
+          Hills Yoshi Will Die On<br><span style="font-size: 0.5em; color: #666; text-transform: uppercase;">Games Apple Didn't Get</span>
+        </div>
+        <div id="yoshi-loved-list" class="scrollable-feed"></div>
+      </div>
+      
+      <div class="leaderboard-column" style="display: flex; flex-direction: column; gap: 10px;">
+        <div class="board-title combined-title" style="text-shadow: 0 0 5px rgba(103,58,183,0.2);">
+          Synergy Report<br><span style="font-size: 0.5em; color: #666; text-transform: uppercase;">How much do you agree?</span>
+        </div>
+        <div id="synergy-stats" style="flex: 1; display: flex; flex-direction: column; justify-content: center;"></div>
+      </div>
 
+      <div class="leaderboard-column">
+        <div class="board-title apple-title">
+          Hills Apple Will Die On<br><span style="font-size: 0.5em; color: #666; text-transform: uppercase;">Games Yoshi Didn't Get</span>
+        </div>
+        <div id="apple-loved-list" class="scrollable-feed"></div>
+      </div>
+      
+    </div>
   </div>
 
   <script>
@@ -779,6 +808,75 @@ function renderFeeds() {
           document.getElementById('blind-spot-charts').innerHTML = chartsHTML || '<div class="score-empty">No blind spots found!</div>';
         }
 
+        function renderGreatDivide() {
+          let sharedRated = [];
+          
+          // Gather all games where BOTH users have a valid score
+          for (let i = 1; i < metaRows.length; i++) {
+            if (!metaRows[i]) continue;
+            let gameName = metaRows[i][META_GAME] || '';
+            let rawY = metaRows[i][META_YOSCORE];
+            let rawA = metaRows[i][META_ASCORE];
+            
+            if (gameName && isScoreValid(rawY) && isScoreValid(rawA)) {
+              let yNum = parseFloat(rawY);
+              let aNum = parseFloat(rawA);
+              sharedRated.push({
+                name: gameName,
+                yScore: yNum,
+                aScore: aNum,
+                diff: parseFloat((yNum - aNum).toFixed(1)),
+                absDiff: parseFloat(Math.abs(yNum - aNum).toFixed(1))
+              });
+            }
+          }
+
+          // Sort the lists by the biggest difference
+          let yoshiLoved = sharedRated.filter(g => g.diff > 0).sort((a, b) => b.diff - a.diff);
+          let appleLoved = sharedRated.filter(g => g.diff < 0).sort((a, b) => b.absDiff - a.absDiff);
+          
+          // Calculate Synergy Stats
+          let perfectMatches = sharedRated.filter(g => g.diff === 0).length;
+          let avgDiff = sharedRated.length > 0 
+            ? (sharedRated.reduce((sum, g) => sum + g.absDiff, 0) / sharedRated.length).toFixed(2) 
+            : 0;
+
+          // Custom card builder to show the individual scores inside the list item
+          function buildDeltaCards(gamesArray, cardClass, maxLimit = 25) {
+            let html = ''; 
+            gamesArray.slice(0, maxLimit).forEach((game, idx) => {
+              let deltaStr = game.absDiff;
+              html += `<div class="game-card ${cardClass}">
+                <div class="rank-badge">#${idx + 1}</div>
+                <div class="game-name" style="display: flex; flex-direction: column;">
+                  <span>${game.name}</span>
+                  <span style="font-size: 0.8em; color: #888; font-weight: normal; margin-top: 2px;">
+                    Y: ${game.yScore} | A: ${game.aScore}
+                  </span>
+                </div>
+                <div class="delta-badge">Δ ${deltaStr}</div>
+              </div>`;
+            });
+            return html || '<div class="score-empty"><br>No major disagreements found.</div>';
+          }
+
+          document.getElementById('yoshi-loved-list').innerHTML = buildDeltaCards(yoshiLoved, 'yoshi-card', 25);
+          document.getElementById('apple-loved-list').innerHTML = buildDeltaCards(appleLoved, 'apple-card', 25);
+
+          document.getElementById('synergy-stats').innerHTML = `
+            <div class="synergy-box">
+              <div class="synergy-label">Average Score Variance</div>
+              <div class="synergy-num">Δ ${avgDiff}</div>
+              <div style="font-size: 0.85em; color: #777; font-style: italic;">Across ${sharedRated.length} shared ratings</div>
+            </div>
+            <div class="synergy-box" style="margin-bottom: 0;">
+              <div class="synergy-label">Perfect Matches</div>
+              <div class="synergy-num">${perfectMatches}</div>
+              <div style="font-size: 0.85em; color: #777; font-style: italic;">Games given the exact same score</div>
+            </div>
+          `;
+        }
+
         // --- 5. INITIALIZE & LISTEN (WITH SYNCING) ---
         function setupSync(group, renderFunc) {
           group.forEach(id => {
@@ -805,6 +903,9 @@ function renderFeeds() {
         renderSeriesLeaderboards();
         renderGenreLeaderboards();
         renderBlindSpots();
+        renderGreatDivide();
+        document.getElementById('divide-header').style.display = 'block';
+        document.getElementById('divide-wrapper').style.display = 'flex';
         document.getElementById('blindspot-header').style.display = 'block';
         document.getElementById('blindspot-wrapper').style.display = 'flex';
         
