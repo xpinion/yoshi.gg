@@ -863,16 +863,45 @@ function renderFeeds() {
           document.getElementById('yoshi-loved-list').innerHTML = buildDeltaCards(yoshiLoved, 'yoshi-card', 25);
           document.getElementById('apple-loved-list').innerHTML = buildDeltaCards(appleLoved, 'apple-card', 25);
 
+          // --- Calculate Overall Average Scores for the Bar Chart ---
+          let yTotal = allYoshiGames.reduce((sum, g) => sum + g.score, 0);
+          let yAvg = allYoshiGames.length > 0 ? (yTotal / allYoshiGames.length).toFixed(2) : 0;
+          let yPct = (yAvg / 10) * 100; // Calculate width out of 10
+
+          let aTotal = allAppleGames.reduce((sum, g) => sum + g.score, 0);
+          let aAvg = allAppleGames.length > 0 ? (aTotal / allAppleGames.length).toFixed(2) : 0;
+          let aPct = (aAvg / 10) * 100; // Calculate width out of 10
+
           document.getElementById('synergy-stats').innerHTML = `
             <div class="synergy-box">
               <div class="synergy-label">Average Score Variance</div>
               <div class="synergy-num">Δ ${avgDiff}</div>
               <div style="font-size: 0.85em; color: #777; font-style: italic;">Across ${sharedRated.length} shared ratings</div>
             </div>
-            <div class="synergy-box" style="margin-bottom: 0;">
+            
+            <div class="synergy-box">
               <div class="synergy-label">Perfect Matches</div>
               <div class="synergy-num">${perfectMatches}</div>
               <div style="font-size: 0.85em; color: #777; font-style: italic;">Games given the exact same score</div>
+            </div>
+
+            <div class="synergy-box" style="margin-bottom: 0; padding: 20px 15px;">
+              <div class="synergy-label" style="margin-bottom: 15px;">Overall Critic Profile</div>
+              
+              <div class="chart-row" style="margin-bottom: 12px;">
+                <div class="chart-label" style="width: 25%; font-size: 1.1em; color: #4CAF50;">Yoshi</div>
+                <div class="chart-bar-wrap" style="width: 75%; height: 20px; background: #ddd;">
+                  <div class="chart-bar" style="width: ${yPct}%; background: #4CAF50; font-size: 0.9em;">${yAvg}</div>
+                </div>
+              </div>
+              
+              <div class="chart-row" style="margin-bottom: 5px;">
+                <div class="chart-label" style="width: 25%; font-size: 1.1em; color: #F44336;">Apple</div>
+                <div class="chart-bar-wrap" style="width: 75%; height: 20px; background: #ddd;">
+                  <div class="chart-bar" style="width: ${aPct}%; background: #F44336; font-size: 0.9em;">${aAvg}</div>
+                </div>
+              </div>
+              <div style="font-size: 0.8em; color: #777; margin-top: 10px; font-style: italic;">Lifetime average score given out of 10</div>
             </div>
           `;
         }
