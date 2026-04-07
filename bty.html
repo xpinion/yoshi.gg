@@ -113,6 +113,10 @@
     .synergy-box { background: #f8f9fa; border-radius: 12px; padding: 25px 20px; text-align: center; margin-bottom: 15px; border: 1px solid #eee; box-shadow: inset 0 2px 5px rgba(0,0,0,0.02); }
     .synergy-num { font-size: 3em; font-weight: 900; color: #673AB7; margin: 10px 0; text-shadow: 2px 2px 0px rgba(103,58,183,0.1); }
     .synergy-label { font-size: 0.95em; font-weight: bold; color: #888; text-transform: uppercase; letter-spacing: 2px; }
+    /* BOTTOM OF THE BARREL */
+    .dk-barrel-icon { height: 1.3em; vertical-align: middle; margin: 0 5px; filter: drop-shadow(0 5px 5px rgba(255, 69, 0, 0.6)); transform: translateY(-3px); }
+    .fire-column { position: relative; overflow: hidden; }
+    .fire-column::after { content: ''; position: absolute; bottom: 0; left: 0; width: 100%; height: 50px; background: linear-gradient(to top, rgba(255, 69, 0, 0.2), transparent); pointer-events: none; border-radius: 0 0 12px 12px; }
   </style>
 </head>
 <body>
@@ -293,6 +297,33 @@
           Hills Apple Will Die On<br><span style="font-size: 0.5em; color: #666; text-transform: uppercase;">Games Yoshi Didn't Get</span>
         </div>
         <div id="apple-loved-list" class="scrollable-feed"></div>
+      </div>
+      
+    </div>
+    <div class="section-header" id="barrel-header" style="display: none;">
+      Bottom of the <img src="barrel-arrow-down.png" class="dk-barrel-icon" alt="Barrel">
+    </div>
+    <div class="leaderboards-wrapper" id="barrel-wrapper" style="display: none;">
+      
+      <div class="leaderboard-column">
+        <div class="board-title yoshi-title">
+          Yoshi's Worst<br><span style="font-size: 0.5em; color: #666; text-transform: uppercase;">Lowest Rated</span>
+        </div>
+        <div id="yoshi-bottom-list" class="scrollable-feed"></div>
+      </div>
+      
+      <div class="leaderboard-column fire-column">
+        <div class="board-title combined-title" style="color: #d32f2f; border-bottom-color: #ffcdd2;">
+          The Trash Fire<br><span style="font-size: 0.5em; color: #d32f2f; text-transform: uppercase;">Lowest Combined Scores</span>
+        </div>
+        <div id="combined-bottom-list" class="scrollable-feed"></div>
+      </div>
+
+      <div class="leaderboard-column">
+        <div class="board-title apple-title">
+          Apple's Worst<br><span style="font-size: 0.5em; color: #666; text-transform: uppercase;">Lowest Rated</span>
+        </div>
+        <div id="apple-bottom-list" class="scrollable-feed"></div>
       </div>
       
     </div>
@@ -841,6 +872,23 @@ function renderFeeds() {
             ? (sharedRated.reduce((sum, g) => sum + g.absDiff, 0) / sharedRated.length).toFixed(2) 
             : 0;
 
+          function renderBottomOfTheBarrel() {
+          // Copy the arrays using the spread operator [...] so we don't accidentally reverse the Top 25 lists
+          let yData = [...allYoshiGames];
+          let aData = [...allAppleGames];
+          let cData = [...allCombinedGames];
+
+          // Sort ascending (lowest scores first)
+          yData.sort((a, b) => (a.score - b.score) !== 0 ? (a.score - b.score) : a.name.localeCompare(b.name));
+          aData.sort((a, b) => (a.score - b.score) !== 0 ? (a.score - b.score) : a.name.localeCompare(b.name));
+          cData.sort((a, b) => (a.totalScore - b.totalScore) !== 0 ? (a.totalScore - b.totalScore) : a.name.localeCompare(b.name));
+
+          // We can reuse the generateRankedCards function perfectly here! Rank #1 will naturally go to the lowest score.
+          document.getElementById('yoshi-bottom-list').innerHTML = generateRankedCards(yData, 'yoshi-card', false, 25);
+          document.getElementById('apple-bottom-list').innerHTML = generateRankedCards(aData, 'apple-card', false, 25);
+          document.getElementById('combined-bottom-list').innerHTML = generateRankedCards(cData, 'combined-card', true, 25);
+        }
+
           // Custom card builder to show the individual scores inside the list item
           function buildDeltaCards(gamesArray, cardClass, maxLimit = 25) {
             let html = ''; 
@@ -933,6 +981,9 @@ function renderFeeds() {
         renderGenreLeaderboards();
         renderBlindSpots();
         renderGreatDivide();
+        renderBottomOfTheBarrel();
+        document.getElementById('barrel-header').style.display = 'block';
+        document.getElementById('barrel-wrapper').style.display = 'flex';
         document.getElementById('divide-header').style.display = 'block';
         document.getElementById('divide-wrapper').style.display = 'flex';
         document.getElementById('blindspot-header').style.display = 'block';
