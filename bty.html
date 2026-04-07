@@ -152,19 +152,19 @@
 <div id="activity-container" class="leaderboards-wrapper" style="display: none;">
       <div class="leaderboard-column">
         <div class="board-title yoshi-title">
-          Yoshi's <select id="y-feed-select" class="year-dropdown"></select>
+          Yoshi's <select id="y-feed-select" class="year-dropdown"></select> Completions
         </div>
         <div id="yoshi-feed" class="scrollable-feed-tall"></div>
       </div>
       <div class="leaderboard-column">
         <div class="board-title combined-title" style="text-shadow: 0 0 5px rgba(103,58,183,0.2);">
-          Shared <select id="c-feed-select" class="year-dropdown"></select>
+          Shared <select id="c-feed-select" class="year-dropdown"></select> Completions
         </div>
         <div id="shared-feed" class="scrollable-feed-tall"></div>
       </div>
       <div class="leaderboard-column">
         <div class="board-title apple-title">
-          Apple's <select id="a-feed-select" class="year-dropdown"></select>
+          Apple's <select id="a-feed-select" class="year-dropdown"></select> Completions
         </div>
         <div id="apple-feed" class="scrollable-feed-tall"></div>
       </div>
@@ -559,12 +559,9 @@ function renderFeeds() {
           aFiltered.sort((a, b) => b.rawDate.localeCompare(a.rawDate) || b.compNum - a.compNum);
 
           // Find the Overlap (Shared Completions)
-          let yGamesSet = new Set(yFiltered.map(act => act.game.toLowerCase().trim()));
           let aGamesSet = new Set(aFiltered.map(act => act.game.toLowerCase().trim()));
           
           let sharedCompletions = [];
-          let ySolo = [];
-          let aSolo = [];
 
           yFiltered.forEach(yAct => {
             let normalizedGame = yAct.game.toLowerCase().trim();
@@ -586,13 +583,7 @@ function renderFeeds() {
                 yDate: yAct.displayDate, yNum: yAct.compNum, 
                 aDate: aAct.displayDate, aNum: aAct.compNum 
               });
-            } else {
-              ySolo.push(yAct);
             }
-          });
-
-          aFiltered.forEach(aAct => {
-            if (!yGamesSet.has(aAct.game.toLowerCase().trim())) aSolo.push(aAct);
           });
 
           // Sort shared array ASCENDING by latest completion date to assign the Shared Number
@@ -602,10 +593,10 @@ function renderFeeds() {
           // Sort shared array DESCENDING for the final feed display
           sharedCompletions.sort((a, b) => b.latestRaw.localeCompare(a.latestRaw));
 
-          // Render Yoshi Solo
-          document.getElementById('yoshi-feed').innerHTML = ySolo.map(act => `
+          // Render Yoshi Feed (Using FULL list)
+          document.getElementById('yoshi-feed').innerHTML = yFiltered.map(act => `
             <div class="game-card yoshi-card"><div class="rank-badge feed-date-badge">${act.displayDate}</div><div class="game-name">${act.game}${act.system ? ` (${act.system})` : ''} <span class="completion-num">(#${act.compNum})</span></div>${act.score ? `<div class="score-badge">${act.score}</div>` : ''}</div>
-          `).join('') || `<div class="score-empty"><br>No solo completions.</div>`;
+          `).join('') || `<div class="score-empty"><br>No completions logged.</div>`;
 
           // Render Shared Middle Column
           document.getElementById('shared-feed').innerHTML = sharedCompletions.map(act => `
@@ -620,10 +611,10 @@ function renderFeeds() {
             </div>
           `).join('') || `<div class="score-empty"><br>No shared completions this year.</div>`;
 
-          // Render Apple Solo
-          document.getElementById('apple-feed').innerHTML = aSolo.map(act => `
+          // Render Apple Feed (Using FULL list)
+          document.getElementById('apple-feed').innerHTML = aFiltered.map(act => `
             <div class="game-card apple-card"><div class="rank-badge feed-date-badge">${act.displayDate}</div><div class="game-name">${act.game}${act.system ? ` (${act.system})` : ''} <span class="completion-num">(#${act.compNum})</span></div>${act.score ? `<div class="score-badge">${act.score}</div>` : ''}</div>
-          `).join('') || `<div class="score-empty"><br>No solo completions.</div>`;
+          `).join('') || `<div class="score-empty"><br>No completions logged.</div>`;
         }
 
         function generateRankedCards(gamesArray, cardClass, isCombined, maxLimit = 25) {
