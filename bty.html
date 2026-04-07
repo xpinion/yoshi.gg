@@ -243,11 +243,12 @@
     </div>
     <div class="section-header" id="blindspot-header" style="display: none;">Blind Spots</div>
     <div class="leaderboards-wrapper" id="blindspot-wrapper" style="display: none;">
+      
       <div class="leaderboard-column">
-        <div class="board-title yoshi-title">
-          Apple's Homework<br><span style="font-size: 0.5em; color: #666; text-transform: uppercase;">Yoshi's Top Rated Unplayed</span>
+        <div class="board-title apple-title">
+          Yoshi's Homework<br><span style="font-size: 0.5em; color: #666; text-transform: uppercase;">Apple's Top Rated Unplayed</span>
         </div>
-        <div id="yoshi-blind-list" class="scrollable-feed"></div>
+        <div id="apple-blind-list" class="scrollable-feed"></div>
       </div>
       
       <div class="leaderboard-column" style="display: flex; flex-direction: column; gap: 10px;">
@@ -258,11 +259,12 @@
       </div>
 
       <div class="leaderboard-column">
-        <div class="board-title apple-title">
-          Yoshi's Homework<br><span style="font-size: 0.5em; color: #666; text-transform: uppercase;">Apple's Top Rated Unplayed</span>
+        <div class="board-title yoshi-title">
+          Apple's Homework<br><span style="font-size: 0.5em; color: #666; text-transform: uppercase;">Yoshi's Top Rated Unplayed</span>
         </div>
-        <div id="apple-blind-list" class="scrollable-feed"></div>
+        <div id="yoshi-blind-list" class="scrollable-feed"></div>
       </div>
+      
     </div>
 
   </div>
@@ -740,7 +742,7 @@ function renderFeeds() {
           document.getElementById('apple-blind-list').innerHTML = generateRankedCards(yoshisHomework, 'apple-card', false, 25);
 
           // Calculate Genre Breakdown for the Charts (Analyzing the entire backlog, not just Top 25)
-          function getTopGenres(gamesArray, limit = 3) {
+          function getTopGenres(gamesArray, limit = 5) {
             let counts = {};
             gamesArray.forEach(g => {
               if (g.genre) counts[g.genre] = (counts[g.genre] || 0) + 1;
@@ -751,8 +753,8 @@ function renderFeeds() {
               .slice(0, limit);
           }
 
-          let applesHomeworkGenres = getTopGenres(applesHomework, 3);
-          let yoshisHomeworkGenres = getTopGenres(yoshisHomework, 3);
+          let applesHomeworkGenres = getTopGenres(applesHomework, 5);
+          let yoshisHomeworkGenres = getTopGenres(yoshisHomework, 5);
 
           function buildChartHTML(title, data, color) {
             if (data.length === 0) return '';
@@ -770,8 +772,9 @@ function renderFeeds() {
             return `<div class="chart-container"><div class="chart-title" style="color: ${color};">${title}</div>${rows}</div>`;
           }
 
-          let chartsHTML = buildChartHTML("Mostly Missing (Apple)", applesHomeworkGenres, "#4CAF50") + 
-                           buildChartHTML("Mostly Missing (Yoshi)", yoshisHomeworkGenres, "#F44336");
+          // Swap chart order to match layout: Yoshi's Homework (Red) on top, Apple's Homework (Green) on bottom
+          let chartsHTML = buildChartHTML("Mostly Missing (Yoshi)", yoshisHomeworkGenres, "#F44336") + 
+                           buildChartHTML("Mostly Missing (Apple)", applesHomeworkGenres, "#4CAF50");
                            
           document.getElementById('blind-spot-charts').innerHTML = chartsHTML || '<div class="score-empty">No blind spots found!</div>';
         }
