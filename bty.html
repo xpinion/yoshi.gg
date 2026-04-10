@@ -731,7 +731,9 @@
         renderFeeds(); renderLeaderboards(); renderSeriesLeaderboards(); renderGenreLeaderboards();
         renderBlindSpots(); renderGreatDivide(); renderBottomOfTheBarrel();
 
-        ['barrel-header', 'barrel-wrapper', 'divide-header', 'divide-wrapper', 'blindspot-header', 'blindspot-wrapper', 'activity-container', 'boards-wrapper', 'series-header', 'series-wrapper', 'genre-header', 'genre-wrapper', 'main-nav'].forEach(id => document.getElementById(id).style.display = document.getElementById(id).tagName === 'DIV' && id.includes('wrapper') ? 'flex' : 'block');
+        ['barrel-header', 'barrel-wrapper', 'divide-header', 'divide-wrapper', 'blindspot-header', 'blindspot-wrapper', 'activity-container', 'boards-wrapper', 'series-header', 'series-wrapper', 'genre-header', 'genre-wrapper', 'main-nav'].forEach(id => {
+          document.getElementById(id).style.display = ''; 
+        });
         document.getElementById('loading-text').style.display = 'none';
 
       } catch (err) {
