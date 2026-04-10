@@ -4,1007 +4,242 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Co-op Dashboard | yoshi.gg</title>
-  
   <link rel="stylesheet" href="style.css">
-
   <style>
-    .bty-container { max-width: 1400px; margin: 40px auto; padding: 0 20px; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+    :root { --yoshi: #4CAF50; --apple: #F44336; --shared: #673AB7; --gold: #FFD700; }
+    .bty-container { max-width: 1400px; margin: 40px auto; padding: 0 20px; font-family: 'Segoe UI', system-ui, sans-serif; }
     
-    .ascii-wrapper { display: flex; justify-content: center; width: 100%; overflow-x: auto; margin-bottom: 10px; }
-    .ascii-art { font-family: 'Courier New', Courier, monospace; font-weight: bold; color: #111; font-size: 14px; line-height: 1.1; text-align: left; }
-    @media (max-width: 768px) { .ascii-art { font-size: 8px; } }
+    /* ASCII & Headers */
+    .ascii-wrapper { display: flex; justify-content: center; overflow-x: auto; margin-bottom: 10px; }
+    .ascii-art { font-family: 'Courier New', monospace; font-weight: bold; font-size: 14px; line-height: 1.1; }
+    .dashboard-header { text-align: center; margin-bottom: 20px; font-size: 2.5em; font-weight: 900; text-transform: uppercase; color: #111; }
+    .section-header { text-align: center; margin: 60px 0 30px 0; font-size: 2em; font-weight: 900; text-transform: uppercase; border-bottom: 3px solid #eee; padding-bottom: 10px;}
 
-    .dashboard-header { text-align: center; margin-bottom: 20px; font-size: 2.5em; font-weight: 900; text-transform: uppercase; letter-spacing: 2px; color: #111; }
-    .section-header { text-align: center; margin: 60px 0 30px 0; font-size: 2em; font-weight: 900; text-transform: uppercase; letter-spacing: 2px; color: #111; border-bottom: 3px solid #eee; padding-bottom: 10px;}
+    /* Layout Grids */
+    .leaderboards-wrapper { display: grid; grid-template-columns: repeat(auto-fit, minmax(350px, 1fr)); gap: 25px; margin-bottom: 40px; }
+    .leaderboard-column { background: #fff; border-radius: 12px; padding: 20px; box-shadow: 0 10px 20px rgba(0,0,0,0.05); }
 
-    /* GOTM SHOWCASE */
-    .gotm-section { background: #fff; border-radius: 12px; padding: 30px; margin-bottom: 40px; box-shadow: 0 10px 20px rgba(0,0,0,0.05); }
-    .gotm-header { text-align: center; font-size: 1.2em; font-weight: bold; color: #666; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 20px; }
+    /* Cards & Tooltips */
+    .game-card { background: #f8f9fa; margin-bottom: 10px; border-radius: 8px; padding: 12px 15px; border-left: 5px solid #ccc; position: relative; transition: 0.2s; cursor: help; }
+    .game-card:hover { transform: translateX(5px); box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+    .yoshi-card { border-left-color: var(--yoshi); }
+    .apple-card { border-left-color: var(--apple); }
+    .combined-card { border-left-color: var(--shared); }
     
-    .hero-card { background: linear-gradient(135deg, #111, #333); color: #fff; border-radius: 12px; padding: 30px; margin-bottom: 20px; box-shadow: 0 8px 15px rgba(0,0,0,0.2); border-top: 4px solid #FFD700; display: flex; align-items: center; justify-content: center; gap: 30px; flex-wrap: wrap; }
-    .hero-art { width: 160px; height: 220px; border-radius: 8px; object-fit: cover; box-shadow: 0 4px 15px rgba(0,0,0,0.6); }
-    .hero-details { text-align: left; }
-    @media (max-width: 600px) { .hero-details { text-align: center; } }
-    .hero-month { color: #FFD700; font-weight: bold; letter-spacing: 2px; text-transform: uppercase; font-size: 0.9em; margin-bottom: 5px; }
-    .hero-game { font-size: 2.5em; font-weight: 900; margin-bottom: 15px; }
-    .hero-score { display: inline-block; background: #FFD700; color: #111; font-size: 1.5em; font-weight: 900; padding: 5px 20px; border-radius: 30px; }
-    
-    .past-gotm-grid { display: flex; gap: 15px; overflow-x: auto; padding-bottom: 15px; }
-    .mini-gotm-card { flex: 0 0 auto; background: #f8f9fa; border: 1px solid #ddd; border-radius: 8px; padding: 15px; min-width: 150px; text-align: center; display: flex; flex-direction: column; align-items: center; }
-    .mini-art { width: 100px; height: 140px; border-radius: 6px; object-fit: cover; margin-bottom: 12px; box-shadow: 0 2px 5px rgba(0,0,0,0.2); }
-    .mini-month { font-size: 0.8em; color: #777; text-transform: uppercase; font-weight: bold; margin-bottom: 5px; }
-    .mini-game { font-weight: 600; color: #222; margin-bottom: 10px; font-size: 1.1em; }
-    .mini-score { background: #333; color: #fff; padding: 3px 10px; border-radius: 4px; font-weight: bold; display: inline-block; }
-
-    /* OVER-THE-TOP SPIRIT METER */
-    .spirit-container { background: #111; color: #fff; padding: 25px; border-radius: 12px; margin-bottom: 20px; text-align: center; box-shadow: 0 10px 30px rgba(0,0,0,0.3); border: 2px solid #FFD700; overflow: hidden; position: relative; }
-    .spirit-title { font-weight: 900; color: #FFD700; letter-spacing: 4px; margin-bottom: 15px; font-size: 1.5em; text-transform: uppercase; text-shadow: 0 2px 5px rgba(255, 215, 0, 0.4); }
-    .spirit-bar-bg { background: #222; height: 30px; border-radius: 20px; margin: 0 auto 20px auto; width: 85%; position: relative; border: 3px solid #444; box-shadow: inset 0 0 10px rgba(0,0,0,0.8); }
-    .spirit-bar-fill { 
-      background: linear-gradient(90deg, #F44336, #FFEB3B, #4CAF50, #00BCD4, #9C27B0, #FFEB3B); 
-      background-size: 200% 200%;
-      height: 100%; 
-      border-radius: 20px; 
-      width: 115%; 
-      animation: rainbow-surge 2s ease infinite, shake-bar 0.5s infinite; 
-      box-shadow: 0 0 20px #FFEB3B, 0 0 40px #FF5722;
-      display: flex; align-items: center; justify-content: flex-end; padding-right: 15px;
-      font-weight: 900; color: #111; font-style: italic; letter-spacing: 1px;
+    .play-note-tooltip { 
+      display: none; position: absolute; left: 0; top: 100%; width: 100%; z-index: 50;
+      background: #fffbe6; border: 1px solid #ffe58f; border-left: 5px solid #fadb14;
+      padding: 10px; border-radius: 4px; font-size: 0.85em; box-shadow: 0 5px 15px rgba(0,0,0,0.1);
     }
-    @keyframes rainbow-surge { 0% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } 100% { background-position: 0% 50%; } }
-    @keyframes shake-bar { 0% { transform: translate(1px, 1px) rotate(0deg); } 25% { transform: translate(-1px, -2px) rotate(-1deg); } 50% { transform: translate(-3px, 0px) rotate(1deg); } 75% { transform: translate(3px, 2px) rotate(0deg); } 100% { transform: translate(1px, -1px) rotate(0deg); } }
-    .spirit-stats { font-size: 1.1em; color: #ccc; line-height: 1.6; }
-    .stat-highlight { color: #fff; font-weight: 900; font-size: 1.3em; color: #FFD700; text-shadow: 0 0 5px rgba(255, 215, 0, 0.5); }
-    .stat-flavor { font-style: italic; color: #888; font-size: 0.9em; display: block; margin-top: 10px; }
+    .game-card:hover .play-note-tooltip { display: block; }
 
-    /* SCORE LEGEND */
-    .score-legend { display: flex; flex-wrap: wrap; justify-content: center; gap: 15px; margin-bottom: 40px; padding: 15px; background: #fff; border-radius: 8px; box-shadow: 0 4px 10px rgba(0,0,0,0.03); font-size: 0.85em; color: #555; }
-    .legend-item { display: flex; align-items: center; gap: 6px; }
-    .legend-num { font-weight: 900; color: #111; background: #eee; padding: 3px 7px; border-radius: 4px; font-size: 1.1em; }
+    /* Components */
+    .spirit-container { background: #111; color: #fff; padding: 25px; border-radius: 12px; margin-bottom: 20px; text-align: center; border: 2px solid var(--gold); }
+    .spirit-bar-bg { background: #222; height: 30px; border-radius: 20px; margin: 15px auto; width: 85%; border: 3px solid #444; overflow: hidden; }
+    .spirit-bar-fill { height: 100%; background: linear-gradient(90deg, var(--apple), var(--gold), var(--yoshi), #00BCD4, var(--shared)); background-size: 200%; animation: rainbow 2s linear infinite; }
+    @keyframes rainbow { 0% { background-position: 0% 50%; } 100% { background-position: 200% 50%; } }
 
-    /* LEADERBOARDS & LISTS */
-    .leaderboards-wrapper { display: flex; flex-wrap: wrap; gap: 25px; justify-content: center; margin-bottom: 40px; }
-    .leaderboard-column { flex: 1; min-width: 320px; background: #fff; border-radius: 12px; padding: 20px; box-shadow: 0 10px 20px rgba(0,0,0,0.05); }
-    .board-title { text-align: center; font-size: 1.5em; font-weight: bold; margin-bottom: 20px; padding-bottom: 10px; border-bottom: 2px solid #eee; }
+    .hero-card { background: linear-gradient(135deg, #111, #333); color: #fff; border-radius: 12px; padding: 30px; display: flex; align-items: center; gap: 30px; flex-wrap: wrap; justify-content: center; border-top: 4px solid var(--gold); }
+    .hero-art { width: 160px; height: 220px; border-radius: 8px; object-fit: cover; box-shadow: 0 4px 15px rgba(0,0,0,0.5); }
     
-    .yoshi-title { color: #2e7d32; }
-    .apple-title { color: #c62828; }
-    .combined-title { color: #673AB7; } 
+    .decade-bar-row { display: flex; align-items: center; margin-bottom: 8px; height: 25px; }
+    .decade-label { width: 60px; font-weight: 900; font-size: 0.85em; color: #666; }
+    .decade-bar-wrap { flex: 1; background: #eee; height: 100%; border-radius: 4px; overflow: hidden; }
+    .decade-bar { height: 100%; background: var(--shared); color: #fff; font-size: 0.75em; display: flex; align-items: center; padding-left: 10px; font-weight: bold; transition: 1s; }
 
-    .year-dropdown { font-size: 1em; font-weight: 900; color: inherit; background: transparent; border: none; border-bottom: 3px solid rgba(0,0,0,0.1); cursor: pointer; outline: none; font-family: inherit; padding: 0 5px; transition: all 0.2s; max-width: 250px; text-overflow: ellipsis; }
-    .year-dropdown:hover { border-bottom: 3px solid inherit; opacity: 0.8; }
-    .year-dropdown option { color: #111; font-weight: normal; }
-
-    .game-card { display: flex; align-items: center; background: #f8f9fa; margin-bottom: 10px; border-radius: 8px; padding: 12px 15px; transition: transform 0.2s, box-shadow 0.2s; border-left: 5px solid #ccc; }
-    .game-card:hover { transform: translateX(5px); box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
-    .yoshi-card { border-left-color: #4CAF50; }
-    .apple-card { border-left-color: #F44336; }
-    .combined-card { border-left-color: #673AB7; }
-
-    .rank-badge { font-weight: 900; font-size: 1.2em; color: #555; min-width: 45px; }
-    .game-name { flex: 1; font-weight: 600; color: #222; font-size: 1.05em; padding-right: 10px; }
-    .completion-num { color: #888; font-size: 0.85em; font-style: italic; font-weight: normal; margin-left: 5px; }
-    .score-badge { background: #222; color: #fff; font-weight: bold; padding: 5px 10px; border-radius: 6px; font-size: 1.1em; white-space: nowrap; }
-    .score-empty { color: #999; font-style: italic; font-size: 0.9em; text-align: center; width: 100%; display: block;}
-
-    /* FEED EXTRAS */
+    .rank-badge { font-weight: 900; margin-right: 10px; color: #777; width: 35px; }
+    .score-badge { background: #222; color: #fff; font-weight: bold; padding: 4px 8px; border-radius: 6px; font-size: 0.9em; }
     .scrollable-feed { max-height: 500px; overflow-y: auto; padding-right: 10px; }
-    .scrollable-feed::-webkit-scrollbar { width: 6px; }
-    .scrollable-feed::-webkit-scrollbar-track { background: #f1f1f1; border-radius: 4px; }
-    .scrollable-feed::-webkit-scrollbar-thumb { background: #ccc; border-radius: 4px; }
-    .scrollable-feed::-webkit-scrollbar-thumb:hover { background: #999; }
-    
-    .scrollable-feed-tall { max-height: 750px; overflow-y: auto; padding-right: 10px; }
-    .scrollable-feed-tall::-webkit-scrollbar { width: 6px; }
-    .scrollable-feed-tall::-webkit-scrollbar-track { background: #f1f1f1; border-radius: 4px; }
-    .scrollable-feed-tall::-webkit-scrollbar-thumb { background: #ccc; border-radius: 4px; }
-    .scrollable-feed-tall::-webkit-scrollbar-thumb:hover { background: #999; }
-
-    .feed-date-badge { font-size: 1.05em; min-width: 65px; margin-right: 15px; color: #666; }
-    /* BLIND SPOTS CHARTS */
-    .chart-container { background: #f8f9fa; padding: 15px; border-radius: 8px; border: 1px solid #eee; margin-bottom: 15px; box-shadow: 0 4px 8px rgba(0,0,0,0.05); }
-    .chart-title { font-weight: 900; margin-bottom: 15px; font-size: 1.1em; text-align: center; text-transform: uppercase; letter-spacing: 1px; }
-    .chart-row { display: flex; align-items: center; margin-bottom: 10px; font-size: 0.9em; }
-    .chart-label { width: 45%; font-weight: 600; color: #555; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding-right: 10px; text-align: right; }
-    .chart-bar-wrap { width: 55%; background: #ddd; border-radius: 10px; height: 16px; overflow: hidden; box-shadow: inset 0 1px 3px rgba(0,0,0,0.2); }
-    .chart-bar { height: 100%; border-radius: 10px; display: flex; align-items: center; justify-content: flex-end; padding-right: 8px; color: white; font-size: 0.8em; font-weight: bold; transition: width 0.5s ease; min-width: 20px;}
-    /* THE GREAT DIVIDE / SYNERGY STATS */
-    .delta-badge { background: #333; color: #FFD700; font-weight: bold; padding: 5px 10px; border-radius: 6px; font-size: 1.1em; white-space: nowrap; margin-left: 10px; border: 1px solid #FFD700; box-shadow: 0 2px 4px rgba(0,0,0,0.2); }
-    .synergy-box { background: #f8f9fa; border-radius: 12px; padding: 25px 20px; text-align: center; margin-bottom: 15px; border: 1px solid #eee; box-shadow: inset 0 2px 5px rgba(0,0,0,0.02); }
-    .synergy-num { font-size: 3em; font-weight: 900; color: #673AB7; margin: 10px 0; text-shadow: 2px 2px 0px rgba(103,58,183,0.1); }
-    .synergy-label { font-size: 0.95em; font-weight: bold; color: #888; text-transform: uppercase; letter-spacing: 2px; }
-    /* BOTTOM OF THE BARREL */
-    .dk-barrel-icon { height: 1.3em; vertical-align: middle; margin: 0 5px; filter: drop-shadow(0 5px 5px rgba(255, 69, 0, 0.6)); transform: translateY(-3px); }
-    .fire-column { position: relative; overflow: hidden; }
-    .fire-column::after { content: ''; position: absolute; bottom: 0; left: 0; width: 100%; height: 50px; background: linear-gradient(to top, rgba(255, 69, 0, 0.2), transparent); pointer-events: none; border-radius: 0 0 12px 12px; }
+    .year-dropdown { font-weight: 900; border: none; border-bottom: 2px solid #ddd; cursor: pointer; background: transparent; }
   </style>
 </head>
 <body>
 
   <div class="bty-container">
-    
-    <div class="ascii-wrapper">
-<pre class="ascii-art">
-  ____       _   _                _____ _                   
- | __ )  ___| |_| |_ ___ _ __    |_   _| |__   __ _ _ __    
- |  _ \ / _ \ __| __/ _ \ '__|     | | | '_ \ / _` | '_ \   
- | |_) |  __/ |_| ||  __/ |        | | | | | | (_| | | | |  
- |____/ \___|\__|\__\___|_|        |_| |_| |_|\__,_|_| |_|  
- __   __             ____                  _                
- \ \ / /__  _   _   / ___|  __ _ _ __ ___ (_)_ __   __ _     
-  \ V / _ \| | | |  | |  _ / _` | '_ ` _ \| | '_ \ / _` |   
-   | | (_) | |_| |  | |_| | (_| | | | | | | | | | | (_| |   
-   |_|\___/ \__,_|   \____|\__,_|_| |_| |_|_|_| |_|\__, |   
+    <div class="ascii-wrapper"><pre class="ascii-art">
+ ____         _  _                _____ _                    
+| __ )  ___| |_| |_ ___ _ __    |_   _| |__   __ _ _ __    
+|  _ \ / _ \ __| __/ _ \ '__|     | | | '_ \ / _` | '_ \   
+| |_) |  __/ |_| ||  __/ |        | | | | | | (_| | | | |  
+|____/ \___|\__|\__\___|_|        |_| |_| |_|\__,_|_| |_|  
+__  __            ____                  _                 
+\ \ / /__  _  _   / ___|  __ _ _ __ ___ (_)_ __   __ _      
+ \ V / _ \| | | |  | |  _ / _` | '_ ` _ \| | '_ \ / _` |   
+  | | (_) | |_| |  | |_| | (_| | | | | | | | | | | (_| |   
+  |_|\___/ \__,_|   \____|\__,_|_| |_| |_|_|_| |_|\__, |   
                                                    |___/    
-</pre>
-    </div>
+    </pre></div>
 
     <div class="dashboard-header">Co-Op Dashboard</div>
-    
-    <div id="loading-text" style="text-align: center; font-family: Courier New;">Loading Pure Database Dashboard...</div>
+    <div id="loading-text" style="text-align: center;">Syncing JSON Cores...</div>
 
-    <div id="gotm-container" class="gotm-section" style="display: none;">
-      <div class="gotm-header">Game of the Month Showcase</div>
+    <div id="gotm-section" style="display:none;" class="leaderboard-column">
       <div id="hero-gotm"></div>
-      <div id="past-gotm" class="past-gotm-grid"></div>
     </div>
 
-    <div id="spirit-container" class="spirit-container" style="display: none;"></div>
-
-    <div class="score-legend" id="score-legend" style="display: none;">
-      <div class="legend-item"><span class="legend-num">10</span> Perfect</div>
-      <div class="legend-item"><span class="legend-num">9</span> Excellent</div>
-      <div class="legend-item"><span class="legend-num">8</span> Great</div>
-      <div class="legend-item"><span class="legend-num">7</span> Good</div>
-      <div class="legend-item"><span class="legend-num">6</span> Above Average</div>
-      <div class="legend-item"><span class="legend-num">5</span> Average</div>
-      <div class="legend-item"><span class="legend-num">4</span> Below Average</div>
-      <div class="legend-item"><span class="legend-num">3</span> Bad</div>
-      <div class="legend-item"><span class="legend-num">2</span> Terrible</div>
-      <div class="legend-item"><span class="legend-num">1</span> Abysmal</div>
-      <div class="legend-item"><span class="legend-num">0</span> Unplayable</div>
+    <div id="spirit-container" class="spirit-container" style="display:none;"></div>
+    
+    <div id="decade-section" class="leaderboard-column" style="display:none; margin-bottom: 40px;">
+      <div class="dashboard-header" style="font-size: 1.2em; color: var(--shared);">The Decade Breakdown</div>
+      <div id="decade-charts"></div>
     </div>
 
-<div id="activity-container" class="leaderboards-wrapper" style="display: none;">
+    <div class="leaderboards-wrapper">
       <div class="leaderboard-column">
-        <div class="board-title yoshi-title">
-          Yoshi's <select id="y-feed-select" class="year-dropdown"></select> Completions
-        </div>
-        <div id="yoshi-feed" class="scrollable-feed-tall"></div>
+        <div class="dashboard-header" style="font-size: 1em; color: var(--yoshi);">Yoshi Feed <select id="y-feed-sel" class="year-dropdown"></select></div>
+        <div id="yoshi-feed" class="scrollable-feed"></div>
       </div>
       <div class="leaderboard-column">
-        <div class="board-title combined-title" style="text-shadow: 0 0 5px rgba(103,58,183,0.2);">
-          Shared <select id="c-feed-select" class="year-dropdown"></select> Completions
-        </div>
-        <div id="shared-feed" class="scrollable-feed-tall"></div>
+        <div class="dashboard-header" style="font-size: 1em; color: var(--shared);">Shared Feed <select id="c-feed-sel" class="year-dropdown"></select></div>
+        <div id="shared-feed" class="scrollable-feed"></div>
       </div>
       <div class="leaderboard-column">
-        <div class="board-title apple-title">
-          Apple's <select id="a-feed-select" class="year-dropdown"></select> Completions
-        </div>
-        <div id="apple-feed" class="scrollable-feed-tall"></div>
+        <div class="dashboard-header" style="font-size: 1em; color: var(--apple);">Apple Feed <select id="a-feed-sel" class="year-dropdown"></select></div>
+        <div id="apple-feed" class="scrollable-feed"></div>
       </div>
     </div>
 
-    <div class="leaderboards-wrapper" id="boards-wrapper" style="display: none;">
+    <div class="section-header">Rankings</div>
+    <div class="leaderboards-wrapper">
       <div class="leaderboard-column">
-        <div class="board-title yoshi-title">
-          Yoshi's <select id="y-top-select" class="year-dropdown"></select> Top 25
-        </div>
+        <div class="dashboard-header" style="font-size: 1em;">Yoshi Top 25 <select id="y-top-sel" class="year-dropdown"></select></div>
         <div id="yoshi-list" class="scrollable-feed"></div>
       </div>
       <div class="leaderboard-column">
-        <div class="board-title combined-title">
-          Combined <select id="c-top-select" class="year-dropdown"></select> Top 25
-        </div>
+        <div class="dashboard-header" style="font-size: 1em;">Combined Top 25 <select id="c-top-sel" class="year-dropdown"></select></div>
         <div id="combined-list" class="scrollable-feed"></div>
       </div>
       <div class="leaderboard-column">
-        <div class="board-title apple-title">
-          Apple's <select id="a-top-select" class="year-dropdown"></select> Top 25
-        </div>
+        <div class="dashboard-header" style="font-size: 1em;">Apple Top 25 <select id="a-top-sel" class="year-dropdown"></select></div>
         <div id="apple-list" class="scrollable-feed"></div>
       </div>
     </div>
 
-    <div class="section-header" id="series-header" style="display: none;">Franchise Rankings</div>
-    <div class="leaderboards-wrapper" id="series-wrapper" style="display: none;">
+    <div class="leaderboards-wrapper">
       <div class="leaderboard-column">
-        <div class="board-title yoshi-title">
-          Yoshi's <select id="y-series-select" class="year-dropdown"></select>
-        </div>
-        <div id="yoshi-series-list" class="scrollable-feed"></div>
+        <div class="dashboard-header" style="font-size: 1em;">Franchises <select id="series-sel" class="year-dropdown"></select></div>
+        <div id="series-list" class="scrollable-feed"></div>
       </div>
       <div class="leaderboard-column">
-        <div class="board-title combined-title">
-          Combined <select id="c-series-select" class="year-dropdown"></select>
-        </div>
-        <div id="combined-series-list" class="scrollable-feed"></div>
-      </div>
-      <div class="leaderboard-column">
-        <div class="board-title apple-title">
-          Apple's <select id="a-series-select" class="year-dropdown"></select>
-        </div>
-        <div id="apple-series-list" class="scrollable-feed"></div>
+        <div class="dashboard-header" style="font-size: 1em;">Genres <select id="genre-sel" class="year-dropdown"></select></div>
+        <div id="genre-list" class="scrollable-feed"></div>
       </div>
     </div>
 
-    <div class="section-header" id="genre-header" style="display: none;">Genre Rankings</div>
-    <div class="leaderboards-wrapper" id="genre-wrapper" style="display: none;">
-      <div class="leaderboard-column">
-        <div class="board-title yoshi-title">
-          Yoshi's <select id="y-genre-select" class="year-dropdown"></select>
-        </div>
-        <div id="yoshi-genre-list" class="scrollable-feed"></div>
-      </div>
-      <div class="leaderboard-column">
-        <div class="board-title combined-title">
-          Combined <select id="c-genre-select" class="year-dropdown"></select>
-        </div>
-        <div id="combined-genre-list" class="scrollable-feed"></div>
-      </div>
-      <div class="leaderboard-column">
-        <div class="board-title apple-title">
-          Apple's <select id="a-genre-select" class="year-dropdown"></select>
-        </div>
-        <div id="apple-genre-list" class="scrollable-feed"></div>
-      </div>
-    </div>
-    <div class="section-header" id="blindspot-header" style="display: none;">Blind Spots</div>
-    <div class="leaderboards-wrapper" id="blindspot-wrapper" style="display: none;">
-      
-      <div class="leaderboard-column">
-        <div class="board-title apple-title">
-          Yoshi's Homework<br><span style="font-size: 0.5em; color: #666; text-transform: uppercase;">Apple's Top Rated Unplayed</span>
-        </div>
-        <div id="apple-blind-list" class="scrollable-feed"></div>
-      </div>
-      
-      <div class="leaderboard-column" style="display: flex; flex-direction: column; gap: 10px;">
-        <div class="board-title combined-title" style="text-shadow: 0 0 5px rgba(103,58,183,0.2);">
-          Genre Breakdown<br><span style="font-size: 0.5em; color: #666; text-transform: uppercase;">What You're Missing</span>
-        </div>
-        <div id="blind-spot-charts" style="flex: 1; display: flex; flex-direction: column; justify-content: center;"></div>
-      </div>
-
-      <div class="leaderboard-column">
-        <div class="board-title yoshi-title">
-          Apple's Homework<br><span style="font-size: 0.5em; color: #666; text-transform: uppercase;">Yoshi's Top Rated Unplayed</span>
-        </div>
-        <div id="yoshi-blind-list" class="scrollable-feed"></div>
-      </div>
-      
-    </div>
-<div class="section-header" id="divide-header" style="display: none;">The Great Divide</div>
-    <div class="leaderboards-wrapper" id="divide-wrapper" style="display: none;">
-      
-      <div class="leaderboard-column">
-        <div class="board-title yoshi-title">
-          Hills Yoshi Will Die On<br><span style="font-size: 0.5em; color: #666; text-transform: uppercase;">Games Apple Didn't Get</span>
-        </div>
-        <div id="yoshi-loved-list" class="scrollable-feed"></div>
-      </div>
-      
-      <div class="leaderboard-column" style="display: flex; flex-direction: column; gap: 10px;">
-        <div class="board-title combined-title" style="text-shadow: 0 0 5px rgba(103,58,183,0.2);">
-          Synergy Report<br><span style="font-size: 0.5em; color: #666; text-transform: uppercase;">How much do you agree?</span>
-        </div>
-        <div id="synergy-stats" style="flex: 1; display: flex; flex-direction: column; justify-content: center;"></div>
-      </div>
-
-      <div class="leaderboard-column">
-        <div class="board-title apple-title">
-          Hills Apple Will Die On<br><span style="font-size: 0.5em; color: #666; text-transform: uppercase;">Games Yoshi Didn't Get</span>
-        </div>
-        <div id="apple-loved-list" class="scrollable-feed"></div>
-      </div>
-      
-    </div>
-    <div class="section-header" id="barrel-header" style="display: none; border-bottom: none; margin: 40px 0;">
-      <img src="barrel-arrow-down.png" style="width: 207px; height: auto; display: block; margin: 0 auto; filter: drop-shadow(0 5px 5px rgba(255, 69, 0, 0.6));">
-    </div>
-    <div class="leaderboards-wrapper" id="barrel-wrapper" style="display: none;">
-      
-      <div class="leaderboard-column">
-        <div class="board-title yoshi-title">
-          Yoshi's Worst<br><span style="font-size: 0.5em; color: #666; text-transform: uppercase;">Lowest Rated</span>
-        </div>
-        <div id="yoshi-bottom-list" class="scrollable-feed"></div>
-      </div>
-      
-      <div class="leaderboard-column fire-column">
-        <div class="board-title combined-title" style="color: #d32f2f; border-bottom-color: #ffcdd2;">
-          The Trash Fire<br><span style="font-size: 0.5em; color: #d32f2f; text-transform: uppercase;">Lowest Combined Scores</span>
-        </div>
-        <div id="combined-bottom-list" class="scrollable-feed"></div>
-      </div>
-
-      <div class="leaderboard-column">
-        <div class="board-title apple-title">
-          Apple's Worst<br><span style="font-size: 0.5em; color: #666; text-transform: uppercase;">Lowest Rated</span>
-        </div>
-        <div id="apple-bottom-list" class="scrollable-feed"></div>
-      </div>
-      
+    <div class="section-header" style="color: #d32f2f;">The Trash Fire</div>
+    <div class="leaderboards-wrapper">
+        <div class="leaderboard-column" style="border-top: 5px solid #d32f2f;"><div id="y-worst" class="scrollable-feed"></div></div>
+        <div class="leaderboard-column" style="border-top: 5px solid #d32f2f;"><div id="c-worst" class="scrollable-feed"></div></div>
+        <div class="leaderboard-column" style="border-top: 5px solid #d32f2f;"><div id="a-worst" class="scrollable-feed"></div></div>
     </div>
   </div>
 
   <script>
-    // --- COLUMN CONSTANTS ---
-    // Metadata Sheet Columns
-    const META_GAME = 0;
-    const META_RELEASE_YEAR = 1;
-    const META_GENRE = 2;
-    const META_SERIES = 5;
-    const META_YOSCORE = 6;
-    const META_ASCORE = 7;
-    const META_ADATE = 8;
-    const META_ASYSTEM = 9;
-    const META_GOTM = 10;
-    const META_ART = 11;
-
-    // Master Sheet Columns
-    const MASTER_DATE = 1;
-    const MASTER_GAME = 2;
-    const MASTER_SYSTEM = 3;
-    const MASTER_STATUS = 8;
-
-    async function loadDashboardData() {
-      try {
-        const [metaResponse, masterResponse] = await Promise.all([
-          fetch('metadata_data.json'),
-          fetch('master_data.json')
-        ]);
-        
-        const metaData = await metaResponse.json();
-        const masterData = await masterResponse.json();
-        
-        // --- DATA SAFETY CHECK ---
-        if (!metaData.values || !masterData.values) {
-          document.getElementById('loading-text').innerHTML = '<span style="color: red;">Error: Database structure invalid or empty. Check Google Sheet JSON outputs.</span>';
-          return;
-        }
-
-        const metaRows = metaData.values;
-        const masterRows = masterData.values;
-
-        // --- PERFORMANCE: BUILD METADATA MAP ---
-        const metaMap = new Map();
-        for (let i = 1; i < metaRows.length; i++) {
-          if (!metaRows[i]) continue;
-          let gameName = metaRows[i][META_GAME] || '';
-          if (gameName) {
-            metaMap.set(gameName, metaRows[i]);
-          }
-        }
-
-        function formatShortDate(dateStr) {
-          let cleanStr = dateStr.trim().split('T')[0].split(' ')[0];
-          let parts = cleanStr.split(/[-/]/); 
-          if (parts.length >= 3) {
-            if (parts[0].length === 4) return `${parts[1].padStart(2, '0')}/${parts[2].substring(0,2).padStart(2, '0')}`;
-            if (parts[2].length === 4) return `${parts[0].padStart(2, '0')}/${parts[1].padStart(2, '0')}`;
-          }
-          return cleanStr; 
-        }
-
-        function isScoreValid(score) {
-          return score !== undefined && score !== null && score !== '' && score !== 'N';
-        }
-
-// --- 1. GAME OF THE MONTH ---
-        let gotmArray = [];
-        const defaultImg = "https://via.placeholder.com/160x220/222/555?text=No+Art"; 
-        const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
-
-        let today = new Date();
-        let currentYearStr = today.getFullYear().toString();
-        let currentYYYYMM = currentYearStr + "-" + String(today.getMonth() + 1).padStart(2, '0');
-
-        for (let i = 1; i < metaRows.length; i++) {
-          if (!metaRows[i]) continue;
-          
-          let gameName = metaRows[i][META_GAME] || ''; 
-          
-          let rawYScore = metaRows[i][META_YOSCORE]; 
-          let yScore = isScoreValid(rawYScore) ? rawYScore : ''; 
-          
-          let rawAScore = metaRows[i][META_ASCORE]; 
-          let aScore = isScoreValid(rawAScore) ? rawAScore : ''; 
-          
-          let gotmTag = metaRows[i][META_GOTM] || ''; 
-          let imgUrl = metaRows[i][META_ART] || defaultImg; 
-
-          if (gotmTag && gotmTag.match(/^\d{4}-\d{2}$/) && gotmTag <= currentYYYYMM) {
-            let parts = gotmTag.split('-');
-            let yearStr = parts[0];
-            let monthNum = parseInt(parts[1], 10);
-            let monthName = monthNames[monthNum - 1];
-
-            gotmArray.push({ sortKey: gotmTag, year: yearStr, monthName: monthName, game: gameName, yScore: yScore, aScore: aScore, img: imgUrl });
-          }
-        }
-
-        gotmArray.sort((a, b) => b.sortKey.localeCompare(a.sortKey));
-
-        if (gotmArray.length > 0) {
-          let topGotm = gotmArray[0];
-          
-          // Build Hero Score Badges
-          let heroScoresHTML = '';
-          let hasBothHeroScores = topGotm.yScore && topGotm.aScore;
-
-          if (topGotm.yScore) heroScoresHTML += `<div class="hero-score" style="background: #4CAF50; color: #fff; font-size: 1.2em;">Y: ${topGotm.yScore}</div>`;
-          if (topGotm.aScore) heroScoresHTML += `<div class="hero-score" style="background: #F44336; color: #fff; font-size: 1.2em;">A: ${topGotm.aScore}</div>`;
-          
-          // The Fun Combined Score Badge for the Hero Card
-          if (hasBothHeroScores) {
-            let cScore = parseFloat(topGotm.yScore) + parseFloat(topGotm.aScore);
-            let cScoreDisplay = Number.isInteger(cScore) ? cScore : cScore.toFixed(1);
-            heroScoresHTML += `<div class="hero-score" style="background: linear-gradient(135deg, #4CAF50, #673AB7, #F44336); color: #fff; font-size: 1.3em; box-shadow: 0 0 15px rgba(103, 58, 183, 0.6); text-shadow: 1px 1px 2px rgba(0,0,0,0.5);">✨ Co-op Power: ${cScoreDisplay} / 20</div>`;
-          }
-
-          document.getElementById('hero-gotm').innerHTML = `
-            <div class="hero-card">
-              <img src="${topGotm.img}" alt="Box Art" class="hero-art">
-              <div class="hero-details">
-                <div class="hero-month">${topGotm.monthName} ${topGotm.year} Game of the Month</div>
-                <div class="hero-game">${topGotm.game}</div>
-                <div style="display: flex; gap: 10px; flex-wrap: wrap; justify-content: inherit; align-items: center;">
-                  ${heroScoresHTML}
-                </div>
-              </div>
-            </div>`;
-            
-          // Build Past GOTM Cards
-          let pastHTML = '';
-          for (let j = 1; j < gotmArray.length; j++) {
-            let hasBothMiniScores = gotmArray[j].yScore && gotmArray[j].aScore;
-            
-            let miniScoresHTML = '';
-            if (gotmArray[j].yScore) miniScoresHTML += `<span style="color: #4CAF50;">Y:${gotmArray[j].yScore}</span>`;
-            if (gotmArray[j].aScore) miniScoresHTML += (miniScoresHTML ? ' <span style="color:#666;">|</span> ' : '') + `<span style="color: #F44336;">A:${gotmArray[j].aScore}</span>`;
-            
-            let scoreBlock = miniScoresHTML ? `<div class="mini-score" style="background: #222; width: 100%; box-sizing: border-box; margin-bottom: 4px;">${miniScoresHTML}</div>` : '';
-
-            // The Fun Combined Score Badge for the Mini Cards
-            if (hasBothMiniScores) {
-              let cScore = parseFloat(gotmArray[j].yScore) + parseFloat(gotmArray[j].aScore);
-              let cScoreDisplay = Number.isInteger(cScore) ? cScore : cScore.toFixed(1);
-              scoreBlock += `<div class="mini-score" style="background: linear-gradient(90deg, #4CAF50, #673AB7, #F44336); width: 100%; box-sizing: border-box; font-size: 0.9em; box-shadow: 0 2px 5px rgba(103,58,183,0.3); text-shadow: 1px 1px 1px rgba(0,0,0,0.5);">✨ ${cScoreDisplay}/20</div>`;
-            }
-
-            pastHTML += `<div class="mini-gotm-card"><img src="${gotmArray[j].img}" alt="Box Art" class="mini-art"><div class="mini-month">${gotmArray[j].monthName} ${gotmArray[j].year}</div><div class="mini-game">${gotmArray[j].game}</div>${scoreBlock}</div>`;
-          }
-          document.getElementById('past-gotm').innerHTML = pastHTML;
-          document.getElementById('gotm-container').style.display = 'block';
-        }
-
-        document.getElementById('score-legend').style.display = 'flex';
-
-        // --- 2. DATA EXTRACTION ---
-        let allYoshiCompletions = []; let allAppleCompletions = [];
-        let yoshiCompletionYearsSet = new Set(); let appleCompletionYearsSet = new Set();
-        let yoshiSeenCompletions = new Set(); let appleSeenCompletions = new Set();
-
-        // Process Master Sheet for Yoshi Completions
-        for (let i = 1; i < masterRows.length; i++) {
-          if (!masterRows[i]) continue;
-          let mDate = masterRows[i][MASTER_DATE] || ''; 
-          let mGame = masterRows[i][MASTER_GAME] || ''; 
-          let mSystem = masterRows[i][MASTER_SYSTEM] || ''; 
-          let mStatus = masterRows[i][MASTER_STATUS] || ''; 
-
-          if (mStatus === 'Completed' || mStatus === 'M-Completed') {
-            let yearMatch = mDate.match(/\d{4}/);
-            if (yearMatch) {
-              let year = yearMatch[0]; let uniqueKey = year + "||" + mGame.toLowerCase().trim(); 
-              if (!yoshiSeenCompletions.has(uniqueKey)) {
-                yoshiSeenCompletions.add(uniqueKey); yoshiCompletionYearsSet.add(year);
-                let shortDate = formatShortDate(mDate);
-                
-                let yScore = ''; 
-                let metaMatch = metaMap.get(mGame); 
-                if (metaMatch && isScoreValid(metaMatch[META_YOSCORE])) {
-                  yScore = metaMatch[META_YOSCORE];
-                }
-                
-                allYoshiCompletions.push({ rawDate: mDate, displayDate: shortDate, game: mGame, score: yScore, system: mSystem, year: year, rowIndex: i });
-              }
-            }
-          }
-        }
-
-        // Process Metadata Sheet for Apple Completions
-        for(let i = 1; i < metaRows.length; i++) {
-          if (!metaRows[i]) continue;
-          let aGame = metaRows[i][META_GAME] || ''; 
-          let rawAScore = metaRows[i][META_ASCORE];
-          let aScore = isScoreValid(rawAScore) ? rawAScore : ''; 
-          let aDate = metaRows[i][META_ADATE] || ''; 
-          let aSystem = metaRows[i][META_ASYSTEM] || '';   
-
-          let yearMatch = aDate.match(/\d{4}/);
-          if (yearMatch) {
-            let year = yearMatch[0]; let uniqueKey = year + "||" + aGame.toLowerCase().trim();
-            if (!appleSeenCompletions.has(uniqueKey)) {
-              appleSeenCompletions.add(uniqueKey); appleCompletionYearsSet.add(year);
-              let shortDate = formatShortDate(aDate);
-              allAppleCompletions.push({ rawDate: aDate, displayDate: shortDate, game: aGame, score: aScore, system: aSystem, year: year, rowIndex: i });
-            }
-          }
-        }
-
-        // --- CALC GAMER SPIRIT METER ---
-        let yoshiCurrentTotal = allYoshiCompletions.filter(c => c.year === currentYearStr).length;
-        let appleCurrentTotal = allAppleCompletions.filter(c => c.year === currentYearStr).length;
-        let combinedCurrentTotal = yoshiCurrentTotal + appleCurrentTotal;
-        
-        let globalShare = (combinedCurrentTotal * 14.37).toFixed(1);
-        let powerLevelNum = combinedCurrentTotal > 0 ? (combinedCurrentTotal * 420) + 69 : 0;
-        let sleepDebtNum = combinedCurrentTotal * 14; 
-        let sleepDebtStatus = combinedCurrentTotal > 0 ? `${sleepDebtNum} Hours` : "Fully Rested";
-
-        document.getElementById('spirit-container').innerHTML = `
-          <div class="spirit-title">⚡ ${currentYearStr} Co-Op Spirit Meter ⚡</div>
-          <div class="spirit-bar-bg">
-            <div class="spirit-bar-fill">${globalShare}%</div>
-          </div>
-          <div class="spirit-stats">
-            Games Conquered: <span class="stat-highlight">${combinedCurrentTotal}</span> | 
-            Global Market Share: <span class="stat-highlight">${globalShare}%</span> | 
-            Power Level: <span class="stat-highlight">${powerLevelNum.toLocaleString()}</span> | 
-            Sleep Debt: <span class="stat-highlight">${sleepDebtStatus}</span>
-            <span class="stat-flavor">The gaming industry is struggling to keep up with your current pace. Please slow down.</span>
-          </div>
-        `;
-        document.getElementById('spirit-container').style.display = 'block';
-
-
-        // Parse All-Time Scores, Release Years, SERIES, and GENRE
-        let allYoshiGames = []; let allAppleGames = []; let allCombinedGames = [];
-        let releaseYearsSet = new Set(); let seriesSet = new Set(); let genreSet = new Set();
-
-        for(let i = 1; i < metaRows.length; i++) {
-            if (!metaRows[i]) continue;
-            let gameName = metaRows[i][META_GAME] || ''; 
-            let releaseYear = metaRows[i][META_RELEASE_YEAR] ? metaRows[i][META_RELEASE_YEAR].toString() : '';
-            
-            let genreVal = metaRows[i][META_GENRE];
-            let genreName = (genreVal === undefined || genreVal === null) ? '' : String(genreVal).trim();
-            
-            let seriesVal = metaRows[i][META_SERIES];
-            let seriesName = (seriesVal === undefined || seriesVal === null) ? '' : String(seriesVal).trim();
-            
-            let rawY = metaRows[i][META_YOSCORE];
-            let rawA = metaRows[i][META_ASCORE];
-            
-            let yNum = isScoreValid(rawY) ? parseFloat(rawY) : NaN;
-            let aNum = isScoreValid(rawA) ? parseFloat(rawA) : NaN;
-
-            if (gameName) {
-                if (releaseYear && (!isNaN(yNum) || !isNaN(aNum))) releaseYearsSet.add(releaseYear);
-                if (seriesName && (!isNaN(yNum) || !isNaN(aNum))) seriesSet.add(seriesName);
-                if (genreName && (!isNaN(yNum) || !isNaN(aNum))) genreSet.add(genreName);
-
-                if (!isNaN(yNum)) allYoshiGames.push({ name: gameName, score: yNum, releaseYear: releaseYear, series: seriesName, genre: genreName });
-                if (!isNaN(aNum)) allAppleGames.push({ name: gameName, score: aNum, releaseYear: releaseYear, series: seriesName, genre: genreName });
-                if (!isNaN(yNum) && !isNaN(aNum)) allCombinedGames.push({ name: gameName, totalScore: yNum + aNum, releaseYear: releaseYear, series: seriesName, genre: genreName });
-            }
-        }
-
-        // --- 3. POPULATE DROPDOWNS ---
-        let yFeedYearsArray = Array.from(yoshiCompletionYearsSet).sort().reverse();
-        let aFeedYearsArray = Array.from(appleCompletionYearsSet).sort().reverse();
-        let releaseYearsArray = Array.from(releaseYearsSet).sort().reverse();
-        let seriesArray = Array.from(seriesSet).sort(); 
-        let genreArray = Array.from(genreSet).sort(); 
-
-        const buildOptions = (items, includeAllTime = true) => (includeAllTime ? `<option value="All-Time">All-Time</option>` : '') + items.map(y => `<option value="${y}">${y}</option>`).join('');
-        const buildFeedOptions = (years) => years.map(y => `<option value="${y}">${y}</option>`).join('');
-
-let allFeedYearsArray = Array.from(new Set([...yFeedYearsArray, ...aFeedYearsArray])).sort().reverse();
-        document.getElementById('y-feed-select').innerHTML = buildFeedOptions(allFeedYearsArray);
-        document.getElementById('c-feed-select').innerHTML = buildFeedOptions(allFeedYearsArray);
-        document.getElementById('a-feed-select').innerHTML = buildFeedOptions(allFeedYearsArray);
-        
-        document.getElementById('y-top-select').innerHTML = buildOptions(releaseYearsArray);
-        document.getElementById('a-top-select').innerHTML = buildOptions(releaseYearsArray);
-        document.getElementById('c-top-select').innerHTML = buildOptions(releaseYearsArray);
-
-        let seriesOptionsHTML = buildOptions(seriesArray, false);
-        document.getElementById('y-series-select').innerHTML = seriesOptionsHTML;
-        document.getElementById('a-series-select').innerHTML = seriesOptionsHTML;
-        document.getElementById('c-series-select').innerHTML = seriesOptionsHTML;
-
-        let genreOptionsHTML = buildOptions(genreArray, false);
-        document.getElementById('y-genre-select').innerHTML = genreOptionsHTML;
-        document.getElementById('a-genre-select').innerHTML = genreOptionsHTML;
-        document.getElementById('c-genre-select').innerHTML = genreOptionsHTML;
-
-        let defaultSeries = seriesArray.find(s => s.toLowerCase().includes('zelda')) || seriesArray[0];
-        if (defaultSeries) {
-          document.getElementById('y-series-select').value = defaultSeries;
-          document.getElementById('a-series-select').value = defaultSeries;
-          document.getElementById('c-series-select').value = defaultSeries;
-        }
-
-        let defaultGenre = genreArray.find(g => g.toLowerCase().includes('2d platformer')) || (genreArray.length > 0 ? genreArray[0] : '');
-        if (defaultGenre) {
-          document.getElementById('y-genre-select').value = defaultGenre;
-          document.getElementById('a-genre-select').value = defaultGenre;
-          document.getElementById('c-genre-select').value = defaultGenre;
-        }
-
-        // --- 4. RENDER FUNCTIONS ---
-function renderFeeds() {
-          let targetYear = document.getElementById('y-feed-select').value; // Using Y as the source of truth for the synced year
-
-          let yFiltered = allYoshiCompletions.filter(act => act.year === targetYear);
-          yFiltered.sort((a, b) => a.rawDate.localeCompare(b.rawDate) || a.rowIndex - b.rowIndex);
-          yFiltered.forEach((act, idx) => act.compNum = idx + 1); // Keep accurate overall completion numbers!
-          yFiltered.sort((a, b) => b.rawDate.localeCompare(a.rawDate) || b.compNum - a.compNum);
-
-          let aFiltered = allAppleCompletions.filter(act => act.year === targetYear);
-          aFiltered.sort((a, b) => a.rawDate.localeCompare(b.rawDate) || a.rowIndex - b.rowIndex);
-          aFiltered.forEach((act, idx) => act.compNum = idx + 1);
-          aFiltered.sort((a, b) => b.rawDate.localeCompare(a.rawDate) || b.compNum - a.compNum);
-
-          // Find the Overlap (Shared Completions)
-          let aGamesSet = new Set(aFiltered.map(act => act.game.toLowerCase().trim()));
-          
-          let sharedCompletions = [];
-
-          yFiltered.forEach(yAct => {
-            let normalizedGame = yAct.game.toLowerCase().trim();
-            if (aGamesSet.has(normalizedGame)) {
-              let aAct = aFiltered.find(a => a.game.toLowerCase().trim() === normalizedGame);
-              // Calculate which date is newer so we know exactly when it became a "Shared" completion
-              let latestRawDate = yAct.rawDate > aAct.rawDate ? yAct.rawDate : aAct.rawDate;
-              
-              // Handle the System tag (Combine them if they are different)
-              let sysStr = yAct.system;
-              if (yAct.system !== aAct.system) {
-                  sysStr = (yAct.system && aAct.system) ? `${yAct.system} / ${aAct.system}` : (yAct.system || aAct.system);
-              }
-
-              sharedCompletions.push({ 
-                game: yAct.game, 
-                system: sysStr,
-                latestRaw: latestRawDate, 
-                yDate: yAct.displayDate, yNum: yAct.compNum, 
-                aDate: aAct.displayDate, aNum: aAct.compNum 
-              });
-            }
-          });
-
-          // Sort shared array ASCENDING by latest completion date to assign the Shared Number
-          sharedCompletions.sort((a, b) => a.latestRaw.localeCompare(b.latestRaw));
-          sharedCompletions.forEach((act, idx) => act.sharedNum = idx + 1);
-
-          // Sort shared array DESCENDING for the final feed display
-          sharedCompletions.sort((a, b) => b.latestRaw.localeCompare(a.latestRaw));
-
-          // Render Yoshi Feed (Using FULL list)
-          document.getElementById('yoshi-feed').innerHTML = yFiltered.map(act => `
-            <div class="game-card yoshi-card"><div class="rank-badge feed-date-badge">${act.displayDate}</div><div class="game-name">${act.game}${act.system ? ` (${act.system})` : ''} <span class="completion-num">(#${act.compNum})</span></div>${act.score ? `<div class="score-badge">${act.score}</div>` : ''}</div>
-          `).join('') || `<div class="score-empty"><br>No completions logged.</div>`;
-
-          // Render Shared Middle Column
-          document.getElementById('shared-feed').innerHTML = sharedCompletions.map(act => `
-            <div class="game-card combined-card" style="flex-direction: column; align-items: flex-start; gap: 5px;">
-              <div class="game-name" style="width: 100%; text-align: center; font-size: 1.15em; padding: 0;">
-                ${act.game}${act.system ? ` (${act.system})` : ''} <span class="completion-num">(#${act.sharedNum})</span>
-              </div>
-              <div style="width: 100%; display: flex; justify-content: space-around; font-size: 0.9em; font-weight: bold; background: #eee; padding: 4px; border-radius: 4px;">
-                <span style="color: #4CAF50;">Y: ${act.yDate} (#${act.yNum})</span>
-                <span style="color: #F44336;">A: ${act.aDate} (#${act.aNum})</span>
-              </div>
-            </div>
-          `).join('') || `<div class="score-empty"><br>No shared completions this year.</div>`;
-
-          // Render Apple Feed (Using FULL list)
-          document.getElementById('apple-feed').innerHTML = aFiltered.map(act => `
-            <div class="game-card apple-card"><div class="rank-badge feed-date-badge">${act.displayDate}</div><div class="game-name">${act.game}${act.system ? ` (${act.system})` : ''} <span class="completion-num">(#${act.compNum})</span></div>${act.score ? `<div class="score-badge">${act.score}</div>` : ''}</div>
-          `).join('') || `<div class="score-empty"><br>No completions logged.</div>`;
-        }
-
-        function generateRankedCards(gamesArray, cardClass, isCombined, maxLimit = 25) {
-          let html = ''; let actualPosition = 1; let lastScore = -1;
-          gamesArray.slice(0, maxLimit).forEach(game => {
-            let scoreToCompare = isCombined ? game.totalScore : game.score;
-            let rankText = ''; 
-            
-            if (scoreToCompare !== lastScore) { 
-              rankText = `#${actualPosition}`; 
-              lastScore = scoreToCompare; 
-            }
-
-            let displayScore = isCombined ? (Number.isInteger(game.totalScore) ? game.totalScore : game.totalScore.toFixed(1)) : (Number.isInteger(game.score) ? game.score : game.score.toFixed(1));
-            html += `<div class="game-card ${cardClass}"><div class="rank-badge">${rankText}</div><div class="game-name">${game.name}</div><div class="score-badge" ${isCombined ? 'style="background: #673AB7;"' : ''}>${displayScore}${isCombined ? ' <span style="font-size:0.7em; color:#bbb;">/ 20</span>' : ''}</div></div>`;
-            actualPosition++;
-          });
-          return html || '<div class="score-empty"><br>No rated games found for this filter.</div>';
-        }
-
-        function renderLeaderboards() {
-          let yYear = document.getElementById('y-top-select').value;
-          let aYear = document.getElementById('a-top-select').value;
-          let cYear = document.getElementById('c-top-select').value;
-
-          let yData = yYear === 'All-Time' ? allYoshiGames : allYoshiGames.filter(g => g.releaseYear === yYear);
-          yData.sort((a, b) => (b.score - a.score) !== 0 ? (b.score - a.score) : a.name.localeCompare(b.name));
-          
-          let aData = aYear === 'All-Time' ? allAppleGames : allAppleGames.filter(g => g.releaseYear === aYear);
-          aData.sort((a, b) => (b.score - a.score) !== 0 ? (b.score - a.score) : a.name.localeCompare(b.name));
-
-          let cData = cYear === 'All-Time' ? allCombinedGames : allCombinedGames.filter(g => g.releaseYear === cYear);
-          cData.sort((a, b) => (b.totalScore - a.totalScore) !== 0 ? (b.totalScore - a.totalScore) : a.name.localeCompare(b.name));
-
-          document.getElementById('yoshi-list').innerHTML = generateRankedCards(yData, 'yoshi-card', false, 25);
-          document.getElementById('apple-list').innerHTML = generateRankedCards(aData, 'apple-card', false, 25);
-          document.getElementById('combined-list').innerHTML = generateRankedCards(cData, 'combined-card', true, 25);
-        }
-
-        function renderSeriesLeaderboards() {
-          let ySeries = document.getElementById('y-series-select').value;
-          let aSeries = document.getElementById('a-series-select').value;
-          let cSeries = document.getElementById('c-series-select').value;
-
-          let yData = allYoshiGames.filter(g => g.series === ySeries);
-          yData.sort((a, b) => (b.score - a.score) !== 0 ? (b.score - a.score) : a.name.localeCompare(b.name));
-          
-          let aData = allAppleGames.filter(g => g.series === aSeries);
-          aData.sort((a, b) => (b.score - a.score) !== 0 ? (b.score - a.score) : a.name.localeCompare(b.name));
-
-          let cData = allCombinedGames.filter(g => g.series === cSeries);
-          cData.sort((a, b) => (b.totalScore - a.totalScore) !== 0 ? (b.totalScore - a.totalScore) : a.name.localeCompare(b.name));
-
-          document.getElementById('yoshi-series-list').innerHTML = generateRankedCards(yData, 'yoshi-card', false, 1000);
-          document.getElementById('apple-series-list').innerHTML = generateRankedCards(aData, 'apple-card', false, 1000);
-          document.getElementById('combined-series-list').innerHTML = generateRankedCards(cData, 'combined-card', true, 1000);
-        }
-
-        function renderGenreLeaderboards() {
-          let yGenre = document.getElementById('y-genre-select').value;
-          let aGenre = document.getElementById('a-genre-select').value;
-          let cGenre = document.getElementById('c-genre-select').value;
-
-          let yData = allYoshiGames.filter(g => g.genre === yGenre);
-          yData.sort((a, b) => (b.score - a.score) !== 0 ? (b.score - a.score) : a.name.localeCompare(b.name));
-          
-          let aData = allAppleGames.filter(g => g.genre === aGenre);
-          aData.sort((a, b) => (b.score - a.score) !== 0 ? (b.score - a.score) : a.name.localeCompare(b.name));
-
-          let cData = allCombinedGames.filter(g => g.genre === cGenre);
-          cData.sort((a, b) => (b.totalScore - a.totalScore) !== 0 ? (b.totalScore - a.totalScore) : a.name.localeCompare(b.name));
-
-          document.getElementById('yoshi-genre-list').innerHTML = generateRankedCards(yData, 'yoshi-card', false, 1000);
-          document.getElementById('apple-genre-list').innerHTML = generateRankedCards(aData, 'apple-card', false, 1000);
-          document.getElementById('combined-genre-list').innerHTML = generateRankedCards(cData, 'combined-card', true, 1000);
-        }
-
-        function renderBlindSpots() {
-          // Find out what games each person has played
-          let yoshiPlayedNames = new Set(allYoshiGames.map(g => g.name.toLowerCase().trim()));
-          let applePlayedNames = new Set(allAppleGames.map(g => g.name.toLowerCase().trim()));
-
-          // Apple's Homework = Games Yoshi played & rated, but Apple has NOT
-          let applesHomework = allYoshiGames.filter(g => !applePlayedNames.has(g.name.toLowerCase().trim()));
-          applesHomework.sort((a, b) => (b.score - a.score) !== 0 ? (b.score - a.score) : a.name.localeCompare(b.name));
-
-          // Yoshi's Homework = Games Apple played & rated, but Yoshi has NOT
-          let yoshisHomework = allAppleGames.filter(g => !yoshiPlayedNames.has(g.name.toLowerCase().trim()));
-          yoshisHomework.sort((a, b) => (b.score - a.score) !== 0 ? (b.score - a.score) : a.name.localeCompare(b.name));
-
-          // Render the Top 25 Lists
-          document.getElementById('yoshi-blind-list').innerHTML = generateRankedCards(applesHomework, 'yoshi-card', false, 25);
-          document.getElementById('apple-blind-list').innerHTML = generateRankedCards(yoshisHomework, 'apple-card', false, 25);
-
-          // Calculate Genre Breakdown for the Charts (Analyzing the entire backlog, not just Top 25)
-          function getTopGenres(gamesArray, limit = 5) {
-            let counts = {};
-            gamesArray.forEach(g => {
-              if (g.genre) counts[g.genre] = (counts[g.genre] || 0) + 1;
-            });
-            return Object.keys(counts)
-              .map(genre => ({ genre, count: counts[genre] }))
-              .sort((a, b) => b.count - a.count)
-              .slice(0, limit);
-          }
-
-          let applesHomeworkGenres = getTopGenres(applesHomework, 5);
-          let yoshisHomeworkGenres = getTopGenres(yoshisHomework, 5);
-
-          function buildChartHTML(title, data, color) {
-            if (data.length === 0) return '';
-            let maxCount = Math.max(...data.map(d => d.count));
-            let rows = data.map(d => {
-              let pct = (d.count / maxCount) * 100; // Scale relative to the largest bar
-              return `
-                <div class="chart-row">
-                  <div class="chart-label" title="${d.genre}">${d.genre}</div>
-                  <div class="chart-bar-wrap">
-                    <div class="chart-bar" style="width: ${pct}%; background: ${color};">${d.count}</div>
-                  </div>
-                </div>`;
-            }).join('');
-            return `<div class="chart-container"><div class="chart-title" style="color: ${color};">${title}</div>${rows}</div>`;
-          }
-
-          // Swap chart order to match layout: Yoshi's Homework (Red) on top, Apple's Homework (Green) on bottom
-          let chartsHTML = buildChartHTML("Mostly Missing (Yoshi)", yoshisHomeworkGenres, "#F44336") + 
-                           buildChartHTML("Mostly Missing (Apple)", applesHomeworkGenres, "#4CAF50");
-                           
-          document.getElementById('blind-spot-charts').innerHTML = chartsHTML || '<div class="score-empty">No blind spots found!</div>';
-        }
-
-        function renderGreatDivide() {
-          let sharedRated = [];
-          
-          // Gather all games where BOTH users have a valid score
-          for (let i = 1; i < metaRows.length; i++) {
-            if (!metaRows[i]) continue;
-            let gameName = metaRows[i][META_GAME] || '';
-            let rawY = metaRows[i][META_YOSCORE];
-            let rawA = metaRows[i][META_ASCORE];
-            
-            if (gameName && isScoreValid(rawY) && isScoreValid(rawA)) {
-              let yNum = parseFloat(rawY);
-              let aNum = parseFloat(rawA);
-              sharedRated.push({
-                name: gameName,
-                yScore: yNum,
-                aScore: aNum,
-                diff: parseFloat((yNum - aNum).toFixed(1)),
-                absDiff: parseFloat(Math.abs(yNum - aNum).toFixed(1))
-              });
-            }
-          }
-
-          // Sort the lists by the biggest difference
-          let yoshiLoved = sharedRated.filter(g => g.diff > 0).sort((a, b) => b.diff - a.diff);
-          let appleLoved = sharedRated.filter(g => g.diff < 0).sort((a, b) => b.absDiff - a.absDiff);
-          
-          // Calculate Synergy Stats
-          let perfectMatches = sharedRated.filter(g => g.diff === 0).length;
-          let avgDiff = sharedRated.length > 0 
-            ? (sharedRated.reduce((sum, g) => sum + g.absDiff, 0) / sharedRated.length).toFixed(2) 
-            : 0;
-
-          // Custom card builder to show the individual scores inside the list item
-          function buildDeltaCards(gamesArray, cardClass, maxLimit = 25) {
-            let html = ''; 
-            gamesArray.slice(0, maxLimit).forEach((game, idx) => {
-              let deltaStr = game.absDiff;
-              html += `<div class="game-card ${cardClass}">
-                <div class="rank-badge">#${idx + 1}</div>
-                <div class="game-name" style="display: flex; flex-direction: column;">
-                  <span>${game.name}</span>
-                  <span style="font-size: 0.8em; color: #888; font-weight: normal; margin-top: 2px;">
-                    Y: ${game.yScore} | A: ${game.aScore}
-                  </span>
-                </div>
-                <div class="delta-badge">Δ ${deltaStr}</div>
-              </div>`;
-            });
-            return html || '<div class="score-empty"><br>No major disagreements found.</div>';
-          }
-
-          document.getElementById('yoshi-loved-list').innerHTML = buildDeltaCards(yoshiLoved, 'yoshi-card', 25);
-          document.getElementById('apple-loved-list').innerHTML = buildDeltaCards(appleLoved, 'apple-card', 25);
-
-          // --- Calculate Overall Average Scores for the Bar Chart ---
-          let yTotal = allYoshiGames.reduce((sum, g) => sum + g.score, 0);
-          let yAvg = allYoshiGames.length > 0 ? (yTotal / allYoshiGames.length).toFixed(2) : 0;
-          let yPct = (yAvg / 10) * 100; // Calculate width out of 10
-
-          let aTotal = allAppleGames.reduce((sum, g) => sum + g.score, 0);
-          let aAvg = allAppleGames.length > 0 ? (aTotal / allAppleGames.length).toFixed(2) : 0;
-          let aPct = (aAvg / 10) * 100; // Calculate width out of 10
-
-          document.getElementById('synergy-stats').innerHTML = `
-            <div class="synergy-box">
-              <div class="synergy-label">Average Score Variance</div>
-              <div class="synergy-num">Δ ${avgDiff}</div>
-              <div style="font-size: 0.85em; color: #777; font-style: italic;">Across ${sharedRated.length} shared ratings</div>
-            </div>
-            
-            <div class="synergy-box">
-              <div class="synergy-label">Perfect Matches</div>
-              <div class="synergy-num">${perfectMatches}</div>
-              <div style="font-size: 0.85em; color: #777; font-style: italic;">Games given the exact same score</div>
-            </div>
-
-            <div class="synergy-box" style="margin-bottom: 0; padding: 20px 15px;">
-              <div class="synergy-label" style="margin-bottom: 15px;">Overall Critic Profile</div>
-              
-              <div class="chart-row" style="margin-bottom: 12px;">
-                <div class="chart-label" style="width: 25%; font-size: 1.1em; color: #4CAF50;">Yoshi</div>
-                <div class="chart-bar-wrap" style="width: 75%; height: 20px; background: #ddd;">
-                  <div class="chart-bar" style="width: ${yPct}%; background: #4CAF50; font-size: 0.9em;">${yAvg}</div>
-                </div>
-              </div>
-              
-              <div class="chart-row" style="margin-bottom: 5px;">
-                <div class="chart-label" style="width: 25%; font-size: 1.1em; color: #F44336;">Apple</div>
-                <div class="chart-bar-wrap" style="width: 75%; height: 20px; background: #ddd;">
-                  <div class="chart-bar" style="width: ${aPct}%; background: #F44336; font-size: 0.9em;">${aAvg}</div>
-                </div>
-              </div>
-              <div style="font-size: 0.8em; color: #777; margin-top: 10px; font-style: italic;">Lifetime average score given out of 10</div>
-            </div>
-          `;
-        }
-
-        // MOVED OUTSIDE OF THE GREAT DIVIDE FUNCTION
-        function renderBottomOfTheBarrel() {
-          // Copy the arrays using the spread operator [...] so we don't accidentally reverse the Top 25 lists
-          let yData = [...allYoshiGames];
-          let aData = [...allAppleGames];
-          let cData = [...allCombinedGames];
-
-          // Sort ascending (lowest scores first)
-          yData.sort((a, b) => (a.score - b.score) !== 0 ? (a.score - b.score) : a.name.localeCompare(b.name));
-          aData.sort((a, b) => (a.score - b.score) !== 0 ? (a.score - b.score) : a.name.localeCompare(b.name));
-          cData.sort((a, b) => (a.totalScore - b.totalScore) !== 0 ? (a.totalScore - b.totalScore) : a.name.localeCompare(b.name));
-
-          // We can reuse the generateRankedCards function perfectly here! Rank #1 will naturally go to the lowest score.
-          document.getElementById('yoshi-bottom-list').innerHTML = generateRankedCards(yData, 'yoshi-card', false, 25);
-          document.getElementById('apple-bottom-list').innerHTML = generateRankedCards(aData, 'apple-card', false, 25);
-          document.getElementById('combined-bottom-list').innerHTML = generateRankedCards(cData, 'combined-card', true, 25);
-        }
-
-        // --- 5. INITIALIZE & LISTEN (WITH SYNCING) ---
-        function setupSync(group, renderFunc) {
-          group.forEach(id => {
-            document.getElementById(id).addEventListener('change', (e) => {
-              let val = e.target.value;
-              group.forEach(targetId => {
-                if (targetId !== id) {
-                  let el = document.getElementById(targetId);
-                  if(el) el.value = val;
-                }
-              });
-              renderFunc();
-            });
-          });
-        }
-
-        setupSync(['y-feed-select', 'c-feed-select', 'a-feed-select'], renderFeeds);
-        setupSync(['y-top-select', 'a-top-select', 'c-top-select'], renderLeaderboards);
-        setupSync(['y-series-select', 'a-series-select', 'c-series-select'], renderSeriesLeaderboards);
-        setupSync(['y-genre-select', 'a-genre-select', 'c-genre-select'], renderGenreLeaderboards);
-
-        renderFeeds();
-        renderLeaderboards();
-        renderSeriesLeaderboards();
-        renderGenreLeaderboards();
-        renderBlindSpots();
-        renderGreatDivide();
-        renderBottomOfTheBarrel();
-        document.getElementById('barrel-header').style.display = 'block';
-        document.getElementById('barrel-wrapper').style.display = 'flex';
-        document.getElementById('divide-header').style.display = 'block';
-        document.getElementById('divide-wrapper').style.display = 'flex';
-        document.getElementById('blindspot-header').style.display = 'block';
-        document.getElementById('blindspot-wrapper').style.display = 'flex';
-        
-        document.getElementById('activity-container').style.display = 'flex';
-        document.getElementById('boards-wrapper').style.display = 'flex';
-        document.getElementById('series-header').style.display = 'block';
-        document.getElementById('series-wrapper').style.display = 'flex';
-        document.getElementById('genre-header').style.display = 'block';
-        document.getElementById('genre-wrapper').style.display = 'flex';
-        document.getElementById('loading-text').style.display = 'none';
-
-      } catch (err) {
-        document.getElementById('loading-text').innerHTML = '<span style="color: red;">Error loading dashboard data. Check console for details.</span>';
-        console.error(err);
-      }
+    let DB = { meta: [], master: [], mCols: {}, sCols: {}, noteMap: new Map() };
+
+    async function init() {
+      const [mRes, sRes] = await Promise.all([fetch('metadata_data.json'), fetch('master_data.json')]);
+      const mJ = await mRes.json(); const sJ = await sRes.json();
+      
+      mJ.values[0].forEach((h, i) => DB.mCols[h.trim()] = i);
+      sJ.values[0].forEach((h, i) => DB.sCols[h.trim()] = i);
+      DB.meta = mJ.values.slice(1); DB.master = sJ.values.slice(1);
+
+      // Map notes and populate filters
+      DB.master.forEach(r => { 
+        const g = r[DB.sCols['Videogame']]; 
+        const n = r[DB.sCols['Detailed Play Note']];
+        if (g && n) DB.noteMap.set(g, n); 
+      });
+
+      setupFilters();
+      renderStatic();
+      refresh();
+      
+      document.getElementById('loading-text').style.display = 'none';
+      document.querySelectorAll('[id$="-section"], [id$="-container"], .leaderboards-wrapper').forEach(el => el.style.display = 'grid');
+      document.getElementById('gotm-section').style.display = 'block';
     }
 
-    loadDashboardData();
+    function createCard(name, score, rank, isCombined, theme) {
+      const note = DB.noteMap.get(name) || "No logs available.";
+      return `
+        <div class="game-card ${theme}-card">
+          <div style="display:flex; justify-content:space-between; align-items:center;">
+            <div style="display:flex; align-items:center;">
+              <span class="rank-badge">${rank ? '#'+rank : ''}</span>
+              <strong>${name}</strong>
+            </div>
+            <span class="score-badge" ${isCombined ? 'style="background:var(--shared)"':''}>${score}${isCombined?'<small>/20</small>':''}</span>
+          </div>
+          <div class="play-note-tooltip">📝 <strong>Recent Entry:</strong><br>${note}</div>
+        </div>`;
+    }
+
+    function setupFilters() {
+      const years = [...new Set(DB.meta.map(r => r[DB.mCols['Release Year']]).filter(Boolean))].sort().reverse();
+      const series = [...new Set(DB.meta.map(r => r[DB.mCols['Series']]).filter(Boolean))].sort();
+      const genres = [...new Set(DB.meta.map(r => r[DB.mCols['Genre']]).filter(Boolean))].sort();
+      const compYears = [...new Set(DB.master.map(r => r[DB.sCols['Date']].substring(0,4)))].filter(y => y.match(/\d{4}/)).sort().reverse();
+
+      const yOpt = `<option value="All">All-Time</option>` + years.map(y => `<option value="${y}">${y}</option>`).join('');
+      document.querySelectorAll('[id$="-sel"]').forEach(s => {
+        if(s.id.includes('feed')) s.innerHTML = compYears.map(y => `<option value="${y}">${y}</option>`).join('');
+        else if(s.id.includes('series')) s.innerHTML = series.map(x => `<option value="${x}">${x}</option>`).join('');
+        else if(s.id.includes('genre')) s.innerHTML = genres.map(x => `<option value="${x}">${x}</option>`).join('');
+        else s.innerHTML = yOpt;
+        s.addEventListener('change', refresh);
+      });
+    }
+
+    function renderStatic() {
+      // Spirit Meter
+      const curY = new Date().getFullYear().toString();
+      const count = DB.master.filter(r => r[DB.sCols['Date']].includes(curY) && r[DB.sCols['Status']] === 'Completed').length;
+      document.getElementById('spirit-container').innerHTML = `
+        <div class="dashboard-header" style="font-size: 1.2em; color: var(--gold);">⚡ ${curY} Co-op Spirit Meter ⚡</div>
+        <div class="spirit-bar-bg"><div class="spirit-bar-fill" style="width: ${Math.min(count*2, 100)}%"></div></div>
+        <div style="font-size:0.9em; opacity:0.8;">Total Games Conquered: ${count}</div>`;
+
+      // Decade Chart
+      const decs = {};
+      DB.meta.forEach(r => { const d = Math.floor(parseInt(r[DB.mCols['Release Year']])/10)*10+'s'; if(d.includes('s')) decs[d] = (decs[d]||0)+1; });
+      const max = Math.max(...Object.values(decs));
+      document.getElementById('decade-charts').innerHTML = Object.entries(decs).sort((a,b)=>b[0].localeCompare(a[0])).map(([d,c]) => `
+        <div class="decade-bar-row"><div class="decade-label">${d}</div><div class="decade-bar-wrap"><div class="decade-bar" style="width:${(c/max)*100}%">${c}</div></div></div>`).join('');
+    }
+
+    function refresh() {
+      const fY = document.getElementById('y-feed-sel').value;
+      const sVal = document.getElementById('series-sel').value;
+      const gVal = document.getElementById('genre-sel').value;
+      
+      // Sync feeds
+      document.getElementById('a-feed-sel').value = fY;
+      document.getElementById('c-feed-sel').value = fY;
+
+      const getList = (user, year, limit=25, sort='desc') => {
+        let l = DB.meta.map(r => ({ n: r[DB.mCols['Videogame']], s: parseFloat(r[DB.mCols[user]])||0, y: r[DB.mCols['Release Year']] }))
+                  .filter(x => x.s > 0 && (year === 'All' || x.y === year));
+        return l.sort((a,b) => sort === 'desc' ? b.s - a.s : a.s - b.s).slice(0, limit);
+      };
+
+      // Render Top Lists
+      document.getElementById('yoshi-list').innerHTML = getList('Yoshi', document.getElementById('y-top-sel').value).map((x,i)=>createCard(x.n, x.s, i+1, false, 'yoshi')).join('');
+      document.getElementById('apple-list').innerHTML = getList('Apple', document.getElementById('a-top-sel').value).map((x,i)=>createCard(x.n, x.s, i+1, false, 'apple')).join('');
+
+      // Render Series/Genre
+      const sList = DB.meta.filter(r => r[DB.mCols['Series']] === sVal).map(r => ({n: r[DB.mCols['Videogame']], s: parseFloat(r[DB.mCols['Yoshi']])||0})).sort((a,b)=>b.s-a.s);
+      document.getElementById('series-list').innerHTML = sList.map(x => createCard(x.n, x.s, null, false, 'yoshi')).join('');
+
+      const gList = DB.meta.filter(r => r[DB.mCols['Genre']] === gVal).map(r => ({n: r[DB.mCols['Videogame']], s: parseFloat(r[DB.mCols['Yoshi']])||0})).sort((a,b)=>b.s-a.s);
+      document.getElementById('genre-list').innerHTML = gList.map(x => createCard(x.n, x.s, null, false, 'yoshi')).join('');
+
+      // Trash Fire
+      document.getElementById('y-worst').innerHTML = "<strong>Yoshi's Worst</strong>" + getList('Yoshi', 'All', 10, 'asc').map((x,i)=>createCard(x.n, x.s, i+1, false, 'yoshi')).join('');
+    }
+
+    init();
   </script>
 </body>
 </html>
