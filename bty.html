@@ -135,56 +135,93 @@ __  __            ____                  _
   </div>
 
   <script>
+// --- GLOBAL DATA STORE ---
     let DB = { meta: [], master: [], mCols: {}, sCols: {}, noteMap: new Map() };
 
+    // 1. INITIALIZE: Finds headers and loads data
     async function init() {
-      const [mRes, sRes] = await Promise.all([fetch('metadata_data.json'), fetch('master_data.json')]);
-      const mJ = await mRes.json(); const sJ = await sRes.json();
-      
-      mJ.values[0].forEach((h, i) => DB.mCols[h.trim()] = i);
-      sJ.values[0].forEach((h, i) => DB.sCols[h.trim()] = i);
-      DB.meta = mJ.values.slice(1); DB.master = sJ.values.slice(1);
+      try {
+        console.log("Fetching JSONs...");
+        const [mRes, sRes] = await Promise.all([fetch('metadata_data.json'), fetch('master_data.json')]);
+        const mJ = await mRes.json(); const sJ = await sRes.json();
+        
+        const findHeaders = (rows) => {
+          const map = {};
+          const headerRowIndex = rows.findIndex(row => row.includes('Date') || row.includes('Videogame'));
+          if (headerRowIndex > -1) {
+            rows[headerRowIndex].forEach((h, i) => { if(h) map[h.trim()] = i; });
+            return { map, dataStart: headerRowIndex + 1 };
+          }
+          return { map: {}, dataStart: 1 };
+        };
 
-      // Map notes and populate filters
-      DB.master.forEach(r => { 
-        const g = r[DB.sCols['Videogame']]; 
-        const n = r[DB.sCols['Detailed Play Note']];
-        if (g && n) DB.noteMap.set(g, n); 
-      });
+        const metaInfo = findHeaders(mJ.values);
+        const masterInfo = findHeaders(sJ.values);
+        DB.mCols = metaInfo.map;
+        DB.sCols = masterInfo.map;
+        DB.meta = mJ.values.slice(metaInfo.dataStart);
+        DB.master = sJ.values.slice(masterInfo.dataStart);
 
-      setupFilters();
-      renderStatic();
-      refresh();
-      
-      document.getElementById('loading-text').style.display = 'none';
-      document.querySelectorAll('[id$="-section"], [id$="-container"], .leaderboards-wrapper').forEach(el => el.style.display = 'grid');
-      document.getElementById('gotm-section').style.display = 'block';
+        // Pre-process Notes
+        DB.master.forEach(row => {
+          const game = row[DB.sCols['Videogame']];
+          const note = row[DB.sCols['Detailed Play Note']];
+          if (game && note) DB.noteMap.set(game, note); 
+        });
+
+        setupFilters();
+        renderStatic();
+        refresh();
+        
+        document.getElementById('loading-text').style.display = 'none';
+        const sections = ['gotm-section', 'decade-section', 'spirit-container', 'activity-container', 'boards-wrapper', 'blindspot-wrapper', 'barrel-wrapper'];
+        sections.forEach(id => {
+          const el = document.getElementById(id);
+          if (el) el.style.display = (id.includes('section') || id.includes('container')) ? 'block' : 'grid';
+        });
+
+      } catch (err) {
+        console.error("Init Error:", err);
+        document.getElementById('loading-text').innerHTML = `<b style="color:red">ERROR:</b> ${err.message}`;
+      }
     }
 
+    // 2. TEMPLATE: Creates the HTML for every game card
     function createCard(name, score, rank, isCombined, theme) {
-      const note = DB.noteMap.get(name) || "No logs available.";
+      const note = DB.noteMap.get(name) || "No log entries found for this title.";
+      const displayScore = (typeof score === 'number' && !Number.isInteger(score)) ? score.toFixed(1) : score;
+      
       return `
         <div class="game-card ${theme}-card">
           <div style="display:flex; justify-content:space-between; align-items:center;">
             <div style="display:flex; align-items:center;">
-              <span class="rank-badge">${rank ? '#'+rank : ''}</span>
+              ${rank ? `<span class="rank-badge">#${rank}</span>` : ''}
               <strong>${name}</strong>
             </div>
-            <span class="score-badge" ${isCombined ? 'style="background:var(--shared)"':''}>${score}${isCombined?'<small>/20</small>':''}</span>
+            <span class="score-badge" ${isCombined ? 'style="background:var(--shared)"':''}>
+              ${displayScore}${isCombined ? '<small>/20</small>' : ''}
+            </span>
           </div>
           <div class="play-note-tooltip">📝 <strong>Recent Entry:</strong><br>${note}</div>
         </div>`;
     }
 
+    // 3. FILTERS: Populates dropdowns
     function setupFilters() {
       const years = [...new Set(DB.meta.map(r => r[DB.mCols['Release Year']]).filter(Boolean))].sort().reverse();
+      const compYears = [...new Set(DB.master.map(r => {
+          const d = r[DB.sCols['Date']];
+          return (d && typeof d === 'string') ? d.substring(0,4) : null;
+      }))].filter(y => y && y.match(/\d{4}/)).sort().reverse();
+
       const series = [...new Set(DB.meta.map(r => r[DB.mCols['Series']]).filter(Boolean))].sort();
       const genres = [...new Set(DB.meta.map(r => r[DB.mCols['Genre']]).filter(Boolean))].sort();
-      const compYears = [...new Set(DB.master.map(r => r[DB.sCols['Date']].substring(0,4)))].filter(y => y.match(/\d{4}/)).sort().reverse();
 
       const yOpt = `<option value="All">All-Time</option>` + years.map(y => `<option value="${y}">${y}</option>`).join('');
+      const feedOpts = compYears.map(y => `<option value="${y}">${y}</option>`).join('');
+
       document.querySelectorAll('[id$="-sel"]').forEach(s => {
-        if(s.id.includes('feed')) s.innerHTML = compYears.map(y => `<option value="${y}">${y}</option>`).join('');
+        if(s.id.includes('feed')) s.innerHTML = feedOpts;
         else if(s.id.includes('series')) s.innerHTML = series.map(x => `<option value="${x}">${x}</option>`).join('');
         else if(s.id.includes('genre')) s.innerHTML = genres.map(x => `<option value="${x}">${x}</option>`).join('');
         else s.innerHTML = yOpt;
@@ -192,50 +229,68 @@ __  __            ____                  _
       });
     }
 
+    // 4. STATIC: Renders charts that don't change with filters
     function renderStatic() {
-      // Spirit Meter
       const curY = new Date().getFullYear().toString();
-      const count = DB.master.filter(r => r[DB.sCols['Date']].includes(curY) && r[DB.sCols['Status']] === 'Completed').length;
+      const count = DB.master.filter(r => r[DB.sCols['Date']] && r[DB.sCols['Date']].includes(curY) && r[DB.sCols['Status']] === 'Completed').length;
       document.getElementById('spirit-container').innerHTML = `
         <div class="dashboard-header" style="font-size: 1.2em; color: var(--gold);">⚡ ${curY} Co-op Spirit Meter ⚡</div>
         <div class="spirit-bar-bg"><div class="spirit-bar-fill" style="width: ${Math.min(count*2, 100)}%"></div></div>
         <div style="font-size:0.9em; opacity:0.8;">Total Games Conquered: ${count}</div>`;
 
-      // Decade Chart
       const decs = {};
-      DB.meta.forEach(r => { const d = Math.floor(parseInt(r[DB.mCols['Release Year']])/10)*10+'s'; if(d.includes('s')) decs[d] = (decs[d]||0)+1; });
+      DB.meta.forEach(r => { 
+        const year = parseInt(r[DB.mCols['Release Year']]);
+        if(year) {
+          const d = Math.floor(year/10)*10+'s';
+          decs[d] = (decs[d]||0)+1; 
+        }
+      });
       const max = Math.max(...Object.values(decs));
       document.getElementById('decade-charts').innerHTML = Object.entries(decs).sort((a,b)=>b[0].localeCompare(a[0])).map(([d,c]) => `
         <div class="decade-bar-row"><div class="decade-label">${d}</div><div class="decade-bar-wrap"><div class="decade-bar" style="width:${(c/max)*100}%">${c}</div></div></div>`).join('');
     }
 
+    // 5. REFRESH: Re-draws lists when filters change
     function refresh() {
       const fY = document.getElementById('y-feed-sel').value;
       const sVal = document.getElementById('series-sel').value;
       const gVal = document.getElementById('genre-sel').value;
       
-      // Sync feeds
       document.getElementById('a-feed-sel').value = fY;
       document.getElementById('c-feed-sel').value = fY;
 
-      const getList = (user, year, limit=25, sort='desc') => {
-        let l = DB.meta.map(r => ({ n: r[DB.mCols['Videogame']], s: parseFloat(r[DB.mCols[user]])||0, y: r[DB.mCols['Release Year']] }))
-                  .filter(x => x.s > 0 && (year === 'All' || x.y === year));
+      const getList = (user, yearSelId, limit=25, sort='desc') => {
+        const year = document.getElementById(yearSelId)?.value || 'All';
+        let l = DB.meta.map(r => ({ 
+            n: r[DB.mCols['Videogame']], 
+            s: parseFloat(r[DB.mCols[user]])||0, 
+            y: r[DB.mCols['Release Year']] 
+        })).filter(x => x.s > 0 && (year === 'All' || x.y === year));
         return l.sort((a,b) => sort === 'desc' ? b.s - a.s : a.s - b.s).slice(0, limit);
       };
 
-      // Render Top Lists
-      document.getElementById('yoshi-list').innerHTML = getList('Yoshi', document.getElementById('y-top-sel').value).map((x,i)=>createCard(x.n, x.s, i+1, false, 'yoshi')).join('');
-      document.getElementById('apple-list').innerHTML = getList('Apple', document.getElementById('a-top-sel').value).map((x,i)=>createCard(x.n, x.s, i+1, false, 'apple')).join('');
+      document.getElementById('yoshi-list').innerHTML = getList('Yoshi', 'y-top-sel').map((x,i)=>createCard(x.n, x.s, i+1, false, 'yoshi')).join('');
+      document.getElementById('apple-list').innerHTML = getList('Apple', 'a-top-sel').map((x,i)=>createCard(x.n, x.s, i+1, false, 'apple')).join('');
 
-      // Render Series/Genre
-      const sList = DB.meta.filter(r => r[DB.mCols['Series']] === sVal).map(r => ({n: r[DB.mCols['Videogame']], s: parseFloat(r[DB.mCols['Yoshi']])||0})).sort((a,b)=>b.s-a.s);
-      document.getElementById('series-list').innerHTML = sList.map(x => createCard(x.n, x.s, null, false, 'yoshi')).join('');
+      // Combined
+      const cYear = document.getElementById('c-top-sel').value;
+      let cList = DB.meta.map(r => ({
+        n: r[DB.mCols['Videogame']],
+        s: (parseFloat(r[DB.mCols['Yoshi']])||0) + (parseFloat(r[DB.mCols['Apple']])||0),
+        y: r[DB.mCols['Release Year']]
+      })).filter(x => x.s > 0 && (cYear === 'All' || x.y === cYear));
+      document.getElementById('combined-list').innerHTML = cList.sort((a,b)=>b.s-a.s).slice(0, 25).map((x,i)=>createCard(x.n, x.s, i+1, true, 'combined')).join('');
 
-      const gList = DB.meta.filter(r => r[DB.mCols['Genre']] === gVal).map(r => ({n: r[DB.mCols['Videogame']], s: parseFloat(r[DB.mCols['Yoshi']])||0})).sort((a,b)=>b.s-a.s);
-      document.getElementById('genre-list').innerHTML = gList.map(x => createCard(x.n, x.s, null, false, 'yoshi')).join('');
+      // Feeds
+      const yFeed = DB.master.filter(r => r[DB.sCols['Date']] && r[DB.sCols['Date']].includes(fY) && r[DB.sCols['Status']] === 'Completed');
+      document.getElementById('yoshi-feed').innerHTML = yFeed.map(r => createCard(r[DB.sCols['Videogame']], 0, null, false, 'yoshi')).join('');
 
-      // Trash Fire
+      // Series/Genre
+      document.getElementById('series-list').innerHTML = DB.meta.filter(r => r[DB.mCols['Series']] === sVal).map(r => createCard(r[DB.mCols['Videogame']], parseFloat(r[DB.mCols['Yoshi']])||0, null, false, 'yoshi')).join('');
+      document.getElementById('genre-list').innerHTML = DB.meta.filter(r => r[DB.mCols['Genre']] === gVal).map(r => createCard(r[DB.mCols['Videogame']], parseFloat(r[DB.mCols['Yoshi']])||0, null, false, 'yoshi')).join('');
+      
+      // Worst
       document.getElementById('y-worst').innerHTML = "<strong>Yoshi's Worst</strong>" + getList('Yoshi', 'All', 10, 'asc').map((x,i)=>createCard(x.n, x.s, i+1, false, 'yoshi')).join('');
     }
 
