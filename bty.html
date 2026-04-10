@@ -155,7 +155,7 @@
     <nav class="dashboard-nav" id="main-nav" style="display: none;">
       <a href="#gotm-container">GOTM</a>
       <a href="#activity-container">Recent</a>
-      <a href="#boards-wrapper">Top 25</a>
+      <a href="#boards-wrapper">Top 100</a>
       <a href="#series-header">Franchise</a>
       <a href="#genre-header">Genre</a>
       <a href="#blindspot-header">Blind Spots</a>
@@ -211,19 +211,19 @@
     <div class="leaderboards-wrapper" id="boards-wrapper" style="display: none;">
       <div class="leaderboard-column">
         <div class="board-title yoshi-title">
-          Yoshi's <select id="y-top-select" class="year-dropdown"></select> Top 25
+          Yoshi's <select id="y-top-select" class="year-dropdown"></select> Top 100
         </div>
         <div id="yoshi-list" class="scrollable-feed"></div>
       </div>
       <div class="leaderboard-column">
         <div class="board-title combined-title">
-          Combined <select id="c-top-select" class="year-dropdown"></select> Top 25
+          Combined <select id="c-top-select" class="year-dropdown"></select> Top 100
         </div>
         <div id="combined-list" class="scrollable-feed"></div>
       </div>
       <div class="leaderboard-column">
         <div class="board-title apple-title">
-          Apple's <select id="a-top-select" class="year-dropdown"></select> Top 25
+          Apple's <select id="a-top-select" class="year-dropdown"></select> Top 100
         </div>
         <div id="apple-list" class="scrollable-feed"></div>
       </div>
@@ -622,9 +622,9 @@
           let yData = yYear === 'All-Time' ? [...allYoshiGames] : allYoshiGames.filter(g => g.releaseYear === yYear); sortGames(yData, 'score');
           let aData = aYear === 'All-Time' ? [...allAppleGames] : allAppleGames.filter(g => g.releaseYear === aYear); sortGames(aData, 'score');
           let cData = cYear === 'All-Time' ? [...allCombinedGames] : allCombinedGames.filter(g => g.releaseYear === cYear); sortGames(cData, 'totalScore');
-          document.getElementById('yoshi-list').innerHTML = generateRankedCards(yData, 'yoshi-card', false, 25);
-          document.getElementById('apple-list').innerHTML = generateRankedCards(aData, 'apple-card', false, 25);
-          document.getElementById('combined-list').innerHTML = generateRankedCards(cData, 'combined-card', true, 25);
+          document.getElementById('yoshi-list').innerHTML = generateRankedCards(yData, 'yoshi-card', false, 100);
+          document.getElementById('apple-list').innerHTML = generateRankedCards(aData, 'apple-card', false, 100);
+          document.getElementById('combined-list').innerHTML = generateRankedCards(cData, 'combined-card', true, 100);
         }
 
         function renderSeriesLeaderboards() {
