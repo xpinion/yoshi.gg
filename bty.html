@@ -446,19 +446,19 @@
         const [metaResponse, masterResponse, top25Response] = await Promise.all([
           fetch('metadata_data.json'),
           fetch('master_data.json'),
-          fetch('top25_data.json') // <-- NEW!
+          fetch('top25_data.json') 
         ]);
         
         const metaData = await metaResponse.json();
         const masterData = await masterResponse.json();
-        const top25Data = await top25Response.json(); // <-- NEW!
+        const top25Data = await top25Response.json(); 
         
         if (!metaData.values || !masterData.values || !top25Data.values) {
           document.getElementById('loading-text').innerHTML = '<span style="color: red;">Error: Database structure invalid or empty. Check Google Sheet JSON outputs.</span>';
           return;
         }
         
-        const top25Rows = top25Data.values; // <-- NEW!
+        const top25Rows = top25Data.values; 
 
         const metaRows = metaData.values;
         const masterRows = masterData.values;
@@ -655,7 +655,6 @@
           if(defaultGenre) document.getElementById(`${p}-genre-select`).value = defaultGenre; 
         });
 
-        // NEW: Populate the Yearly Records dropdown
         document.getElementById('y-records-select').innerHTML = buildOptions(allFeedYearsArray, false);
 
         // --- 4. RENDER FUNCTIONS ---
@@ -838,7 +837,13 @@
             });
             return html || emptyStateHTML("No records found for this year.");
           }
-          // --- RANDOM TOP 25 LOGIC ---
+          
+          document.getElementById('yoshi-most-played-list').innerHTML = genRecordCards(timeData, true, false);
+          document.getElementById('yoshi-most-days-list').innerHTML = genRecordCards(daysData, false, false);
+          document.getElementById('yoshi-best-session-list').innerHTML = genRecordCards(sessionData, true, true);
+        }
+
+        // --- RANDOM TOP 25 LOGIC ---
         let allTop25Tables = [];
         
         // 1. Parse the dual-tables from the top25 sheet
@@ -894,18 +899,6 @@
           document.getElementById('random-top25-content').innerHTML = html;
         }
 
-        // 4. Initial Random Pick & Listen
-        if (allTop25Tables.length > 0) {
-          let randomIdx = Math.floor(Math.random() * allTop25Tables.length);
-          document.getElementById('random-top25-select').value = allTop25Tables[randomIdx].title;
-          document.getElementById('random-top25-select').addEventListener('change', renderRandomTop25);
-          renderRandomTop25();
-        }
-
-          document.getElementById('yoshi-most-played-list').innerHTML = genRecordCards(timeData, true, false);
-          document.getElementById('yoshi-most-days-list').innerHTML = genRecordCards(daysData, false, false);
-          document.getElementById('yoshi-best-session-list').innerHTML = genRecordCards(sessionData, true, true);
-        }
 
         // --- 5. INITIALIZE & LISTEN ---
         function setupSync(group, renderFunc) {
@@ -934,7 +927,15 @@
         renderBlindSpots(); 
         renderGreatDivide(); 
         renderBottomOfTheBarrel();
-        renderYearlyRecords(); // NEW: Render the records on page load
+        renderYearlyRecords(); 
+
+        // 4. Initial Random Pick & Listen
+        if (allTop25Tables.length > 0) {
+          let randomIdx = Math.floor(Math.random() * allTop25Tables.length);
+          document.getElementById('random-top25-select').value = allTop25Tables[randomIdx].title;
+          document.getElementById('random-top25-select').addEventListener('change', renderRandomTop25);
+          renderRandomTop25();
+        }
 
         // Unhide all the sections by clearing display: none
         ['barrel-header', 'barrel-wrapper', 'divide-header', 'divide-wrapper', 'blindspot-header', 'blindspot-wrapper', 'activity-container', 'boards-wrapper', 'series-header', 'series-wrapper', 'genre-header', 'genre-wrapper', 'main-nav', 'records-header', 'records-wrapper', 'random-header', 'random-wrapper'].forEach(id => {
