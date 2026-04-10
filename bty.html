@@ -128,6 +128,15 @@
     .dk-barrel-icon { height: 1.3em; vertical-align: middle; margin: 0 5px; filter: drop-shadow(0 5px 5px rgba(255, 69, 0, 0.6)); transform: translateY(-3px); }
     .fire-column { position: relative; overflow: hidden; }
     .fire-column::after { content: ''; position: absolute; bottom: 0; left: 0; width: 100%; height: 50px; background: linear-gradient(to top, rgba(255, 69, 0, 0.2), transparent); pointer-events: none; border-radius: 0 0 12px 12px; }
+
+    /* RANDOM TOP 25 TABLE */
+    .top25-table { width: 100%; border-collapse: collapse; background: #fff; border-radius: 8px; overflow: hidden; font-size: 0.95em; box-shadow: inset 0 0 0 1px #eee; }
+    .top25-table th { background: #111; color: #FFD700; padding: 12px 15px; text-transform: uppercase; font-size: 0.85em; letter-spacing: 1px; text-align: left; }
+    .top25-table td { padding: 10px 15px; border-bottom: 1px solid #eee; color: #444; }
+    .top25-table tr:last-child td { border-bottom: none; }
+    .top25-table tr:nth-child(even) { background-color: #fcfcfc; }
+    .top25-table tr:hover { background-color: #f1f1f1; }
+    .top25-table td:first-child { font-weight: 900; color: #111; width: 50px; text-align: center; } /* Rank */
   </style>
 </head>
 <body>
@@ -162,6 +171,7 @@
       <a href="#divide-header">The Divide</a>
       <a href="#barrel-header">Trash Fire</a>
       <a href="#records-header">Yoshi's Yearly Records</a>
+      <a href="#random-header">Yoshi's Random Spotlight</a>
     </nav>
     
     <div id="loading-text" style="text-align: center; font-family: Courier New; padding: 50px;">Loading Pure Database Dashboard...</div>
@@ -362,6 +372,16 @@
         <div id="yoshi-best-session-list" class="scrollable-feed"></div>
       </div>
     </div>
+    <div class="section-header" id="random-header" style="display: none;">Yoshi's Random Spotlight</div>
+    <div class="leaderboards-wrapper" id="random-wrapper" style="display: none;">
+      <div class="leaderboard-column" style="flex: 1 1 100%; max-width: 100%;">
+        <div class="board-title combined-title" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 15px;">
+          <span>🎲 Featured List</span>
+          <select id="random-top25-select" class="year-dropdown" style="font-size: 0.7em; max-width: 60%;"></select>
+        </div>
+        <div id="random-top25-content" style="overflow-x: auto;"></div>
+      </div>
+    </div>
   </div>
 
   <script>
@@ -423,18 +443,22 @@
 
     async function loadDashboardData() {
       try {
-        const [metaResponse, masterResponse] = await Promise.all([
+        const [metaResponse, masterResponse, top25Response] = await Promise.all([
           fetch('metadata_data.json'),
-          fetch('master_data.json')
+          fetch('master_data.json'),
+          fetch('top25_data.json') // <-- NEW!
         ]);
         
         const metaData = await metaResponse.json();
         const masterData = await masterResponse.json();
+        const top25Data = await top25Response.json(); // <-- NEW!
         
-        if (!metaData.values || !masterData.values) {
+        if (!metaData.values || !masterData.values || !top25Data.values) {
           document.getElementById('loading-text').innerHTML = '<span style="color: red;">Error: Database structure invalid or empty. Check Google Sheet JSON outputs.</span>';
           return;
         }
+        
+        const top25Rows = top25Data.values; // <-- NEW!
 
         const metaRows = metaData.values;
         const masterRows = masterData.values;
@@ -814,6 +838,69 @@
             });
             return html || emptyStateHTML("No records found for this year.");
           }
+          // --- RANDOM TOP 25 LOGIC ---
+        let allTop25Tables = [];
+        
+        // 1. Parse the dual-tables from the top25 sheet
+        for (let i = 0; i < top25Rows.length; i++) {
+          let row = top25Rows[i];
+          if (!row) continue;
+          
+          // Identify a Title Row: Col 0 has text, Col 1 is empty (merged), Col 6 has text
+          if (row[0] && row[1] === "" && row[6]) {
+            let titleLeft = row[0];
+            let titleRight = row[6];
+            let headersLeft = top25Rows[i+1].slice(0, 5);
+            let headersRight = top25Rows[i+1].slice(6, 11);
+            let dataLeft = [];
+            let dataRight = [];
+
+            let j = i + 2;
+            // Keep reading data rows until we hit a totally blank spacer row
+            while (j < top25Rows.length) {
+              let dataRow = top25Rows[j];
+              let leftHasData = dataRow.slice(0, 5).some(c => c && c.trim() !== "");
+              let rightHasData = dataRow.slice(6, 11).some(c => c && c.trim() !== "");
+
+              if (!leftHasData && !rightHasData) break; // End of table block
+
+              if (leftHasData) dataLeft.push(dataRow.slice(0, 5));
+              if (rightHasData) dataRight.push(dataRow.slice(6, 11));
+              j++;
+            }
+            
+            if (dataLeft.length > 0) allTop25Tables.push({ title: titleLeft, headers: headersLeft, rows: dataLeft });
+            if (dataRight.length > 0) allTop25Tables.push({ title: titleRight, headers: headersRight, rows: dataRight });
+            i = j - 1; // Skip ahead
+          }
+        }
+
+        // 2. Populate Dropdown
+        document.getElementById('random-top25-select').innerHTML = allTop25Tables.map(t => `<option value="${escapeHTML(t.title)}">${escapeHTML(t.title)}</option>`).join('');
+
+        // 3. Render Function
+        function renderRandomTop25() {
+          let selectedTitle = document.getElementById('random-top25-select').value;
+          let tableObj = allTop25Tables.find(t => t.title === selectedTitle);
+          if (!tableObj) return;
+
+          let html = `<table class="top25-table">
+            <thead><tr>${tableObj.headers.map(h => `<th>${escapeHTML(h)}</th>`).join('')}</tr></thead>
+            <tbody>
+              ${tableObj.rows.map(r => `<tr>${r.map(c => `<td>${escapeHTML(c)}</td>`).join('')}</tr>`).join('')}
+            </tbody>
+          </table>`;
+
+          document.getElementById('random-top25-content').innerHTML = html;
+        }
+
+        // 4. Initial Random Pick & Listen
+        if (allTop25Tables.length > 0) {
+          let randomIdx = Math.floor(Math.random() * allTop25Tables.length);
+          document.getElementById('random-top25-select').value = allTop25Tables[randomIdx].title;
+          document.getElementById('random-top25-select').addEventListener('change', renderRandomTop25);
+          renderRandomTop25();
+        }
 
           document.getElementById('yoshi-most-played-list').innerHTML = genRecordCards(timeData, true, false);
           document.getElementById('yoshi-most-days-list').innerHTML = genRecordCards(daysData, false, false);
@@ -850,7 +937,7 @@
         renderYearlyRecords(); // NEW: Render the records on page load
 
         // Unhide all the sections by clearing display: none
-        ['barrel-header', 'barrel-wrapper', 'divide-header', 'divide-wrapper', 'blindspot-header', 'blindspot-wrapper', 'activity-container', 'boards-wrapper', 'series-header', 'series-wrapper', 'genre-header', 'genre-wrapper', 'main-nav', 'records-header', 'records-wrapper'].forEach(id => {
+        ['barrel-header', 'barrel-wrapper', 'divide-header', 'divide-wrapper', 'blindspot-header', 'blindspot-wrapper', 'activity-container', 'boards-wrapper', 'series-header', 'series-wrapper', 'genre-header', 'genre-wrapper', 'main-nav', 'records-header', 'records-wrapper', 'random-header', 'random-wrapper'].forEach(id => {
           document.getElementById(id).style.display = ''; 
         });
         
