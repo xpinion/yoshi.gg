@@ -161,6 +161,7 @@
       <a href="#blindspot-header">Blind Spots</a>
       <a href="#divide-header">The Divide</a>
       <a href="#barrel-header">Trash Fire</a>
+      <a href="#records-header">Yoshi's Yearly Records</a>
     </nav>
     
     <div id="loading-text" style="text-align: center; font-family: Courier New; padding: 50px;">Loading Pure Database Dashboard...</div>
@@ -340,10 +341,37 @@
         <div id="apple-bottom-list" class="scrollable-feed"></div>
       </div>
     </div>
+    <div class="section-header" id="records-header" style="display: none;">Yoshi's Yearly Records</div>
+    <div class="leaderboards-wrapper" id="records-wrapper" style="display: none;">
+      <div class="leaderboard-column">
+        <div class="board-title yoshi-title">
+          Most Played <select id="y-records-select" class="year-dropdown"></select>
+        </div>
+        <div id="yoshi-most-played-list" class="scrollable-feed"></div>
+      </div>
+      <div class="leaderboard-column">
+        <div class="board-title yoshi-title">
+          Most Days Played
+        </div>
+        <div id="yoshi-most-days-list" class="scrollable-feed"></div>
+      </div>
+      <div class="leaderboard-column">
+        <div class="board-title yoshi-title">
+          Longest Single Session
+        </div>
+        <div id="yoshi-best-session-list" class="scrollable-feed"></div>
+      </div>
+    </div>
   </div>
 
   <script>
     // --- UTILITY FUNCTIONS ---
+    function formatMinutes(totalMins) {
+      let h = Math.floor(totalMins / 60);
+      let m = totalMins % 60;
+      return h > 0 ? `${h}h ${m.toString().padStart(2, '0')}m` : `${m}m`;
+    }
+
     function escapeHTML(str) {
       if (typeof str !== 'string') return str;
       return str.replace(/[&<>'"]/g, function(tag) {
@@ -391,7 +419,7 @@
     const META_GAME = 0; const META_RELEASE_YEAR = 1; const META_GENRE = 2; const META_SERIES = 5;
     const META_YOSCORE = 6; const META_ASCORE = 7; const META_ADATE = 8; const META_ASYSTEM = 9;
     const META_GOTM = 10; const META_ART = 11;
-    const MASTER_DATE = 1; const MASTER_GAME = 2; const MASTER_SYSTEM = 3; const MASTER_STATUS = 8;
+    const MASTER_DATE = 1; const MASTER_GAME = 2; const MASTER_SYSTEM = 3; const MASTER_TIME = 4; const MASTER_STATUS = 8;
 
     async function loadDashboardData() {
       try {
@@ -481,19 +509,45 @@
 
         document.getElementById('score-legend').style.display = 'flex';
 
-        // --- 2. DATA EXTRACTION ---
+        /// --- 2. DATA EXTRACTION ---
         let allYoshiCompletions = []; let allAppleCompletions = [];
         let yoshiCompletionYearsSet = new Set(); let appleCompletionYearsSet = new Set();
         let yoshiSeenCompletions = new Set(); let appleSeenCompletions = new Set();
+        
+        // Trackers for the Yearly Records
+        let yoshiYearlyTime = {}; let yoshiYearlyDays = {}; let yoshiYearlySessions = {};
 
         for (let i = 1; i < masterRows.length; i++) {
           if (!masterRows[i]) continue;
-          let mStatus = masterRows[i][MASTER_STATUS] || ''; 
-          if (mStatus === 'Completed' || mStatus === 'M-Completed') {
-            let mDate = masterRows[i][MASTER_DATE] || ''; let mGame = masterRows[i][MASTER_GAME] || '';
-            let yearMatch = mDate.match(/\d{4}/);
-            if (yearMatch) {
-              let year = yearMatch[0]; let uniqueKey = year + "||" + mGame.toLowerCase().trim(); 
+          let mDate = masterRows[i][MASTER_DATE] || ''; let mGame = masterRows[i][MASTER_GAME] || '';
+          let mTime = masterRows[i][MASTER_TIME] || ''; let mStatus = masterRows[i][MASTER_STATUS] || ''; 
+          
+          let yearMatch = mDate.match(/\d{4}/);
+          if (yearMatch && mGame) {
+            let year = yearMatch[0];
+            
+            // A. Aggregate Time & Sessions for ALL entries
+            let minutes = 0;
+            if (mTime) {
+              let p = mTime.split(':');
+              minutes = (parseInt(p[0]) || 0) * 60 + (parseInt(p[1]) || 0);
+            }
+            
+            if (minutes > 0) {
+              if (!yoshiYearlyTime[year]) { yoshiYearlyTime[year] = {}; yoshiYearlyDays[year] = {}; yoshiYearlySessions[year] = {}; }
+              if (!yoshiYearlyTime[year][mGame]) { yoshiYearlyTime[year][mGame] = 0; yoshiYearlyDays[year][mGame] = new Set(); }
+              
+              let sessionKey = mGame + "||" + mDate;
+              if (!yoshiYearlySessions[year][sessionKey]) yoshiYearlySessions[year][sessionKey] = { game: mGame, date: mDate, minutes: 0 };
+              
+              yoshiYearlyTime[year][mGame] += minutes;
+              yoshiYearlyDays[year][mGame].add(mDate);
+              yoshiYearlySessions[year][sessionKey].minutes += minutes;
+            }
+
+            // B. Track Completions
+            if (mStatus === 'Completed' || mStatus === 'M-Completed') {
+              let uniqueKey = year + "||" + mGame.toLowerCase().trim(); 
               if (!yoshiSeenCompletions.has(uniqueKey)) {
                 yoshiSeenCompletions.add(uniqueKey); yoshiCompletionYearsSet.add(year);
                 let metaMatch = metaMap.get(mGame); 
@@ -576,6 +630,9 @@
           if(defaultSeries) document.getElementById(`${p}-series-select`).value = defaultSeries; 
           if(defaultGenre) document.getElementById(`${p}-genre-select`).value = defaultGenre; 
         });
+
+        // NEW: Populate the Yearly Records dropdown
+        document.getElementById('y-records-select').innerHTML = buildOptions(allFeedYearsArray, false);
 
         // --- 4. RENDER FUNCTIONS ---
         function renderFeeds() {
@@ -726,6 +783,43 @@
           document.getElementById('combined-bottom-list').innerHTML = generateRankedCards(cData, 'combined-card', true, 25);
         }
 
+        function renderYearlyRecords() {
+          let year = document.getElementById('y-records-select').value;
+          
+          // Convert our aggregated objects into sortable arrays
+          let timeData = Object.entries(yoshiYearlyTime[year] || {}).map(([name, mins]) => ({ name, score: mins }));
+          sortGames(timeData, 'score');
+          
+          let daysData = Object.entries(yoshiYearlyDays[year] || {}).map(([name, daySet]) => ({ name, score: daySet.size }));
+          sortGames(daysData, 'score');
+          
+          let sessionData = Object.values(yoshiYearlySessions[year] || {}).map(s => ({ name: s.game, score: s.minutes, date: s.date }));
+          sortGames(sessionData, 'score');
+
+          function genRecordCards(data, isTime, hasDate) {
+            let html = ''; let actualPos = 1; let lastScore = -1;
+            data.slice(0, 25).forEach(item => {
+              let rankText = item.score !== lastScore ? `#${actualPos}` : ''; lastScore = item.score;
+              let displayScore = isTime ? formatMinutes(item.score) : `${item.score} Days`;
+              let subText = hasDate ? `<span style="font-size:0.7em; color:#bbb; display:block; font-weight: normal;">on ${formatShortDate(item.date)}</span>` : '';
+              
+              html += `<div class="game-card yoshi-card">
+                <div class="rank-badge">${rankText}</div>
+                <div class="game-name" style="display: flex; flex-direction: column;">
+                  <span>${escapeHTML(item.name)}</span>${subText}
+                </div>
+                <div class="score-badge">${displayScore}</div>
+              </div>`;
+              actualPos++;
+            });
+            return html || emptyStateHTML("No records found for this year.");
+          }
+
+          document.getElementById('yoshi-most-played-list').innerHTML = genRecordCards(timeData, true, false);
+          document.getElementById('yoshi-most-days-list').innerHTML = genRecordCards(daysData, false, false);
+          document.getElementById('yoshi-best-session-list').innerHTML = genRecordCards(sessionData, true, true);
+        }
+
         // --- 5. INITIALIZE & LISTEN ---
         function setupSync(group, renderFunc) {
           group.forEach(id => {
@@ -742,12 +836,24 @@
         setupSync(['y-series-select', 'a-series-select', 'c-series-select'], renderSeriesLeaderboards);
         setupSync(['y-genre-select', 'a-genre-select', 'c-genre-select'], renderGenreLeaderboards);
 
-        renderFeeds(); renderLeaderboards(); renderSeriesLeaderboards(); renderGenreLeaderboards();
-        renderBlindSpots(); renderGreatDivide(); renderBottomOfTheBarrel();
+        // NEW: Listen for changes on the Yearly Records dropdown
+        document.getElementById('y-records-select').addEventListener('change', renderYearlyRecords);
 
-        ['barrel-header', 'barrel-wrapper', 'divide-header', 'divide-wrapper', 'blindspot-header', 'blindspot-wrapper', 'activity-container', 'boards-wrapper', 'series-header', 'series-wrapper', 'genre-header', 'genre-wrapper', 'main-nav'].forEach(id => {
+        // Run the initial render functions
+        renderFeeds(); 
+        renderLeaderboards(); 
+        renderSeriesLeaderboards(); 
+        renderGenreLeaderboards();
+        renderBlindSpots(); 
+        renderGreatDivide(); 
+        renderBottomOfTheBarrel();
+        renderYearlyRecords(); // NEW: Render the records on page load
+
+        // Unhide all the sections by clearing display: none
+        ['barrel-header', 'barrel-wrapper', 'divide-header', 'divide-wrapper', 'blindspot-header', 'blindspot-wrapper', 'activity-container', 'boards-wrapper', 'series-header', 'series-wrapper', 'genre-header', 'genre-wrapper', 'main-nav', 'records-header', 'records-wrapper'].forEach(id => {
           document.getElementById(id).style.display = ''; 
         });
+        
         document.getElementById('loading-text').style.display = 'none';
 
       } catch (err) {
