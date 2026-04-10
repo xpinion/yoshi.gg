@@ -607,15 +607,29 @@
         }
 
         function generateRankedCards(gamesArray, cardClass, isCombined, maxLimit = 25) {
-          let html = ''; let actualPosition = 1; let lastScore = -1;
-          gamesArray.slice(0, maxLimit).forEach(game => {
-            let scoreToCompare = isCombined ? game.totalScore : game.score;
-            let rankText = scoreToCompare !== lastScore ? `#${actualPosition}` : ''; lastScore = scoreToCompare;
-            html += `<div class="game-card ${cardClass}"><div class="rank-badge">${rankText}</div><div class="game-name">${escapeHTML(game.name)}</div><div class="score-badge" ${isCombined ? 'style="background: #673AB7;"' : ''}>${formatScore(scoreToCompare)}${isCombined ? ' <span style="font-size:0.7em; color:#bbb;">/ 20</span>' : ''}</div></div>`;
-            actualPosition++;
-          });
-          return html || emptyStateHTML("No rated games found.");
+      let html = ''; 
+      let actualPosition = 1; 
+      let lastScore = -1;
+      
+      for (let i = 0; i < gamesArray.length; i++) {
+        let game = gamesArray[i];
+        let scoreToCompare = isCombined ? game.totalScore : game.score;
+        
+        // If we've hit the limit, AND this score is lower than the tiebreaker, stop adding cards.
+        if (i >= maxLimit && scoreToCompare !== lastScore) {
+          break;
         }
+
+        let rankText = scoreToCompare !== lastScore ? `#${actualPosition}` : ''; 
+        lastScore = scoreToCompare;
+        
+        html += `<div class="game-card ${cardClass}"><div class="rank-badge">${rankText}</div><div class="game-name">${escapeHTML(game.name)}</div><div class="score-badge" ${isCombined ? 'style="background: #673AB7;"' : ''}>${formatScore(scoreToCompare)}${isCombined ? ' <span style="font-size:0.7em; color:#bbb;">/ 20</span>' : ''}</div></div>`;
+        
+        actualPosition++;
+      }
+      
+      return html || emptyStateHTML("No rated games found.");
+    }
 
         function renderLeaderboards() {
           let yYear = document.getElementById('y-top-select').value; let aYear = document.getElementById('a-top-select').value; let cYear = document.getElementById('c-top-select').value;
