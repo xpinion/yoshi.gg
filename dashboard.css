@@ -179,3 +179,60 @@ body {
   font-style: italic;
   margin-top: 20px;
 }
+
+/* --- Monthly Detailed Table Styles --- */
+.monthly-table-wrapper {
+  width: 100%;
+  overflow-x: auto; /* Allows side-scrolling on small screens */
+  padding-bottom: 10px;
+}
+
+.monthly-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+  min-width: 1200px; /* Ensures columns don't crush together */
+}
+
+.monthly-table th {
+  background-color: var(--primary-green);
+  color: white;
+  font-weight: 700;
+  padding: 10px;
+  border: 1px solid #1a4a1c;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.monthly-table td {
+  padding: 8px 10px;
+  border: 1px solid #e0e0e0;
+  vertical-align: middle;
+}
+
+.monthly-table tr.active-row {
+  font-weight: 700;
+  background-color: #ffffff;
+}
+
+.monthly-table tr.inactive-row {
+  font-weight: 400;
+  background-color: #f9f9f9;
+  color: #666;
+}
+
+.monthly-table td.text-left { text-align: left; }
+.monthly-table td.text-center { text-align: center; }
+
+.status-cell {
+  color: #000; /* Dark text for readability against bright colors */
+  text-shadow: 0 0 2px rgba(255,255,255,0.5); /* Helps legibility */
+}
+
+.grand-total-row td {
+  background-color: #111;
+  color: #fff;
+  font-weight: 800;
+  font-size: 0.95rem;
+  border-color: #000;
+}
