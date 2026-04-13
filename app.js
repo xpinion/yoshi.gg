@@ -34,6 +34,36 @@ function escapeHTML(str) {
   return str.replace(/[&<>'"]/g, tag => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[tag] || tag));
 }
 
+// Utility: Convert "HH:MM" to total seconds
+function timeStringToSeconds(timeString) {
+  if (!timeString || typeof timeString !== 'string') return 0;
+  const p = timeString.split(':').map(s => parseInt(s, 10));
+  if (p.length === 3) return (p[0] || 0) * 3600 + (p[1] || 0) * 60 + (p[2] || 0);
+  if (p.length === 2) return (p[0] || 0) * 3600 + (p[1] || 0) * 60;
+  return 0;
+}
+
+// Utility: Convert total seconds back to "HH:MM"
+function formatHHMM(totalSeconds) {
+  if (isNaN(totalSeconds) || totalSeconds <= 0) return "00:00";
+  const h = Math.floor(totalSeconds / 3600);
+  const m = Math.floor((totalSeconds % 3600) / 60);
+  return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`;
+}
+
+// Utility: Get background color for Game Status
+function getStatusColor(status) {
+  switch (status) {
+    case 'Completed': case 'M-Completed': return '#00FF00'; // Green
+    case 'Active': return '#FFFF00'; // Yellow
+    case 'Multiplayer': return '#00FFFF'; // Cyan
+    case 'Abandoned': return '#FFCCCC'; // Light Red
+    case 'Postgame': return '#FFA500'; // Orange
+    case 'Non-Completable': return '#DDDDDD'; // Gray
+    default: return '#FFFFFF';
+  }
+}
+
 // Initialization
 async function initDashboard() {
   try {
