@@ -318,35 +318,76 @@ function renderCompletions(year) {
   }).join('');
 }
 
+// Most Played Time
 function renderMostPlayed(year) {
   const container = document.getElementById('most-played-list');
   const yearStats = rawData.metrics.yearlyGameStats[year];
   if (!yearStats) { container.innerHTML = `<div class="loading-text">No playtime logged.</div>`; return; }
 
-  const sortedGames = Object.entries(yearStats).map(([name, stats]) => ({ name, seconds: stats.totalSeconds })).sort((a, b) => b.seconds - a.seconds).slice(0, 25);
-  container.innerHTML = sortedGames.map((game, index) => `<div class="list-item"><div class="item-info"><span class="item-rank">#${index + 1}</span><div class="item-text"><span class="item-title hover-trigger" data-game="${escapeHTML(game.name)}">${escapeHTML(game.name)}</span></div></div><div class="item-badge">${formatTime(game.seconds)}</div></div>`).join('');
+  const sortedGames = Object.entries(yearStats).map(([name, stats]) => {
+    // Parse out the systems array
+    const sysStr = Array.isArray(stats.systems) ? stats.systems.join(', ') : (stats.systems && stats.systems.data ? stats.systems.data.join(', ') : '');
+    return { name, seconds: stats.totalSeconds, systems: sysStr };
+  }).sort((a, b) => b.seconds - a.seconds).slice(0, 25);
+
+  container.innerHTML = sortedGames.map((game, index) => `
+    <div class="list-item">
+      <div class="item-info">
+        <span class="item-rank">#${index + 1}</span>
+        <div class="item-text">
+          <span class="item-title hover-trigger" data-game="${escapeHTML(game.name)}">${escapeHTML(game.name)}${game.systems ? ` (${escapeHTML(game.systems)})` : ''}</span>
+        </div>
+      </div>
+      <div class="item-badge">${formatTime(game.seconds)}</div>
+    </div>
+  `).join('');
 }
 
+// Most Days Played
 function renderMostDays(year) {
   const container = document.getElementById('most-days-list');
   const yearStats = rawData.metrics.yearlyGameStats[year];
   if (!yearStats) { container.innerHTML = `<div class="loading-text">No playtime logged.</div>`; return; }
 
   const sortedDays = Object.entries(yearStats).map(([name, stats]) => {
-    const dayCount = Array.isArray(stats.days) ? stats.days.length : (stats.days.data ? stats.days.data.length : 0);
-    return { name, days: dayCount };
+    const dayCount = Array.isArray(stats.days) ? stats.days.length : (stats.days && stats.days.data ? stats.days.data.length : 0);
+    const sysStr = Array.isArray(stats.systems) ? stats.systems.join(', ') : (stats.systems && stats.systems.data ? stats.systems.data.join(', ') : '');
+    return { name, days: dayCount, systems: sysStr };
   }).sort((a, b) => b.days - a.days).slice(0, 25);
 
-  container.innerHTML = sortedDays.map((game, index) => `<div class="list-item"><div class="item-info"><span class="item-rank">#${index + 1}</span><div class="item-text"><span class="item-title hover-trigger" data-game="${escapeHTML(game.name)}">${escapeHTML(game.name)}</span></div></div><div class="item-badge">${game.days} Days</div></div>`).join('');
+  container.innerHTML = sortedDays.map((game, index) => `
+    <div class="list-item">
+      <div class="item-info">
+        <span class="item-rank">#${index + 1}</span>
+        <div class="item-text">
+          <span class="item-title hover-trigger" data-game="${escapeHTML(game.name)}">${escapeHTML(game.name)}${game.systems ? ` (${escapeHTML(game.systems)})` : ''}</span>
+        </div>
+      </div>
+      <div class="item-badge">${game.days} Days</div>
+    </div>
+  `).join('');
 }
 
+// Longest Single Session
 function renderLongestSession(year) {
   const container = document.getElementById('longest-session-list');
   const sessions = rawData.metrics.singleDaySessions.filter(s => new Date(s.date).getUTCFullYear().toString() === year);
   if (sessions.length === 0) { container.innerHTML = `<div class="loading-text">No sessions logged.</div>`; return; }
 
   const sortedSessions = sessions.sort((a, b) => b.time - a.time).slice(0, 25);
-  container.innerHTML = sortedSessions.map((s, index) => `<div class="list-item"><div class="item-info"><span class="item-rank">#${index + 1}</span><div class="item-text"><span class="item-title hover-trigger" data-game="${escapeHTML(s.game)}">${escapeHTML(s.game)}</span><span class="item-sub">on ${formatShortDate(s.date)}</span></div></div><div class="item-badge">${formatTime(s.time)}</div></div>`).join('');
+  
+  container.innerHTML = sortedSessions.map((s, index) => `
+    <div class="list-item">
+      <div class="item-info">
+        <span class="item-rank">#${index + 1}</span>
+        <div class="item-text">
+          <span class="item-title hover-trigger" data-game="${escapeHTML(s.game)}">${escapeHTML(s.game)}${s.system ? ` (${escapeHTML(s.system)})` : ''}</span>
+          <span class="item-sub">on ${formatShortDate(s.date)}</span>
+        </div>
+      </div>
+      <div class="item-badge">${formatTime(s.time)}</div>
+    </div>
+  `).join('');
 }
 
 function renderRankings(filterType, filterValue, containerId, limit) {
