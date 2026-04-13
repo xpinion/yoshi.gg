@@ -79,6 +79,27 @@
       </div>
     </section>
 
+    <section class="card-row" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); gap: 20px;">
+      
+      <div class="card">
+        <div class="card-header">
+          <h2>On This Day (<span id="today-date"></span>)</h2>
+        </div>
+        <div class="card-content" id="on-this-day-list"></div>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <h2>Spotlight: <select id="random-top25-select" class="header-dropdown" style="max-width: 60%; font-size: 1.1rem;"></select></h2>
+        </div>
+        <div class="card-content" id="random-top25-content" style="padding: 0;"></div>
+      </div>
+
+    </section>
+  </main>
+
+  <div id="game-tooltip" class="game-tooltip"></div>
+
   </main>
 
   <script src="app.js"></script>
