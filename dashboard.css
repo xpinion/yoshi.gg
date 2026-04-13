@@ -236,3 +236,68 @@ body {
   font-size: 0.95rem;
   border-color: #000;
 }
+
+/* --- Top 25 Spotlight Table --- */
+.top25-table { 
+  width: 100%; 
+  border-collapse: collapse; 
+  font-size: 0.85rem; 
+}
+.top25-table th { 
+  background: var(--badge-bg); 
+  color: var(--badge-text); 
+  padding: 10px; 
+  text-align: left; 
+  position: sticky;
+  top: 0;
+}
+.top25-table td { 
+  padding: 8px 10px; 
+  border-bottom: 1px solid #eee; 
+}
+.top25-table tr:nth-child(even) { background-color: #fafafa; }
+.top25-table tr:hover { background-color: #f1f1f1; }
+
+/* --- Hover History Tooltip --- */
+.hover-trigger { 
+  cursor: help; 
+  border-bottom: 1px dotted var(--primary-green); 
+}
+
+.game-tooltip {
+  position: absolute;
+  background: rgba(20, 20, 20, 0.95);
+  color: #fff;
+  padding: 15px;
+  border-radius: 8px;
+  width: 350px;
+  max-height: 300px;
+  overflow-y: auto;
+  box-shadow: 0 10px 25px rgba(0,0,0,0.3);
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+  z-index: 1000;
+  font-size: 0.85rem;
+  backdrop-filter: blur(5px);
+}
+.game-tooltip.visible { opacity: 1; }
+.game-tooltip h3 { 
+  color: #4CAF50; 
+  margin-bottom: 10px; 
+  font-size: 1.1rem; 
+  border-bottom: 1px solid #444; 
+  padding-bottom: 5px; 
+}
+.tooltip-entry { 
+  margin-bottom: 10px; 
+  padding-bottom: 10px; 
+  border-bottom: 1px dashed #333; 
+}
+.tooltip-entry:last-child { border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
+.tooltip-meta { font-weight: bold; color: #aaa; margin-bottom: 3px; }
+.tooltip-note { color: #ddd; line-height: 1.4; }
+
+/* Scrollbar for tooltip */
+.game-tooltip::-webkit-scrollbar { width: 4px; }
+.game-tooltip::-webkit-scrollbar-thumb { background: #666; border-radius: 4px; }
