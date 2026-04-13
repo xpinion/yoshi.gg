@@ -178,31 +178,169 @@ function setupDropdowns() {
 
 // --- RENDER FUNCTIONS ---
 
-// Monthly Summary
+// Monthly Summary (Detailed Table View)
 function renderMonthlySummary(monthKey) {
   const container = document.getElementById('monthly-summary-list');
-  const monthStats = rawData.metrics.monthlyStats[monthKey];
+  if (!rawData || !rawData.allEntries) return;
+
+  // 1. Filter all master log entries for the selected month
+  const monthEntries = rawData.allEntries.filter(e => e.date.startsWith(monthKey));
   
-  if (!monthStats) {
-    container.innerHTML = `<div class="loading-text">No data for this month.</div>`;
+  if (monthEntries.length === 0) {
+    container.innerHTML = `<div class="loading-text">No data for ${monthKey}.</div>`;
     return;
   }
 
-  const sortedGames = Object.entries(monthStats)
-    .map(([name, stats]) => ({ name, seconds: stats.totalSeconds }))
-    .sort((a, b) => b.seconds - a.seconds);
+  // 2. Aggregate the data (Rebuilding the logic from your Apps Script)
+  const monthData = { games: {}, allEntryDays: new Set() };
+  let totalSecondsInMonth = 0;
 
-  container.innerHTML = sortedGames.map((game, index) => `
-    <div class="list-item">
-      <div class="item-info">
-        <span class="item-rank">#${index + 1}</span>
-        <div class="item-text">
-          <span class="item-title">${escapeHTML(game.name)}</span>
-        </div>
-      </div>
-      <div class="item-badge">${formatTime(game.seconds)}</div>
-    </div>
-  `).join('');
+  monthEntries.forEach(entry => {
+    const timeSec = timeStringToSeconds(entry.time);
+    totalSecondsInMonth += timeSec;
+    monthData.allEntryDays.add(entry.date.split('T')[0]);
+
+    if (!monthData.games[entry.game]) {
+      monthData.games[entry.game] = {
+        name: entry.game,
+        totalSeconds: 0,
+        latestGameLifetime: entry.gameLifetime,
+        latestGameLifetimeDays: entry.gameLifetimeDays,
+        activePlaythroughs: {}
+      };
+    }
+    const g = monthData.games[entry.game];
+    g.totalSeconds += timeSec;
+    g.latestGameLifetime = entry.gameLifetime; // Keeps the latest
+    g.latestGameLifetimeDays = entry.gameLifetimeDays;
+
+    if (!g.activePlaythroughs[entry.ptTag]) {
+      g.activePlaythroughs[entry.ptTag] = {
+        timeframeTime: 0,
+        timeframeDays: new Set(),
+        timeframeSystems: new Set(),
+        lastDate: entry.date,
+        lastStatus: entry.status,
+        lastPtLifetime: entry.ptLifetime,
+        lastPtLifetimeDays: entry.ptLifetimeDays,
+        latestNote: entry.note
+      };
+    }
+    const pt = g.activePlaythroughs[entry.ptTag];
+    pt.timeframeTime += timeSec;
+    pt.timeframeDays.add(entry.date.split('T')[0]);
+    pt.timeframeSystems.add(entry.system);
+
+    if (entry.date >= pt.lastDate) {
+      pt.lastDate = entry.date;
+      pt.lastStatus = entry.status;
+      pt.lastPtLifetime = entry.ptLifetime;
+      pt.lastPtLifetimeDays = entry.ptLifetimeDays;
+      pt.latestNote = entry.note;
+    }
+  });
+
+  // 3. Sort games by total time spent this month
+  const sortedGames = Object.values(monthData.games).sort((a, b) => b.totalSeconds - a.totalSeconds);
+
+  // 4. Build the HTML Table
+  let html = `
+    <div class="monthly-table-wrapper">
+      <table class="monthly-table">
+        <thead>
+          <tr>
+            <th rowspan="2">Videogame</th>
+            <th rowspan="2">System</th>
+            <th colspan="2">Active Month</th>
+            <th colspan="2">Playthrough Lifetime</th>
+            <th colspan="2">Game Lifetime</th>
+            <th rowspan="2">Date Started</th>
+            <th rowspan="2">Last Updated</th>
+            <th rowspan="2">Game Status</th>
+            <th rowspan="2">Playthrough Details</th>
+          </tr>
+          <tr>
+            <th>Time</th><th>Days</th>
+            <th>Time</th><th>Days</th>
+            <th>Time</th><th>Days</th>
+          </tr>
+        </thead>
+        <tbody>
+  `;
+
+  sortedGames.forEach(game => {
+    const activeTags = Object.keys(game.activePlaythroughs);
+    
+    // Render Active Playthroughs
+    activeTags.forEach(ptTag => {
+      const ptLocal = game.activePlaythroughs[ptTag];
+      const ptHistory = rawData.playthroughHistory[ptTag]; // Grab start date/final state
+      const sysStr = Array.from(ptLocal.timeframeSystems).join(', ');
+      const bgColor = getStatusColor(ptHistory.finalStatus);
+
+      html += `
+        <tr class="active-row">
+          <td class="text-left">${escapeHTML(game.name)}</td>
+          <td class="text-center">${escapeHTML(sysStr)}</td>
+          <td class="text-center">${formatHHMM(ptLocal.timeframeTime)}</td>
+          <td class="text-center">${ptLocal.timeframeDays.size}</td>
+          <td class="text-center">${ptLocal.lastPtLifetime}</td>
+          <td class="text-center">${ptLocal.lastPtLifetimeDays}</td>
+          <td class="text-center">${game.latestGameLifetime}</td>
+          <td class="text-center">${game.latestGameLifetimeDays}</td>
+          <td class="text-center">${formatShortDate(ptHistory.startDate)}</td>
+          <td class="text-center">${formatShortDate(ptLocal.lastDate)}</td>
+          <td class="text-center status-cell" style="background-color: ${bgColor};">${ptLocal.lastStatus}</td>
+          <td class="text-left">${escapeHTML(ptLocal.latestNote)}</td>
+        </tr>
+      `;
+    });
+
+    // Render Inactive Playthroughs (Historical context for the same game)
+    const allGamePlaythroughs = Object.keys(rawData.playthroughHistory).filter(tag => rawData.playthroughHistory[tag].gameName === game.name);
+    
+    allGamePlaythroughs.forEach(oldTag => {
+      if (!activeTags.includes(oldTag)) {
+        const oldPt = rawData.playthroughHistory[oldTag];
+        const bgColor = getStatusColor(oldPt.finalStatus);
+        
+        html += `
+          <tr class="inactive-row">
+            <td class="text-left">${escapeHTML(game.name)}</td>
+            <td class="text-center">${escapeHTML(oldPt.system)}</td>
+            <td class="text-center">00:00</td>
+            <td class="text-center">0</td>
+            <td class="text-center">${oldPt.finalPtLifetime}</td>
+            <td class="text-center">${oldPt.finalPtLifetimeDays}</td>
+            <td class="text-center">${game.latestGameLifetime}</td>
+            <td class="text-center">${game.latestGameLifetimeDays}</td>
+            <td class="text-center">${formatShortDate(oldPt.startDate)}</td>
+            <td class="text-center">${formatShortDate(oldPt.lastDate)}</td>
+            <td class="text-center status-cell" style="background-color: ${bgColor};">${oldPt.finalStatus}</td>
+            <td class="text-left">${escapeHTML(oldPt.finalNote)}</td>
+          </tr>
+        `;
+      }
+    });
+  });
+
+  // Calculate Days in Month for the Grand Total
+  const [yearStr, monthStr] = monthKey.split('-');
+  const daysInMonth = new Date(parseInt(yearStr), parseInt(monthStr), 0).getDate();
+
+  // Grand Total Row
+  html += `
+        <tr class="grand-total-row">
+          <td colspan="2" class="text-left">Grand Total</td>
+          <td class="text-center">${formatHHMM(totalSecondsInMonth)}</td>
+          <td class="text-center">'${monthData.allEntryDays.size}/${daysInMonth}</td>
+          <td colspan="8"></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>`;
+
+  container.innerHTML = html;
 }
 
 // Completions (With Exact Spreadsheet Tie-Breaker Fix)
