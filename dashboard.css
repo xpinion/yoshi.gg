@@ -301,3 +301,78 @@ body {
 /* Scrollbar for tooltip */
 .game-tooltip::-webkit-scrollbar { width: 4px; }
 .game-tooltip::-webkit-scrollbar-thumb { background: #666; border-radius: 4px; }
+
+/* --- Analysis Tables --- */
+.analysis-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+  min-width: 900px;
+}
+.analysis-table th {
+  background-color: var(--primary-green);
+  color: white;
+  padding: 10px;
+  border: 1px solid #1a4a1c;
+  text-align: center;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+.analysis-table td {
+  padding: 8px;
+  border: 1px solid #e0e0e0;
+  text-align: center;
+}
+.analysis-table tr:nth-child(even) { background-color: #fafafa; }
+.analysis-table tr:hover { background-color: #f1f1f1; }
+.analysis-table tr.all-time-row td { font-weight: bold; background-color: #e8f5e9; }
+
+/* --- Milestone Tracker --- */
+.milestone-item {
+  position: relative;
+  padding: 0 0 20px 25px;
+  border-left: 2px solid var(--primary-green);
+  margin-left: 10px;
+}
+.milestone-item::before {
+  content: '';
+  position: absolute;
+  left: -6px;
+  top: 0;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--primary-green);
+  box-shadow: 0 0 0 3px #e8f5e9;
+}
+.milestone-item:last-child { border-left-color: transparent; }
+.milestone-date { font-weight: 800; color: var(--primary-green); font-size: 0.85rem; margin-bottom: 5px; }
+.milestone-detail { font-size: 0.9rem; color: #333; line-height: 1.4; }
+
+/* --- Heatmap --- */
+.heatmap-table {
+  border-collapse: collapse;
+  margin: 0 auto;
+  font-size: 0.75rem;
+}
+.heatmap-table th {
+  padding: 4px;
+  color: #555;
+  font-weight: bold;
+}
+.heatmap-table td {
+  width: 25px;
+  height: 25px;
+  border: 1px solid #fff;
+  text-align: center;
+  cursor: crosshair;
+  transition: transform 0.1s;
+}
+.heatmap-table td:hover {
+  transform: scale(1.15);
+  box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+  z-index: 5;
+  position: relative;
+}
+.heatmap-empty { background-color: #eee; }
