@@ -178,9 +178,25 @@ const playedSelect = document.getElementById('year-select-played');
     renderLongestSession(currentYear);
   }
 
+// 3. Rankings Dropdowns
   const releaseYears = [...new Set(metaGames.map(g => g.releaseYear))].filter(y => y !== 'Unknown').sort().reverse();
   const franchises = [...new Set(metaGames.map(g => g.franchise))].filter(f => f !== 'Unknown' && f !== 'ZZNONE').sort();
   const genres = [...new Set(metaGames.map(g => g.genre))].filter(g => g !== 'Unknown').sort();
+
+  // --- NEW: Helper to find categories with at least 3 rated games ---
+  const getValidRandoms = (key) => {
+    const counts = {};
+    metaGames.filter(g => g.score !== null).forEach(g => {
+      const val = g[key];
+      if (val && val !== 'Unknown' && val !== 'ZZNONE') {
+        counts[val] = (counts[val] || 0) + 1;
+      }
+    });
+    return Object.keys(counts).filter(val => counts[val] >= 3);
+  };
+
+  const validFranchises = getValidRandoms('franchise');
+  const validGenres = getValidRandoms('genre');
 
   const top100Select = document.getElementById('top100-year-select');
   if (top100Select) {
@@ -193,7 +209,11 @@ const playedSelect = document.getElementById('year-select-played');
   const franchiseSelect = document.getElementById('franchise-select');
   if (franchiseSelect) {
     franchiseSelect.innerHTML = franchises.map(f => `<option value="${escapeHTML(f)}">${escapeHTML(f)}</option>`).join('');
-    const randomFranchise = franchises[Math.floor(Math.random() * franchises.length)];
+    
+    // Pick from the filtered pool of >=3 games. If none exist (unlikely), fallback to everything.
+    const pool = validFranchises.length > 0 ? validFranchises : franchises;
+    const randomFranchise = pool[Math.floor(Math.random() * pool.length)];
+    
     franchiseSelect.value = randomFranchise;
     franchiseSelect.addEventListener('change', (e) => renderRankings('franchise', e.target.value, 'franchise-list', 100));
     renderRankings('franchise', randomFranchise, 'franchise-list', 100);
@@ -202,7 +222,11 @@ const playedSelect = document.getElementById('year-select-played');
   const genreSelect = document.getElementById('genre-select');
   if (genreSelect) {
     genreSelect.innerHTML = genres.map(g => `<option value="${escapeHTML(g)}">${escapeHTML(g)}</option>`).join('');
-    const randomGenre = genres[Math.floor(Math.random() * genres.length)];
+    
+    // Pick from the filtered pool of >=3 games.
+    const pool = validGenres.length > 0 ? validGenres : genres;
+    const randomGenre = pool[Math.floor(Math.random() * pool.length)];
+    
     genreSelect.value = randomGenre;
     genreSelect.addEventListener('change', (e) => renderRankings('genre', e.target.value, 'genre-list', 100));
     renderRankings('genre', randomGenre, 'genre-list', 100);
