@@ -97,15 +97,12 @@
 
     </section>
 
-    <section class="card-row" style="display: grid; grid-template-columns: 2fr 1fr; gap: 20px;">
-      
+<section class="card-row" style="display: grid; grid-template-columns: 2fr 1fr; gap: 20px;">
       <div class="card">
         <div class="card-header">
           <h2>Data Analysis: 
             <select id="analysis-select" class="header-dropdown">
               <option value="playthrough">Playthrough Stats</option>
-              <option value="gameSummary">Game Timeframe Summary</option>
-              <option value="genreSummary">Genre Timeframe Summary</option>
               <option value="dayOfWeek">Day of Week Stats</option>
               <option value="genre">Genre Stats</option>
               <option value="releaseYear">Release Year Stats</option>
@@ -123,16 +120,17 @@
         </div>
         <div class="card-content" id="milestones-list"></div>
       </div>
-
     </section>
 
     <section class="card-row grid-1">
       <div class="card">
         <div class="card-header">
-          <h2>Calendar Heatmap: 
+          <h2>Metrics & Heatmaps: 
             <select id="heatmap-select" class="header-dropdown">
-              <option value="days">Days Played (Years Played / Possible Years)</option>
-              <option value="time">Total Time Spent</option>
+              <option value="days">Heatmap: Days Played</option>
+              <option value="time">Heatmap: Total Time Spent</option>
+              <option value="gameSummary">Table: Game Timeframe Summary</option>
+              <option value="genreSummary">Table: Genre Timeframe Summary</option>
             </select>
           </h2>
         </div>
