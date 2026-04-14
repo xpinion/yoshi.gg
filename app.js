@@ -266,13 +266,13 @@ const playedSelect = document.getElementById('year-select-played');
   // 7. Series Archive Dropdown
   const seriesArchiveSelect = document.getElementById('series-archive-select');
   if (seriesArchiveSelect) {
-    // We already generated the 'franchises' array higher up in this function
     seriesArchiveSelect.innerHTML = franchises.map(f => `<option value="${escapeHTML(f)}">${escapeHTML(f)}</option>`).join('');
     
-    // Default to Donkey Kong (or the first one available if DK isn't found)
-    const initialSeries = franchises.includes('Donkey Kong') ? 'Donkey Kong' : franchises[0];
-    seriesArchiveSelect.value = initialSeries;
+    // Pick from the filtered pool of >=3 games
+    const pool = validFranchises.length > 0 ? validFranchises : franchises;
+    const randomSeries = pool[Math.floor(Math.random() * pool.length)];
     
+    seriesArchiveSelect.value = randomSeries;
     seriesArchiveSelect.addEventListener('change', (e) => renderSeriesArchive(e.target.value));
   }
 }
@@ -920,11 +920,23 @@ function renderSeriesArchive(seriesName) {
     return;
   }
 
-  // 3. Sort playthroughs: Alphabetically by Game, then chronologically
+  // 3. Sort playthroughs: Group by game, sort groups by newest overall update, sort PTs within group by newest
+  const gameMaxDates = {};
+  // First pass: find the absolute latest update date for every single game in the series
+  pts.forEach(pt => {
+      const ptDate = new Date(pt.lastDate).getTime();
+      if (!gameMaxDates[pt.gameName] || ptDate > gameMaxDates[pt.gameName]) {
+          gameMaxDates[pt.gameName] = ptDate;
+      }
+  });
+
   pts.sort((a, b) => {
-    const nameCmp = a.gameName.localeCompare(b.gameName);
-    if (nameCmp !== 0) return nameCmp;
-    return new Date(a.startDate) - new Date(b.startDate); 
+      // Compare the overall max lastDate for the two games (Newest Game Group on top)
+      const gameDateDiff = gameMaxDates[b.gameName] - gameMaxDates[a.gameName];
+      if (gameDateDiff !== 0) return gameDateDiff; 
+      
+      // If it's the exact same game, sort its individual playthroughs by their own lastDate (Newest PT on top)
+      return new Date(b.lastDate).getTime() - new Date(a.lastDate).getTime();
   });
 
   // 4. Get the absolute latest Game Lifetime totals for each game
