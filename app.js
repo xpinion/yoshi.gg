@@ -94,6 +94,11 @@ async function initDashboard() {
     renderMilestones();
     renderAnalysis('playthrough');
     renderHeatmap('gameSummary');
+
+    // Trigger the staggered fade-in animations for all cards
+    document.querySelectorAll('.card').forEach((card, index) => {
+      card.style.animationDelay = `${index * 0.08}s`; // 80ms delay per card
+    });
     
   } catch (error) {
     console.error("Error loading dashboard data:", error);
