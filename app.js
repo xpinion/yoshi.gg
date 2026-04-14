@@ -223,13 +223,21 @@ const playedSelect = document.getElementById('year-select-played');
 
 function setupHoverHistory() {
   const tooltip = document.getElementById('game-tooltip');
+  let tooltipTimeout; // The grace-period timer
   
   document.addEventListener('mouseover', (e) => {
+    // If hovering over the game name OR the tooltip itself, cancel the closing timer
+    if (e.target.classList.contains('hover-trigger') || e.target.closest('#game-tooltip')) {
+      clearTimeout(tooltipTimeout);
+    }
+
+    // If hovering over a game name, build and show the tooltip
     if (e.target.classList.contains('hover-trigger')) {
       const gameName = e.target.getAttribute('data-game');
       if (!gameName) return;
       
-      const entries = rawData.allEntries.filter(entry => entry.game === gameName).slice().reverse().slice(0, 15);
+      // Removed the .slice(0, 15) so you can scroll the FULL history!
+      const entries = rawData.allEntries.filter(entry => entry.game === gameName).slice().reverse();
       if (entries.length === 0) return;
 
       let html = `<h3>${escapeHTML(gameName)} History</h3>`;
@@ -243,9 +251,12 @@ function setupHoverHistory() {
       tooltip.innerHTML = html;
       tooltip.classList.add('visible');
 
+      // Positioning logic
       const rect = e.target.getBoundingClientRect();
       let top = rect.bottom + window.scrollY + 10;
       let left = rect.left + window.scrollX;
+      
+      // Prevent it from flying off the right side of the screen
       if (left + 350 > window.innerWidth) left = window.innerWidth - 370;
       
       tooltip.style.top = top + 'px';
@@ -254,8 +265,11 @@ function setupHoverHistory() {
   });
 
   document.addEventListener('mouseout', (e) => {
-    if (e.target.classList.contains('hover-trigger')) {
-      tooltip.classList.remove('visible');
+    // If the mouse leaves the game name OR leaves the tooltip, start the countdown
+    if (e.target.classList.contains('hover-trigger') || e.target.closest('#game-tooltip')) {
+      tooltipTimeout = setTimeout(() => {
+        tooltip.classList.remove('visible');
+      }, 300); // 300ms gives you time to casually move the mouse into the box
     }
   });
 }
