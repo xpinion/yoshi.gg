@@ -855,12 +855,15 @@ function renderGameHistory(gameName) {
   // We reuse the 'monthly-table' CSS class because it already looks perfect!
   let html = `
     <div class="monthly-table-wrapper" style="padding: 20px;">
-      <table class="monthly-table" style="min-width: 800px;">
+      <table class="monthly-table" style="min-width: 1100px;">
         <thead>
           <tr>
+            <th style="width: 80px;">Entry #</th>
             <th style="width: 120px;">Date</th>
             <th style="width: 100px;">System</th>
-            <th style="width: 100px;">Time</th>
+            <th style="width: 100px;">Session Time</th>
+            <th style="width: 100px;">PT Total</th>
+            <th style="width: 100px;">Game Total</th>
             <th style="width: 150px;">Status</th>
             <th>Playthrough Details</th>
           </tr>
@@ -872,9 +875,12 @@ function renderGameHistory(gameName) {
     const bgColor = getStatusColor(entry.status);
     html += `
       <tr>
+        <td class="text-center">${entry.entryNum}</td>
         <td class="text-center" style="font-weight: bold;">${formatFullDate(entry.date)}</td>
         <td class="text-center">${escapeHTML(entry.system)}</td>
         <td class="text-center">${entry.time}</td>
+        <td class="text-center">${entry.ptLifetime}</td>
+        <td class="text-center">${entry.gameLifetime}</td>
         <td class="text-center status-cell" style="background-color: ${bgColor}; font-weight: bold;">${entry.status}</td>
         <td class="text-left">${escapeHTML(entry.note)}</td>
       </tr>
