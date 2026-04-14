@@ -93,7 +93,7 @@ async function initDashboard() {
     renderOnThisDay();
     renderMilestones();
     renderAnalysis('playthrough');
-    renderHeatmap('days');
+    renderHeatmap('gameSummary');
     
   } catch (error) {
     console.error("Error loading dashboard data:", error);
@@ -213,9 +213,10 @@ const playedSelect = document.getElementById('year-select-played');
     analysisSelect.addEventListener('change', (e) => renderAnalysis(e.target.value));
   }
 
-  // 5. Heatmap Dropdown
+// 5. Heatmap Dropdown
   const heatmapSelect = document.getElementById('heatmap-select');
   if (heatmapSelect) {
+    heatmapSelect.value = 'gameSummary'; // Force the default value
     heatmapSelect.addEventListener('change', (e) => renderHeatmap(e.target.value));
   }
 }
