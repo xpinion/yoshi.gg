@@ -79,7 +79,7 @@
       </div>
     </section>
 
-    <section class="card-row" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); gap: 20px;">
+<section class="card-row" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); gap: 20px;">
       
       <div class="card">
         <div class="card-header">
@@ -90,12 +90,13 @@
 
       <div class="card">
         <div class="card-header">
-          <h2>Spotlight: <select id="random-top25-select" class="header-dropdown" style="max-width: 60%; font-size: 1.1rem;"></select></h2>
+          <h2>Spotlight: <select id="random-top25-select" class="header-dropdown"></select></h2>
         </div>
         <div class="card-content" id="random-top25-content" style="padding: 0;"></div>
       </div>
 
     </section>
+
     <section class="card-row" style="display: grid; grid-template-columns: 2fr 1fr; gap: 20px;">
       
       <div class="card">
@@ -103,6 +104,8 @@
           <h2>Data Analysis: 
             <select id="analysis-select" class="header-dropdown">
               <option value="playthrough">Playthrough Stats</option>
+              <option value="gameSummary">Game Timeframe Summary</option>
+              <option value="genreSummary">Genre Timeframe Summary</option>
               <option value="dayOfWeek">Day of Week Stats</option>
               <option value="genre">Genre Stats</option>
               <option value="releaseYear">Release Year Stats</option>
