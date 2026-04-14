@@ -158,13 +158,24 @@ function setupDropdowns() {
     renderCompletions(currentYear);
   }
 
-  const playedSelect = document.getElementById('year-select-played');
+const playedSelect = document.getElementById('year-select-played');
   if (playedSelect) {
-    playedSelect.innerHTML = yearOptions; playedSelect.value = currentYear;
+    // Add "All-Time" to the very top of the options
+    playedSelect.innerHTML = `<option value="All-Time">All-Time</option>` + yearOptions;
+    
+    // Force it to select the current year (e.g. 2026) by default
+    playedSelect.value = currentYear; 
+    
     playedSelect.addEventListener('change', (e) => {
-      renderMostPlayed(e.target.value); renderMostDays(e.target.value); renderLongestSession(e.target.value);
+      renderMostPlayed(e.target.value); 
+      renderMostDays(e.target.value); 
+      renderLongestSession(e.target.value);
     });
-    renderMostPlayed(currentYear); renderMostDays(currentYear); renderLongestSession(currentYear);
+    
+    // Initial render
+    renderMostPlayed(currentYear); 
+    renderMostDays(currentYear); 
+    renderLongestSession(currentYear);
   }
 
   const releaseYears = [...new Set(metaGames.map(g => g.releaseYear))].filter(y => y !== 'Unknown').sort().reverse();
@@ -341,11 +352,12 @@ function renderCompletions(year) {
 // Most Played Time
 function renderMostPlayed(year) {
   const container = document.getElementById('most-played-list');
-  const yearStats = rawData.metrics.yearlyGameStats[year];
-  if (!yearStats) { container.innerHTML = `<div class="loading-text">No playtime logged.</div>`; return; }
+  // Route data based on selection
+  const statsObj = year === 'All-Time' ? rawData.metrics.allTimeGameStats : rawData.metrics.yearlyGameStats[year];
+  
+  if (!statsObj) { container.innerHTML = `<div class="loading-text">No playtime logged.</div>`; return; }
 
-  const sortedGames = Object.entries(yearStats).map(([name, stats]) => {
-    // Parse out the systems array
+  const sortedGames = Object.entries(statsObj).map(([name, stats]) => {
     const sysStr = Array.isArray(stats.systems) ? stats.systems.join(', ') : (stats.systems && stats.systems.data ? stats.systems.data.join(', ') : '');
     return { name, seconds: stats.totalSeconds, systems: sysStr };
   }).sort((a, b) => b.seconds - a.seconds).slice(0, 25);
@@ -366,10 +378,12 @@ function renderMostPlayed(year) {
 // Most Days Played
 function renderMostDays(year) {
   const container = document.getElementById('most-days-list');
-  const yearStats = rawData.metrics.yearlyGameStats[year];
-  if (!yearStats) { container.innerHTML = `<div class="loading-text">No playtime logged.</div>`; return; }
+  // Route data based on selection
+  const statsObj = year === 'All-Time' ? rawData.metrics.allTimeGameStats : rawData.metrics.yearlyGameStats[year];
+  
+  if (!statsObj) { container.innerHTML = `<div class="loading-text">No playtime logged.</div>`; return; }
 
-  const sortedDays = Object.entries(yearStats).map(([name, stats]) => {
+  const sortedDays = Object.entries(statsObj).map(([name, stats]) => {
     const dayCount = Array.isArray(stats.days) ? stats.days.length : (stats.days && stats.days.data ? stats.days.data.length : 0);
     const sysStr = Array.isArray(stats.systems) ? stats.systems.join(', ') : (stats.systems && stats.systems.data ? stats.systems.data.join(', ') : '');
     return { name, days: dayCount, systems: sysStr };
@@ -391,7 +405,12 @@ function renderMostDays(year) {
 // Longest Single Session
 function renderLongestSession(year) {
   const container = document.getElementById('longest-session-list');
-  const sessions = rawData.metrics.singleDaySessions.filter(s => new Date(s.date).getUTCFullYear().toString() === year);
+  
+  // Route data based on selection (either everything, or filter by year)
+  const sessions = year === 'All-Time' 
+    ? rawData.metrics.singleDaySessions 
+    : rawData.metrics.singleDaySessions.filter(s => new Date(s.date).getUTCFullYear().toString() === year);
+    
   if (sessions.length === 0) { container.innerHTML = `<div class="loading-text">No sessions logged.</div>`; return; }
 
   const sortedSessions = sessions.sort((a, b) => b.time - a.time).slice(0, 25);
