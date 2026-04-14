@@ -636,6 +636,60 @@ function renderHeatmap(mode) {
   const container = document.getElementById('heatmap-content');
   if (!rawData || !rawData.metrics || !rawData.metrics.calendarData) return;
 
+  // --- NEW: Game of the Year (Scores) Summary ---
+  if (mode === 'gotySummary') {
+    const ratedGames = metaGames.filter(g => g.score !== null);
+    
+    // Group games by their release year
+    const gamesByYear = {};
+    ratedGames.forEach(g => {
+      const y = g.releaseYear;
+      if (y !== 'Unknown') {
+        if (!gamesByYear[y]) gamesByYear[y] = [];
+        gamesByYear[y].push(g);
+      }
+    });
+    
+    const sortedYears = Object.keys(gamesByYear).sort((a,b) => b - a);
+    
+    let html = `<div style="overflow-x: auto;"><table class="analysis-table"><thead><tr>`;
+    html += `<th>Release Year</th><th>🏆 GOTY</th><th>2nd Place</th><th>3rd Place</th><th>4th Place</th><th>5th Place</th></tr></thead><tbody>`;
+    
+    // 1. Render All-Time Top 5
+    const allTimeTop5 = [...ratedGames].sort((a,b) => b.score - a.score || a.name.localeCompare(b.name)).slice(0, 5);
+    html += `<tr class="all-time-row">
+      <td class="text-center" style="font-weight: bold;">All-Time</td>
+      ${[0,1,2,3,4].map(i => {
+         if (allTimeTop5[i]) {
+             const displayScore = Number.isInteger(allTimeTop5[i].score) ? allTimeTop5[i].score : allTimeTop5[i].score.toFixed(1);
+             return `<td style="font-size: 0.85rem; text-align: left;">[${displayScore}] <span class="hover-trigger" data-game="${escapeHTML(allTimeTop5[i].name)}">${escapeHTML(allTimeTop5[i].name)}</span></td>`;
+         } else {
+             return `<td></td>`;
+         }
+      }).join('')}
+    </tr>`;
+
+    // 2. Render Top 5 for each individual Release Year
+    sortedYears.forEach(year => {
+      const yearTop5 = gamesByYear[year].sort((a,b) => b.score - a.score || a.name.localeCompare(b.name)).slice(0, 5);
+      html += `<tr>
+        <td class="text-center" style="font-weight: bold; font-size: 1.1rem;">${year}</td>
+        ${[0,1,2,3,4].map(i => {
+           if (yearTop5[i]) {
+               const displayScore = Number.isInteger(yearTop5[i].score) ? yearTop5[i].score : yearTop5[i].score.toFixed(1);
+               return `<td style="font-size: 0.85rem; text-align: left;">[${displayScore}] <span class="hover-trigger" data-game="${escapeHTML(yearTop5[i].name)}">${escapeHTML(yearTop5[i].name)}</span></td>`;
+           } else {
+               return `<td></td>`;
+           }
+        }).join('')}
+      </tr>`;
+    });
+    
+    html += `</tbody></table></div>`;
+    container.innerHTML = html;
+    return;
+  }
+  
   // 1. Render Chart Tables (Game/Genre Summaries)
   if (mode === 'gameSummary' || mode === 'genreSummary') {
     const isGame = mode === 'gameSummary';
