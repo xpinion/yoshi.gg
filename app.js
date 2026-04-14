@@ -532,10 +532,69 @@ function renderAnalysis(type) {
       </tr>`;
     });
   } 
+  else if (type === 'gameSummary' || type === 'genreSummary') {
+    const isGame = type === 'gameSummary';
+    
+    // Combine all timeframes into one lookup map
+    const map = isGame ? 
+      { 'All-Time': rawData.metrics.allTimeGameStats, ...rawData.metrics.yearlyGameStats, ...rawData.metrics.monthlyStats } :
+      { 'All-Time': rawData.metrics.allTimeGenreStats, ...rawData.metrics.yearlyGenreStats, ...rawData.metrics.monthlyGenreStats };
+    
+    const gameMapForDays = { 'All-Time': rawData.metrics.allTimeGameStats, ...rawData.metrics.yearlyGameStats, ...rawData.metrics.monthlyStats };
+
+    const yearKeys = Object.keys(rawData.metrics.yearlyGameStats).sort().reverse();
+    const monthKeys = Object.keys(rawData.metrics.monthlyStats).sort().reverse();
+    const timeframes = ['All-Time', ...yearKeys, ...monthKeys];
+
+    html += `<th>Timeframe</th><th>Time Spent</th><th>Days Played</th><th>1st Most</th><th>2nd Most</th><th>3rd Most</th><th>4th Most</th><th>5th Most</th></tr></thead><tbody>`;
+
+    timeframes.forEach(key => {
+      const stats = map[key] || {};
+      const top5 = Object.entries(stats).map(([name, data]) => ({ name, ...data })).sort((a,b) => b.totalSeconds - a.totalSeconds).slice(0, 5);
+      const totalTime = Object.values(stats).reduce((sum, item) => sum + item.totalSeconds, 0);
+      
+      // Calculate total unique days played in this timeframe
+      const totalDaysSet = new Set();
+      const statsForDays = isGame ? stats : gameMapForDays[key];
+      if (statsForDays) {
+          Object.values(statsForDays).forEach(item => {
+              if (item.days) {
+                  const daysArr = Array.isArray(item.days) ? item.days : (item.days.data || []);
+                  daysArr.forEach(d => totalDaysSet.add(d));
+              }
+          });
+      }
+      
+      // Format the month names nicely (e.g. "2026-04 April")
+      let displayKey = key;
+      if (key !== 'All-Time' && key.includes('-')) {
+          const [y, m] = key.split('-');
+          const dateObj = new Date(Date.UTC(y, m-1, 1));
+          displayKey = `${y}-${m} ${dateObj.toLocaleString('en-US', {month: 'long', timeZone: 'UTC'})}`;
+      }
+
+      html += `<tr class="${key === 'All-Time' ? 'all-time-row' : ''}">
+        <td class="text-left" style="white-space: nowrap; font-weight: bold;">${displayKey}</td>
+        <td>${formatHHMM(totalTime)}</td>
+        <td>${totalDaysSet.size}</td>
+        ${[0,1,2,3,4].map(i => {
+           if (top5[i]) {
+               if (isGame) {
+                   const sysStr = Array.isArray(top5[i].systems) ? top5[i].systems.join(', ') : (top5[i].systems && top5[i].systems.data ? top5[i].systems.data.join(', ') : '');
+                   return `<td style="font-size: 0.75rem;">[${formatHHMM(top5[i].totalSeconds)}] ${escapeHTML(top5[i].name)} (${escapeHTML(sysStr)})</td>`;
+               } else {
+                   return `<td style="font-size: 0.75rem;">[${formatHHMM(top5[i].totalSeconds)}] ${escapeHTML(top5[i].name)}</td>`;
+               }
+           } else {
+               return `<td></td>`;
+           }
+        }).join('')}
+      </tr>`;
+    });
+  }
   else if (type === 'dayOfWeek') {
     const data = rawData.metrics.dayOfWeekStats;
     const timeframes = Object.keys(data).sort((a, b) => a === 'All-Time' ? -1 : b === 'All-Time' ? 1 : b.localeCompare(a));
-    const dowObj = { 1:'Mon', 2:'Tue', 3:'Wed', 4:'Thu', 5:'Fri', 6:'Sat', 0:'Sun' };
     
     html += `<th>Timeframe</th><th>Mon</th><th>Tue</th><th>Wed</th><th>Thu</th><th>Fri</th><th>Sat</th><th>Sun</th></tr></thead><tbody>`;
     
@@ -548,7 +607,6 @@ function renderAnalysis(type) {
     });
   } 
   else {
-    // Meta tables (Genre, Year, Dev, Pub)
     const map = { genre: 'genreAnalysis', releaseYear: 'releaseYearAnalysis', developer: 'developerAnalysis', publisher: 'publisherAnalysis' };
     const dataKey = map[type];
     const data = rawData.metrics[dataKey];
