@@ -95,6 +95,7 @@ async function initDashboard() {
     renderAnalysis('playthrough');
     renderHeatmap('gameSummary');
     renderGameHistory(document.getElementById('game-history-select').value);
+    renderSeriesArchive(document.getElementById('series-archive-select').value);
 
     // Trigger the staggered fade-in animations for all cards
     document.querySelectorAll('.card').forEach((card, index) => {
@@ -261,6 +262,18 @@ const playedSelect = document.getElementById('year-select-played');
     gameHistorySelect.value = mostRecentGame;
     
     gameHistorySelect.addEventListener('change', (e) => renderGameHistory(e.target.value));
+  }
+  // 7. Series Archive Dropdown
+  const seriesArchiveSelect = document.getElementById('series-archive-select');
+  if (seriesArchiveSelect) {
+    // We already generated the 'franchises' array higher up in this function
+    seriesArchiveSelect.innerHTML = franchises.map(f => `<option value="${escapeHTML(f)}">${escapeHTML(f)}</option>`).join('');
+    
+    // Default to Donkey Kong (or the first one available if DK isn't found)
+    const initialSeries = franchises.includes('Donkey Kong') ? 'Donkey Kong' : franchises[0];
+    seriesArchiveSelect.value = initialSeries;
+    
+    seriesArchiveSelect.addEventListener('change', (e) => renderSeriesArchive(e.target.value));
   }
 }
 
@@ -888,6 +901,112 @@ function renderGameHistory(gameName) {
   });
 
   html += `</tbody></table></div>`;
+  container.innerHTML = html;
+}
+
+// --- SERIES ARCHIVE ---
+function renderSeriesArchive(seriesName) {
+  const container = document.getElementById('series-archive-content');
+  if (!rawData || !rawData.playthroughHistory || !metaGames) return;
+
+  // 1. Find all games belonging to this series
+  const seriesGames = metaGames.filter(g => g.franchise === seriesName).map(g => g.name);
+
+  // 2. Find all playthroughs for these games
+  const pts = Object.values(rawData.playthroughHistory).filter(pt => seriesGames.includes(pt.gameName));
+
+  if (pts.length === 0) {
+    container.innerHTML = `<div class="loading-text" style="padding: 20px;">No playthroughs logged for this series.</div>`;
+    return;
+  }
+
+  // 3. Sort playthroughs: Alphabetically by Game, then chronologically
+  pts.sort((a, b) => {
+    const nameCmp = a.gameName.localeCompare(b.gameName);
+    if (nameCmp !== 0) return nameCmp;
+    return new Date(a.startDate) - new Date(b.startDate); 
+  });
+
+  // 4. Get the absolute latest Game Lifetime totals for each game
+  const gameTotals = {};
+  seriesGames.forEach(game => {
+     const gameEntries = rawData.allEntries.filter(e => e.game === game);
+     if (gameEntries.length > 0) {
+         const lastE = gameEntries[gameEntries.length - 1];
+         gameTotals[game] = { time: lastE.gameLifetime, days: lastE.gameLifetimeDays };
+     }
+  });
+
+  // 5. Calculate Series Totals
+  const uniqueGamesCount = new Set(pts.map(pt => pt.gameName)).size;
+  let totalSeconds = 0;
+  let totalDays = 0;
+
+  pts.forEach(pt => {
+     totalSeconds += timeStringToSeconds(pt.finalPtLifetime);
+     totalDays += parseInt(pt.finalPtLifetimeDays) || 0;
+  });
+
+  // 6. Build the HTML (Using the clean standard dashboard theme)
+  let html = `
+    <div class="monthly-table-wrapper" style="padding: 20px;">
+      <table class="monthly-table" style="min-width: 1100px;">
+        <thead>
+          <tr>
+            <th rowspan="2">Videogame</th>
+            <th rowspan="2">System</th>
+            <th colspan="2">Playthrough Lifetime</th>
+            <th colspan="2">Game Lifetime</th>
+            <th rowspan="2">Date Started</th>
+            <th rowspan="2">Last Updated</th>
+            <th rowspan="2">Game Status</th>
+            <th rowspan="2">Playthrough Details</th>
+          </tr>
+          <tr>
+            <th>Time</th>
+            <th>Days</th>
+            <th>Time</th>
+            <th>Days</th>
+          </tr>
+        </thead>
+        <tbody>
+  `;
+
+  pts.forEach(pt => {
+    const bgColor = getStatusColor(pt.finalStatus);
+    const gTime = gameTotals[pt.gameName] ? gameTotals[pt.gameName].time : "00:00";
+    const gDays = gameTotals[pt.gameName] ? gameTotals[pt.gameName].days : "0";
+
+    html += `
+      <tr>
+        <td class="text-left" style="font-weight: bold;">
+          <span class="hover-trigger" data-game="${escapeHTML(pt.gameName)}">${escapeHTML(pt.gameName)}</span>
+        </td>
+        <td class="text-center">${escapeHTML(pt.system)}</td>
+        <td class="text-center">${pt.finalPtLifetime}</td>
+        <td class="text-center">${pt.finalPtLifetimeDays}</td>
+        <td class="text-center">${gTime}</td>
+        <td class="text-center">${gDays}</td>
+        <td class="text-center">${formatFullDate(pt.startDate)}</td>
+        <td class="text-center">${formatFullDate(pt.lastDate)}</td>
+        <td class="text-center status-cell" style="background-color: ${bgColor}; font-weight: bold;">${pt.finalStatus}</td>
+        <td class="text-left">${escapeHTML(pt.finalNote)}</td>
+      </tr>
+    `;
+  });
+
+  // The Totals Row using the clean dark theme
+  html += `
+          <tr class="grand-total-row">
+            <td colspan="2" class="text-right" style="padding-right: 15px;">Series Total: ${uniqueGamesCount} Game${uniqueGamesCount !== 1 ? 's' : ''}</td>
+            <td class="text-center">${formatHHMM(totalSeconds)}</td>
+            <td class="text-center">${totalDays}</td>
+            <td colspan="6"></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  `;
   container.innerHTML = html;
 }
 
