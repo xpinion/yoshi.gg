@@ -94,6 +94,7 @@ async function initDashboard() {
     renderMilestones();
     renderAnalysis('playthrough');
     renderHeatmap('gameSummary');
+    renderGameHistory(document.getElementById('game-history-select').value);
 
     // Trigger the staggered fade-in animations for all cards
     document.querySelectorAll('.card').forEach((card, index) => {
@@ -247,6 +248,19 @@ const playedSelect = document.getElementById('year-select-played');
   if (heatmapSelect) {
     heatmapSelect.value = 'gameSummary'; // Force the default value
     heatmapSelect.addEventListener('change', (e) => renderHeatmap(e.target.value));
+  }
+  // 6. Game History Dropdown
+  const gameHistorySelect = document.getElementById('game-history-select');
+  if (gameHistorySelect) {
+    // Get an alphabetical list of every unique game you've ever played
+    const uniqueGames = [...new Set(rawData.allEntries.map(e => e.game))].sort((a,b) => a.localeCompare(b));
+    gameHistorySelect.innerHTML = uniqueGames.map(g => `<option value="${escapeHTML(g)}">${escapeHTML(g)}</option>`).join('');
+    
+    // Smart Default: Find the game from the absolute last entry in your log
+    const mostRecentGame = rawData.allEntries[rawData.allEntries.length - 1].game;
+    gameHistorySelect.value = mostRecentGame;
+    
+    gameHistorySelect.addEventListener('change', (e) => renderGameHistory(e.target.value));
   }
 }
 
@@ -821,6 +835,52 @@ function renderHeatmap(mode) {
     }
     html += `</tr>`;
   }
+  html += `</tbody></table></div>`;
+  container.innerHTML = html;
+}
+
+// --- FULL GAME ARCHIVE ---
+function renderGameHistory(gameName) {
+  const container = document.getElementById('game-history-content');
+  if (!rawData || !rawData.allEntries) return;
+
+  // Grab all entries for this game and reverse them so the newest is at the top
+  const entries = rawData.allEntries.filter(e => e.game === gameName).slice().reverse();
+  
+  if (entries.length === 0) {
+    container.innerHTML = `<div class="loading-text" style="padding: 20px;">No entries found.</div>`;
+    return;
+  }
+
+  // We reuse the 'monthly-table' CSS class because it already looks perfect!
+  let html = `
+    <div class="monthly-table-wrapper" style="padding: 20px;">
+      <table class="monthly-table" style="min-width: 800px;">
+        <thead>
+          <tr>
+            <th style="width: 120px;">Date</th>
+            <th style="width: 100px;">System</th>
+            <th style="width: 100px;">Time</th>
+            <th style="width: 150px;">Status</th>
+            <th>Playthrough Details</th>
+          </tr>
+        </thead>
+        <tbody>
+  `;
+
+  entries.forEach(entry => {
+    const bgColor = getStatusColor(entry.status);
+    html += `
+      <tr>
+        <td class="text-center" style="font-weight: bold;">${formatFullDate(entry.date)}</td>
+        <td class="text-center">${escapeHTML(entry.system)}</td>
+        <td class="text-center">${entry.time}</td>
+        <td class="text-center status-cell" style="background-color: ${bgColor}; font-weight: bold;">${entry.status}</td>
+        <td class="text-left">${escapeHTML(entry.note)}</td>
+      </tr>
+    `;
+  });
+
   html += `</tbody></table></div>`;
   container.innerHTML = html;
 }
