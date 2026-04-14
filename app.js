@@ -85,6 +85,9 @@ async function initDashboard() {
     setupDropdowns();
     setupHoverHistory();
     renderOnThisDay();
+    renderMilestones();
+    renderAnalysis('playthrough');
+    renderHeatmap('days');
     
   } catch (error) {
     console.error("Error loading dashboard data:", error);
@@ -186,6 +189,17 @@ function setupDropdowns() {
     genreSelect.value = randomGenre;
     genreSelect.addEventListener('change', (e) => renderRankings('genre', e.target.value, 'genre-list', 100));
     renderRankings('genre', randomGenre, 'genre-list', 100);
+  }
+  // 4. Analysis Dropdown
+  const analysisSelect = document.getElementById('analysis-select');
+  if (analysisSelect) {
+    analysisSelect.addEventListener('change', (e) => renderAnalysis(e.target.value));
+  }
+
+  // 5. Heatmap Dropdown
+  const heatmapSelect = document.getElementById('heatmap-select');
+  if (heatmapSelect) {
+    heatmapSelect.addEventListener('change', (e) => renderHeatmap(e.target.value));
   }
 }
 
@@ -468,6 +482,165 @@ function renderRandomTop25() {
         }).join('')}</tr>`).join('')}
       </tbody>
     </table>`;
+}
+
+// --- ANALYSIS TABLES ---
+function renderAnalysis(type) {
+  const container = document.getElementById('analysis-content');
+  if (!rawData || !rawData.metrics) return;
+
+  let html = `<div style="overflow-x: auto;"><table class="analysis-table"><thead><tr>`;
+  
+  if (type === 'playthrough') {
+    const data = rawData.metrics.playthroughAnalysis;
+    const timeframes = Object.keys(data).sort((a, b) => a === 'All-Time' ? -1 : b === 'All-Time' ? 1 : b - a);
+    
+    html += `<th>Timeframe</th><th>Total PTs</th><th># Completed</th><th># Abandoned</th><th># Active</th><th>Comp Rate</th><th># Multiplayer</th><th># Non-Comp</th><th>Avg Time</th><th>Avg Days</th></tr></thead><tbody>`;
+    
+    timeframes.forEach(key => {
+      const s = data[key];
+      const completions = s.completed + s.postgame;
+      html += `<tr class="${key === 'All-Time' ? 'all-time-row' : ''}">
+        <td class="text-left">${key}</td><td>${s.totalPlaythroughs}</td><td>${completions}</td><td>${s.abandoned}</td><td>${s.active}</td>
+        <td>${(s.completionRate * 100).toFixed(1)}%</td><td>${s.multiplayer}</td><td>${s.nonCompletable}</td>
+        <td>${formatHHMM(s.avgCompletionTimeSeconds)}</td><td>${s.avgCompletionDays.toFixed(1)}</td>
+      </tr>`;
+    });
+  } 
+  else if (type === 'dayOfWeek') {
+    const data = rawData.metrics.dayOfWeekStats;
+    const timeframes = Object.keys(data).sort((a, b) => a === 'All-Time' ? -1 : b === 'All-Time' ? 1 : b.localeCompare(a));
+    const dowObj = { 1:'Mon', 2:'Tue', 3:'Wed', 4:'Thu', 5:'Fri', 6:'Sat', 0:'Sun' };
+    
+    html += `<th>Timeframe</th><th>Mon</th><th>Tue</th><th>Wed</th><th>Thu</th><th>Fri</th><th>Sat</th><th>Sun</th></tr></thead><tbody>`;
+    
+    timeframes.forEach(key => {
+      const s = data[key];
+      html += `<tr class="${key === 'All-Time' ? 'all-time-row' : ''}">
+        <td class="text-left">${key}</td>
+        ${[1,2,3,4,5,6,0].map(day => `<td>${formatHHMM(s[day] || 0)}</td>`).join('')}
+      </tr>`;
+    });
+  } 
+  else {
+    // Meta tables (Genre, Year, Dev, Pub)
+    const map = { genre: 'genreAnalysis', releaseYear: 'releaseYearAnalysis', developer: 'developerAnalysis', publisher: 'publisherAnalysis' };
+    const dataKey = map[type];
+    const data = rawData.metrics[dataKey];
+    const nameKey = type;
+    
+    let sortedData = Object.values(data).filter(item => item[nameKey] !== "N/A");
+    if (type === 'releaseYear') sortedData.sort((a,b) => b[nameKey] - a[nameKey]);
+    else sortedData.sort((a,b) => b.totalPlaythroughs - a.totalPlaythroughs);
+
+    html += `<th>${type.charAt(0).toUpperCase() + type.slice(1)}</th><th>Total PTs</th><th># Completed</th><th># Abandoned</th><th># Active</th><th>Comp Rate</th><th># Multiplayer</th><th># Non-Comp</th><th>Avg Time</th><th>Avg Days</th></tr></thead><tbody>`;
+    
+    sortedData.forEach(s => {
+      const completions = s.completed + s.postgame;
+      html += `<tr>
+        <td class="text-left">${escapeHTML(s[nameKey])}</td><td>${s.totalPlaythroughs}</td><td>${completions}</td><td>${s.abandoned}</td><td>${s.active}</td>
+        <td>${(s.completionRate * 100).toFixed(1)}%</td><td>${s.multiplayer}</td><td>${s.nonCompletable}</td>
+        <td>${formatHHMM(s.avgCompletionTimeSeconds)}</td><td>${s.avgCompletionDays.toFixed(1)}</td>
+      </tr>`;
+    });
+  }
+  
+  html += `</tbody></table></div>`;
+  container.innerHTML = html;
+}
+
+// --- MILESTONES ---
+function renderMilestones() {
+  const container = document.getElementById('milestones-list');
+  if (!rawData || !rawData.metrics || !rawData.metrics.milestones) return;
+  
+  const milestones = rawData.metrics.milestones.slice().sort((a,b) => new Date(b.date) - new Date(a.date));
+  
+  container.innerHTML = milestones.map(m => `
+    <div class="milestone-item">
+      <div class="milestone-date">${formatShortDate(m.date)}/${new Date(m.date).getUTCFullYear()}</div>
+      <div class="milestone-detail">${escapeHTML(m.details)}</div>
+    </div>
+  `).join('');
+}
+
+// --- CALENDAR HEATMAP ---
+function renderHeatmap(mode) {
+  const container = document.getElementById('heatmap-content');
+  if (!rawData || !rawData.metrics || !rawData.metrics.calendarData) return;
+
+  const calData = rawData.metrics.calendarData;
+  const possible = rawData.metrics.possibleYears;
+  const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  
+  // Find max time for log scaling
+  let maxTime = 0;
+  if (mode === 'time') {
+    for (let m=0; m<12; m++) {
+      for (let d=1; d<=31; d++) {
+        if (calData[m][d].totalSeconds > maxTime) maxTime = calData[m][d].totalSeconds;
+      }
+    }
+  }
+  const logMax = Math.log(maxTime > 0 ? maxTime : 1);
+
+  let html = `<table class="heatmap-table"><thead><tr><th></th>`;
+  for (let i = 1; i <= 31; i++) html += `<th>${i}</th>`;
+  html += `</tr></thead><tbody>`;
+
+  for (let m = 0; m < 12; m++) {
+    html += `<tr><th style="text-align: right; padding-right: 10px;">${monthNames[m]}</th>`;
+    const daysInBaseYear = new Date(2023, m + 1, 0).getDate(); // Base non-leap year
+
+    for (let d = 1; d <= 31; d++) {
+      if (d > daysInBaseYear && !(m === 1 && d === 29)) {
+        html += `<td class="heatmap-empty"></td>`;
+        continue;
+      }
+
+      const dayData = calData[m][d];
+      const poss = possible[m][d];
+      // Safely extract Set data (handles normal arrays or {data: []} formats)
+      const playedCount = dayData.yearsPlayed ? (Array.isArray(dayData.yearsPlayed) ? dayData.yearsPlayed.length : (dayData.yearsPlayed.data ? dayData.yearsPlayed.data.length : 0)) : 0;
+      const timeSec = dayData.totalSeconds;
+
+      let bgColor = '#f7f7f7';
+      let titleText = `${monthNames[m]} ${d}`;
+      let innerText = '';
+
+      if (mode === 'days') {
+        if (poss > 0) {
+          if (playedCount > 0 && playedCount === poss) bgColor = '#7CFC00'; // Perfect
+          else {
+            const ratio = playedCount / poss;
+            if (ratio >= 0.8) bgColor = '#008837';
+            else if (ratio >= 0.6) bgColor = '#a6dba0';
+            else if (ratio >= 0.4) bgColor = '#ffffbf';
+            else if (ratio >= 0.2) bgColor = '#fee08b';
+            else if (ratio > 0) bgColor = '#f1a340';
+          }
+          innerText = playedCount > 0 ? `${playedCount}` : '';
+          titleText += `: ${playedCount}/${poss} Years Played`;
+        }
+      } else if (mode === 'time') {
+        if (timeSec > 0) {
+          const ratio = Math.log(timeSec) / logMax;
+          if (ratio >= 0.9) bgColor = '#cc4c02';
+          else if (ratio >= 0.75) bgColor = '#ec7014';
+          else if (ratio >= 0.6) bgColor = '#fe9929';
+          else if (ratio >= 0.45) bgColor = '#fec44f';
+          else if (ratio >= 0.3) bgColor = '#fee391';
+          else bgColor = '#fff7bc';
+          titleText += `: ${formatHHMM(timeSec)} Hours`;
+        }
+      }
+
+      html += `<td style="background-color: ${bgColor};" title="${titleText}">${innerText}</td>`;
+    }
+    html += `</tr>`;
+  }
+  html += `</tbody></table>`;
+  container.innerHTML = html;
 }
 
 initDashboard();
