@@ -274,7 +274,7 @@ body {
   max-height: 300px;
   overflow-y: auto;
   box-shadow: 0 10px 25px rgba(0,0,0,0.3);
-  pointer-events: none;
+  pointer-events: auto;
   opacity: 0;
   transition: opacity 0.2s ease;
   z-index: 1000;
