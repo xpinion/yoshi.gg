@@ -26,6 +26,12 @@ function formatShortDate(dateString) {
   const d = new Date(dateString);
   return `${String(d.getUTCMonth() + 1).padStart(2, '0')}/${String(d.getUTCDate()).padStart(2, '0')}`;
 }
+// Utility: Format date to "YYYY/MM/DD"
+function formatFullDate(dateString) {
+  if (!dateString) return '';
+  const d = new Date(dateString);
+  return `${d.getUTCFullYear()}/${String(d.getUTCMonth() + 1).padStart(2, '0')}/${String(d.getUTCDate()).padStart(2, '0')}`;
+}
 function timeStringToSeconds(timeString) {
   if (!timeString || typeof timeString !== 'string') return 0;
   const p = timeString.split(':').map(s => parseInt(s, 10));
@@ -285,13 +291,13 @@ function renderMonthlySummary(monthKey) {
     activeTags.forEach(ptTag => {
       const ptLocal = game.activePlaythroughs[ptTag]; const ptHistory = rawData.playthroughHistory[ptTag];
       const sysStr = Array.from(ptLocal.timeframeSystems).join(', '); const bgColor = getStatusColor(ptHistory.finalStatus);
-      html += `<tr class="active-row"><td class="text-left"><span class="hover-trigger" data-game="${escapeHTML(game.name)}">${escapeHTML(game.name)}</span></td><td class="text-center">${escapeHTML(sysStr)}</td><td class="text-center">${formatHHMM(ptLocal.timeframeTime)}</td><td class="text-center">${ptLocal.timeframeDays.size}</td><td class="text-center">${ptLocal.lastPtLifetime}</td><td class="text-center">${ptLocal.lastPtLifetimeDays}</td><td class="text-center">${game.latestGameLifetime}</td><td class="text-center">${game.latestGameLifetimeDays}</td><td class="text-center">${formatShortDate(ptHistory.startDate)}</td><td class="text-center">${formatShortDate(ptLocal.lastDate)}</td><td class="text-center status-cell" style="background-color: ${bgColor};">${ptLocal.lastStatus}</td><td class="text-left">${escapeHTML(ptLocal.latestNote)}</td></tr>`;
+      html += `<tr class="active-row"><td class="text-left"><span class="hover-trigger" data-game="${escapeHTML(game.name)}">${escapeHTML(game.name)}</span></td><td class="text-center">${escapeHTML(sysStr)}</td><td class="text-center">${formatHHMM(ptLocal.timeframeTime)}</td><td class="text-center">${ptLocal.timeframeDays.size}</td><td class="text-center">${ptLocal.lastPtLifetime}</td><td class="text-center">${ptLocal.lastPtLifetimeDays}</td><td class="text-center">${game.latestGameLifetime}</td><td class="text-center">${game.latestGameLifetimeDays}</td><td class="text-center">${formatFullDate(ptHistory.startDate)}</td><td class="text-center">${formatFullDate(ptLocal.lastDate)}</td><td class="text-center status-cell" style="background-color: ${bgColor};">${ptLocal.lastStatus}</td><td class="text-left">${escapeHTML(ptLocal.latestNote)}</td></tr>`;
     });
     const allGamePlaythroughs = Object.keys(rawData.playthroughHistory).filter(tag => rawData.playthroughHistory[tag].gameName === game.name);
     allGamePlaythroughs.forEach(oldTag => {
       if (!activeTags.includes(oldTag)) {
         const oldPt = rawData.playthroughHistory[oldTag]; const bgColor = getStatusColor(oldPt.finalStatus);
-        html += `<tr class="inactive-row"><td class="text-left"><span class="hover-trigger" data-game="${escapeHTML(game.name)}">${escapeHTML(game.name)}</span></td><td class="text-center">${escapeHTML(oldPt.system)}</td><td class="text-center">00:00</td><td class="text-center">0</td><td class="text-center">${oldPt.finalPtLifetime}</td><td class="text-center">${oldPt.finalPtLifetimeDays}</td><td class="text-center">${game.latestGameLifetime}</td><td class="text-center">${game.latestGameLifetimeDays}</td><td class="text-center">${formatShortDate(oldPt.startDate)}</td><td class="text-center">${formatShortDate(oldPt.lastDate)}</td><td class="text-center status-cell" style="background-color: ${bgColor};">${oldPt.finalStatus}</td><td class="text-left">${escapeHTML(oldPt.finalNote)}</td></tr>`;
+        html += `<tr class="inactive-row"><td class="text-left"><span class="hover-trigger" data-game="${escapeHTML(game.name)}">${escapeHTML(game.name)}</span></td><td class="text-center">${escapeHTML(oldPt.system)}</td><td class="text-center">00:00</td><td class="text-center">0</td><td class="text-center">${oldPt.finalPtLifetime}</td><td class="text-center">${oldPt.finalPtLifetimeDays}</td><td class="text-center">${game.latestGameLifetime}</td><td class="text-center">${game.latestGameLifetimeDays}</td><td class="text-center">${formatFullDate(oldPt.startDate)}</td><td class="text-center">${formatFullDate(oldPt.lastDate)}</td><td class="text-center status-cell" style="background-color: ${bgColor};">${oldPt.finalStatus}</td><td class="text-left">${escapeHTML(oldPt.finalNote)}</td></tr>`;
       }
     });
   });
