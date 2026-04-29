@@ -442,7 +442,7 @@ function renderMostPlayed(year) {
   const sortedGames = Object.entries(statsObj).map(([name, stats]) => {
     const sysStr = Array.isArray(stats.systems) ? stats.systems.join(', ') : (stats.systems && stats.systems.data ? stats.systems.data.join(', ') : '');
     return { name, seconds: stats.totalSeconds, systems: sysStr };
-  }).sort((a, b) => b.seconds - a.seconds).slice(0, 25);
+  }).sort((a, b) => b.seconds - a.seconds).slice(0, 100); // <-- CHANGED TO 100
 
   container.innerHTML = sortedGames.map((game, index) => `
     <div class="list-item">
@@ -469,7 +469,7 @@ function renderMostDays(year) {
     const dayCount = Array.isArray(stats.days) ? stats.days.length : (stats.days && stats.days.data ? stats.days.data.length : 0);
     const sysStr = Array.isArray(stats.systems) ? stats.systems.join(', ') : (stats.systems && stats.systems.data ? stats.systems.data.join(', ') : '');
     return { name, days: dayCount, systems: sysStr };
-  }).sort((a, b) => b.days - a.days).slice(0, 25);
+  }).sort((a, b) => b.days - a.days).slice(0, 100); // <-- CHANGED TO 100
 
   container.innerHTML = sortedDays.map((game, index) => `
     <div class="list-item">
@@ -495,7 +495,7 @@ function renderLongestSession(year) {
     
   if (sessions.length === 0) { container.innerHTML = `<div class="loading-text">No sessions logged.</div>`; return; }
 
-  const sortedSessions = sessions.sort((a, b) => b.time - a.time).slice(0, 25);
+  const sortedSessions = sessions.sort((a, b) => b.time - a.time).slice(0, 100); // <-- CHANGED TO 100
   
   container.innerHTML = sortedSessions.map((s, index) => `
     <div class="list-item">
