@@ -159,30 +159,45 @@ function setupDropdowns() {
   const yearOptions = years.map(y => `<option value="${y}">${y}</option>`).join('');
   
   const compSelect = document.getElementById('year-select-comp');
+  const playedSelect = document.getElementById('year-select-played');
+  const daysSelect = document.getElementById('year-select-days');
+  const sessionSelect = document.getElementById('year-select-session');
+
+  const yearOptionsHtml = `<option value="All-Time">All-Time</option>` + yearOptions;
+  
+  // Randomize the default selection on page load (50/50 chance)
+  const defaultChoice = Math.random() < 0.5 ? 'All-Time' : currentYear;
+
+  // 1. Completions Dropdown
   if (compSelect) {
-    compSelect.innerHTML = yearOptions; compSelect.value = currentYear;
+    compSelect.innerHTML = yearOptionsHtml; 
+    compSelect.value = defaultChoice;
     compSelect.addEventListener('change', (e) => renderCompletions(e.target.value));
-    renderCompletions(currentYear);
+    renderCompletions(defaultChoice);
   }
 
-const playedSelect = document.getElementById('year-select-played');
+  // 2. Most Played Dropdown
   if (playedSelect) {
-    // Add "All-Time" to the very top of the options
-    playedSelect.innerHTML = `<option value="All-Time">All-Time</option>` + yearOptions;
-    
-    // Force it to select the current year (e.g. 2026) by default
-    playedSelect.value = currentYear; 
-    
-    playedSelect.addEventListener('change', (e) => {
-      renderMostPlayed(e.target.value); 
-      renderMostDays(e.target.value); 
-      renderLongestSession(e.target.value);
-    });
-    
-    // Initial render
-    renderMostPlayed(currentYear); 
-    renderMostDays(currentYear); 
-    renderLongestSession(currentYear);
+    playedSelect.innerHTML = yearOptionsHtml;
+    playedSelect.value = defaultChoice; 
+    playedSelect.addEventListener('change', (e) => renderMostPlayed(e.target.value));
+    renderMostPlayed(defaultChoice); 
+  }
+
+  // 3. Most Days Played Dropdown
+  if (daysSelect) {
+    daysSelect.innerHTML = yearOptionsHtml;
+    daysSelect.value = defaultChoice; 
+    daysSelect.addEventListener('change', (e) => renderMostDays(e.target.value));
+    renderMostDays(defaultChoice); 
+  }
+
+  // 4. Longest Session Dropdown
+  if (sessionSelect) {
+    sessionSelect.innerHTML = yearOptionsHtml;
+    sessionSelect.value = defaultChoice; 
+    sessionSelect.addEventListener('change', (e) => renderLongestSession(e.target.value));
+    renderLongestSession(defaultChoice); 
   }
 
 // 3. Rankings Dropdowns
@@ -394,6 +409,7 @@ function renderCompletions(year) {
   const container = document.getElementById('completions-list');
   const completions = Object.values(rawData.playthroughHistory).filter(pt => {
     if (!['Completed', 'M-Completed'].includes(pt.finalStatus)) return false;
+    if (year === 'All-Time') return true; // <-- NEW LINE ADDED HERE
     return new Date(pt.lastDate).getUTCFullYear().toString() === year;
   });
 
