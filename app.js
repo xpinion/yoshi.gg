@@ -155,20 +155,18 @@ function setupDropdowns() {
     renderMonthlySummary(monthKeys[0]);
   }
 
+  // --- NEW YEAR DROPDOWN LOGIC ---
   const years = Object.keys(rawData.metrics.yearlyGameStats).sort().reverse();
-  const yearOptions = years.map(y => `<option value="${y}">${y}</option>`).join('');
+  const yearOptionsHtml = `<option value="All-Time">All-Time</option>` + years.map(y => `<option value="${y}">${y}</option>`).join('');
   
   const compSelect = document.getElementById('year-select-comp');
   const playedSelect = document.getElementById('year-select-played');
   const daysSelect = document.getElementById('year-select-days');
   const sessionSelect = document.getElementById('year-select-session');
 
-  const yearOptionsHtml = `<option value="All-Time">All-Time</option>` + yearOptions;
-  
   // Randomize the default selection on page load (50/50 chance)
   const defaultChoice = Math.random() < 0.5 ? 'All-Time' : currentYear;
 
-  // 1. Completions Dropdown
   if (compSelect) {
     compSelect.innerHTML = yearOptionsHtml; 
     compSelect.value = defaultChoice;
@@ -176,7 +174,6 @@ function setupDropdowns() {
     renderCompletions(defaultChoice);
   }
 
-  // 2. Most Played Dropdown
   if (playedSelect) {
     playedSelect.innerHTML = yearOptionsHtml;
     playedSelect.value = defaultChoice; 
@@ -184,7 +181,6 @@ function setupDropdowns() {
     renderMostPlayed(defaultChoice); 
   }
 
-  // 3. Most Days Played Dropdown
   if (daysSelect) {
     daysSelect.innerHTML = yearOptionsHtml;
     daysSelect.value = defaultChoice; 
@@ -192,7 +188,6 @@ function setupDropdowns() {
     renderMostDays(defaultChoice); 
   }
 
-  // 4. Longest Session Dropdown
   if (sessionSelect) {
     sessionSelect.innerHTML = yearOptionsHtml;
     sessionSelect.value = defaultChoice; 
