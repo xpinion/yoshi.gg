@@ -79,8 +79,7 @@
       </div>
     </section>
 
-<section class="card-row" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); gap: 20px;">
-      
+    <section class="card-row" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); gap: 20px;">
       <div class="card">
         <div class="card-header">
           <h2>On This Day in History (<span id="today-date"></span>)</h2>
@@ -90,14 +89,22 @@
 
       <div class="card">
         <div class="card-header">
+          <h2>Milestone Tracker</h2>
+        </div>
+        <div class="card-content" id="milestones-list"></div>
+      </div>
+    </section>
+
+    <section class="card-row grid-1">
+      <div class="card">
+        <div class="card-header">
           <h2>Spotlight: <select id="random-top25-select" class="header-dropdown"></select></h2>
         </div>
         <div class="card-content" id="random-top25-content" style="padding: 0;"></div>
       </div>
-
     </section>
 
-<section class="card-row" style="display: grid; grid-template-columns: 2fr 1fr; gap: 20px;">
+    <section class="card-row grid-1">
       <div class="card">
         <div class="card-header">
           <h2>Data Analysis: 
@@ -113,16 +120,9 @@
         </div>
         <div class="card-content" id="analysis-content" style="padding: 0;"></div>
       </div>
-
-      <div class="card">
-        <div class="card-header">
-          <h2>Milestone Tracker</h2>
-        </div>
-        <div class="card-content" id="milestones-list"></div>
-      </div>
     </section>
     
-<section class="card-row grid-1">
+    <section class="card-row grid-1">
       <div class="card">
         <div class="card-header">
           <h2>Metrics & Heatmaps: 
@@ -161,10 +161,7 @@
       </div>
     </section>
     
-  </main>
-
-  <div id="game-tooltip" class="game-tooltip"></div>
-
+    <div id="game-tooltip" class="game-tooltip"></div>
   </main>
 
   <script src="app.js"></script>
