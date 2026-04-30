@@ -196,7 +196,9 @@ function loadFromCache() {
   let files = DriveApp.getFilesByName(DRIVE_CACHE_FILENAME);
   if (files.hasNext()) {
     try {
-      const content = files.next().getContentAsString();
+      const file = files.next();
+      // FIX: Extract the blob data first!
+      const content = file.getBlob().getDataAsString();
       return JSON.parse(content, dataReviver);
     } catch (e) {
       Logger.log("Failed to parse Drive Cache: " + e.message);
