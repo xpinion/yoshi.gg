@@ -99,43 +99,55 @@ function processNewEntries() {
     return;
   }
 
-  for (let i = rowsToProcess.length - 1; i >= 0; i--) {
-    const rowIndex = rowsToProcess[i];
+  // Find the highest existing entry number to increment from
+  let currentMaxEntryNum = 0;
+  for (let i = 0; i < values.length; i++) {
+    const eNum = parseInt(values[i][COLS.ENTRY_NUM], 10);
+    if (eNum > currentMaxEntryNum) currentMaxEntryNum = eNum;
+  }
+
+  // Process chronologically (top-down) so multiple entries for the same game stack correctly
+  for (let idx = 0; idx < rowsToProcess.length; idx++) {
+    const rowIndex = rowsToProcess[idx];
     const rowData = values[rowIndex];
     const gameName = rowData[COLS.VIDEOGAME];
     const sessionTimeStr = rowData[COLS.TIME];
     const playNote = rowData[COLS.DETAILS];
+    
     const playNoteMatch = playNote.match(/^Game (\d+)/);
     const playthroughNumPrefix = playNoteMatch ? playNoteMatch[0] : null;
 
-    let lifetimeTimeSec = 0, playthroughTimeSec = 0, system = "", playthroughTag = "", status = "", series = "";
+    let lifetimeTimeSec = 0, playthroughTimeSec = 0, system = "", playthroughTag = "", status = "";
     let prevGameFound = false, prevPlaythroughFound = false;
 
-    for (let j = 0; j < values.length; j++) {
-      if (i === j || !values[j][COLS.ENTRY_NUM]) continue;
-      const historicalRow = values[j];
-      const historicalGameName = historicalRow[COLS.VIDEOGAME];
+    // Optimized reverse lookup: Search backwards starting immediately above the new entry
+    for (let j = rowIndex - 1; j >= 0; j--) {
+      if (!values[j][COLS.ENTRY_NUM]) continue; 
+      
+      const historicalGameName = values[j][COLS.VIDEOGAME];
+      
       if (!prevGameFound && historicalGameName === gameName) {
-        lifetimeTimeSec = timeStringToSeconds(historicalRow[COLS.GAME_TOTAL]);
+        lifetimeTimeSec = timeStringToSeconds(values[j][COLS.GAME_TOTAL]);
         prevGameFound = true;
       }
-      if (!prevPlaythroughFound && historicalGameName === gameName && historicalRow[COLS.DETAILS].startsWith(playthroughNumPrefix)) {
-        playthroughTimeSec = timeStringToSeconds(historicalRow[COLS.PT_TOTAL]);
-        system = historicalRow[COLS.SYSTEM];
-        playthroughTag = historicalRow[COLS.PT_TAG];
-        status = historicalRow[COLS.STATUS];
+      
+      if (!prevPlaythroughFound && historicalGameName === gameName && values[j][COLS.DETAILS].startsWith(playthroughNumPrefix)) {
+        playthroughTimeSec = timeStringToSeconds(values[j][COLS.PT_TOTAL]);
+        system = values[j][COLS.SYSTEM];
+        playthroughTag = values[j][COLS.PT_TAG];
+        status = values[j][COLS.STATUS];
         prevPlaythroughFound = true;
       }
+      
       if (prevGameFound && prevPlaythroughFound) break;
     }
 
     if (!prevPlaythroughFound) status = "Active";
 
-    const entryNumBelow = (rowIndex + 1 < values.length) ? values[rowIndex + 1][COLS.ENTRY_NUM] : 0;
-    const newEntryNum = Number(entryNumBelow) + 1;
     const sessionTimeSec = timeStringToSeconds(sessionTimeStr);
+    currentMaxEntryNum++;
 
-    values[rowIndex][COLS.ENTRY_NUM] = newEntryNum;
+    values[rowIndex][COLS.ENTRY_NUM] = currentMaxEntryNum;
     values[rowIndex][COLS.SYSTEM] = system;
     values[rowIndex][COLS.PT_TOTAL] = secondsToTimeString(playthroughTimeSec + sessionTimeSec);
     values[rowIndex][COLS.GAME_TOTAL] = secondsToTimeString(lifetimeTimeSec + sessionTimeSec);
@@ -143,9 +155,15 @@ function processNewEntries() {
     values[rowIndex][COLS.STATUS] = status;
   }
 
+  // Batch write the updated data back to the spreadsheet
   sheet.getRange(startRow, 1, values.length, sheet.getLastColumn()).setValues(values);
-  clearAggregatedDataCache(false);
-  ui.alert(`Success!`, `Processed ${rowsToProcess.length} new log entries.`, ui.ButtonSet.OK);
+  
+  // Silently rebuild the cache in the background so the next Top 25 generation is instant
+  SpreadsheetApp.getActiveSpreadsheet().toast('Processing complete. Rebuilding cache in background...', 'Hold on', -1);
+  clearAggregatedDataCache(false); 
+  getAggregatedData(); 
+
+  ui.alert(`Success!`, `Processed ${rowsToProcess.length} new log entries and refreshed the cache.`, ui.ButtonSet.OK);
 }
 
 function aggregateMasterData(values, statusColors, metadataMap) {
