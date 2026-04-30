@@ -87,7 +87,7 @@ async function initDashboard() {
       }
     }
 
-    parseTop25Data(top25Data.values);
+    parseTop25Data(top25Data);
     setupDropdowns();
     setupHoverHistory();
     renderOnThisDay();
@@ -108,32 +108,86 @@ async function initDashboard() {
   }
 }
 
-function parseTop25Data(rows) {
-  for (let i = 0; i < rows.length; i++) {
-    let row = rows[i];
-    if (!row) continue;
-    if (row[0] && row[1] === "" && row[6]) {
-      let titleLeft = row[0], titleRight = row[6];
-      let headersLeft = rows[i+1].slice(0, 5), headersRight = rows[i+1].slice(6, 11);
-      let dataLeft = [], dataRight = [];
-      let j = i + 2;
-      while (j < rows.length) {
-        let dataRow = rows[j];
-        let leftHasData = dataRow.slice(0, 5).some(c => c && c.trim() !== "");
-        let rightHasData = dataRow.slice(6, 11).some(c => c && c.trim() !== "");
-        if (!leftHasData && !rightHasData) break;
-        if (leftHasData) dataLeft.push(dataRow.slice(0, 5));
-        if (rightHasData) dataRight.push(dataRow.slice(6, 11));
-        j++;
+function parseTop25Data(top25Data) {
+  allTop25Tables = [];
+  
+  // Extract values and the rich visual background data
+  const values = top25Data.values;
+  const backgrounds = top25Data.backgrounds;
+
+  if (!values || !backgrounds) return;
+
+  // The exact theme colors defined in your Config.js
+  const TITLE_BG = "#0000ff";
+  const HEADER_BG = "#00ffff";
+
+  // Keep track of cells we've already parsed so we don't double-count overlapping areas
+  const processed = new Set();
+
+  for (let r = 0; r < values.length; r++) {
+    for (let c = 0; c < values[r].length; c++) {
+      const cellKey = `${r},${c}`;
+      if (processed.has(cellKey)) continue;
+
+      const bg = backgrounds[r][c] ? backgrounds[r][c].toLowerCase() : "";
+      const val = values[r][c];
+
+      // 1. Identify a Table Title by its blue background
+      if (bg === TITLE_BG && val && val.trim() !== "") {
+        let title = val;
+        let headers = [];
+        let rowsData = [];
+        
+        // 2. The next row down should contain the cyan headers
+        let hr = r + 1;
+        if (hr < values.length && backgrounds[hr][c] && backgrounds[hr][c].toLowerCase() === HEADER_BG) {
+          
+          // Scan right to grab all headers until the cyan background stops
+          let hc = c;
+          while (hc < values[hr].length && backgrounds[hr][hc] && backgrounds[hr][hc].toLowerCase() === HEADER_BG) {
+            if (values[hr][hc].trim() !== "") {
+               headers.push(values[hr][hc]);
+            }
+            processed.add(`${hr},${hc}`); // Mark as processed
+            hc++;
+          }
+          
+          // 3. Now grab the data rows directly below the headers
+          let dr = hr + 1;
+          while (dr < values.length) {
+            let currentBg = backgrounds[dr][c] ? backgrounds[dr][c].toLowerCase() : "";
+            
+            // Stop parsing this table if we hit the start of a new table title or header
+            if (currentBg === TITLE_BG || currentBg === HEADER_BG) break;
+            
+            let rowHasData = false;
+            let rowVals = [];
+            for (let i = 0; i < headers.length; i++) {
+              let cellVal = values[dr][c + i] || "";
+              rowVals.push(cellVal);
+              if (cellVal.trim() !== "") rowHasData = true;
+              processed.add(`${dr},${c+i}`); // Mark as processed
+            }
+            
+            // If the row is entirely blank across the table's width, the table is over
+            if (!rowHasData) break;
+            
+            rowsData.push(rowVals);
+            dr++;
+          }
+          
+          // Save the completed table to the global array!
+          if (rowsData.length > 0) {
+            allTop25Tables.push({ title: title, headers: headers, rows: rowsData });
+          }
+        }
       }
-      if (dataLeft.length > 0) allTop25Tables.push({ title: titleLeft, headers: headersLeft, rows: dataLeft });
-      if (dataRight.length > 0) allTop25Tables.push({ title: titleRight, headers: headersRight, rows: dataRight });
-      i = j - 1;
     }
   }
   
+  // Populate the dropdown menu
   const select = document.getElementById('random-top25-select');
-  if(select && allTop25Tables.length > 0) {
+  if (select && allTop25Tables.length > 0) {
      select.innerHTML = allTop25Tables.map(t => `<option value="${escapeHTML(t.title)}">${escapeHTML(t.title)}</option>`).join('');
      const randomIdx = Math.floor(Math.random() * allTop25Tables.length);
      select.value = allTop25Tables[randomIdx].title;
