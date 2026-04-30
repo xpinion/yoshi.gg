@@ -89,6 +89,7 @@ function processNewEntries() {
   const rowsToProcess = [];
   for (let i = 0; i < values.length; i++) {
     const row = values[i];
+    // Check if Entry # is blank, but Game, Time, and Details are filled
     if (!row[COLS.ENTRY_NUM] && row[COLS.VIDEOGAME] && row[COLS.TIME] && row[COLS.DETAILS]) {
       rowsToProcess.push(i);
     }
@@ -114,39 +115,59 @@ function processNewEntries() {
     const sessionTimeStr = rowData[COLS.TIME];
     const playNote = rowData[COLS.DETAILS];
     
+    // Preserve any existing inputs the user might have manually typed into D, H, or I
+    let system = rowData[COLS.SYSTEM] ? String(rowData[COLS.SYSTEM]).trim() : "";
+    let playthroughTag = rowData[COLS.PT_TAG] ? String(rowData[COLS.PT_TAG]).trim() : "";
+    let status = rowData[COLS.STATUS] ? String(rowData[COLS.STATUS]).trim() : "";
+
     const playNoteMatch = playNote.match(/^Game (\d+)/);
     const playthroughNumPrefix = playNoteMatch ? playNoteMatch[0] : null;
 
-    let lifetimeTimeSec = 0, playthroughTimeSec = 0, system = "", playthroughTag = "", status = "";
+    let lifetimeTimeSec = 0, playthroughTimeSec = 0;
     let prevGameFound = false, prevPlaythroughFound = false;
 
     // Optimized reverse lookup: Search backwards starting immediately above the new entry
     for (let j = rowIndex - 1; j >= 0; j--) {
+      // Skip rows that haven't been assigned an Entry Number yet (except those we just processed)
       if (!values[j][COLS.ENTRY_NUM]) continue; 
       
       const historicalGameName = values[j][COLS.VIDEOGAME];
       
-      if (!prevGameFound && historicalGameName === gameName) {
-        lifetimeTimeSec = timeStringToSeconds(values[j][COLS.GAME_TOTAL]);
-        prevGameFound = true;
-      }
-      
-      if (!prevPlaythroughFound && historicalGameName === gameName && values[j][COLS.DETAILS].startsWith(playthroughNumPrefix)) {
-        playthroughTimeSec = timeStringToSeconds(values[j][COLS.PT_TOTAL]);
-        system = values[j][COLS.SYSTEM];
-        playthroughTag = values[j][COLS.PT_TAG];
-        status = values[j][COLS.STATUS];
-        prevPlaythroughFound = true;
+      if (historicalGameName === gameName) {
+        
+        // The first time we find the game (most recent entry), grab the lifetime total
+        if (!prevGameFound) {
+          lifetimeTimeSec = timeStringToSeconds(values[j][COLS.GAME_TOTAL]);
+          
+          // SMART FALLBACK: If user left System, PT Tag, or Status blank, inherit them!
+          if (!system) system = values[j][COLS.SYSTEM];
+          if (!playthroughTag) playthroughTag = values[j][COLS.PT_TAG];
+          if (!status) status = values[j][COLS.STATUS];
+          
+          prevGameFound = true;
+        }
+        
+        // Find the specific playthrough's total time
+        const matchesPrefix = playthroughNumPrefix ? values[j][COLS.DETAILS].startsWith(playthroughNumPrefix) : true;
+        const matchesTag = playthroughTag ? values[j][COLS.PT_TAG] === playthroughTag : true;
+        
+        if (!prevPlaythroughFound && matchesPrefix && matchesTag) {
+          playthroughTimeSec = timeStringToSeconds(values[j][COLS.PT_TOTAL]);
+          prevPlaythroughFound = true;
+        }
       }
       
       if (prevGameFound && prevPlaythroughFound) break;
     }
 
-    if (!prevPlaythroughFound) status = "Active";
+    // Default formatting for completely new games/playthroughs
+    if (!status) status = "Active";
+    if (!playthroughTag) playthroughTag = `${gameName}-1`;
 
     const sessionTimeSec = timeStringToSeconds(sessionTimeStr);
     currentMaxEntryNum++;
 
+    // Assign calculated values back to the array
     values[rowIndex][COLS.ENTRY_NUM] = currentMaxEntryNum;
     values[rowIndex][COLS.SYSTEM] = system;
     values[rowIndex][COLS.PT_TOTAL] = secondsToTimeString(playthroughTimeSec + sessionTimeSec);
