@@ -1012,7 +1012,7 @@ function formatMetricsStreaksAndRecords(sheet, allStreaksData, currentYear, allT
     );
   }
   
-  if (outputValues.length === 0) return;
+if (outputValues.length === 0) return;
   const range = sheet.getRange(1, 1, outputValues.length, NUM_COLS);
   range.setValues(outputValues);
   range.setBackgrounds(outputBackgrounds);
@@ -1023,7 +1023,12 @@ function formatMetricsStreaksAndRecords(sheet, allStreaksData, currentYear, allT
   range.setNumberFormats(outputNumberFormats);
   range.setFontFamily(STYLES.FONT_FAMILY).setVerticalAlignment("middle").setWrap(true);
   mergeRangesA1.forEach(a1 => sheet.getRange(a1).merge());
-  sheet.setColumnWidth(1, 35); sheet.setColumnWidth(2, 100); sheet.setColumnWidth(3, 85); sheet.setColumnWidth(4, 85); sheet.setColumnWidth(5, 1000); sheet.setColumnWidth(6, 20); sheet.setColumnWidth(7, 40); sheet.setColumnWidth(8, 100); sheet.setColumnWidth(9, 85); sheet.setColumnWidth(10, 85); sheet.setColumnWidth(11, 1000); 
+  
+  // Optimized column width setting
+  const columnWidths = [35, 100, 85, 85, 1000, 20, 40, 100, 85, 85, 1000];
+  columnWidths.forEach((width, index) => {
+    sheet.setColumnWidth(index + 1, width);
+  });
 }
 
 
@@ -1048,67 +1053,49 @@ const dataReplacer = (key, value) => {
   return value;
 };
 
-function saveToCache(key, data) {
-  const cache = CacheService.getScriptCache();
-  const jsonString = JSON.stringify(data, dataReplacer);
+const DRIVE_CACHE_FILENAME = "YoshiGG_Aggregated_Cache.json";
+
+function saveToCache(data) {
+  const folderName = "Videogame Log Backups"; 
+  let folders = DriveApp.getFoldersByName(folderName);
+  let folder = folders.hasNext() ? folders.next() : DriveApp.createFolder(folderName);
   
-  if (jsonString.length <= CACHE_CHUNK_SIZE) {
-    cache.put(key, jsonString, 21600); 
+  const jsonString = JSON.stringify(data, dataReplacer);
+  let files = folder.getFilesByName(DRIVE_CACHE_FILENAME);
+  
+  if (files.hasNext()) {
+    files.next().setContent(jsonString);
   } else {
-    const chunks = {};
-    const chunkCount = Math.ceil(jsonString.length / CACHE_CHUNK_SIZE);
-    
-    for (let i = 0; i < chunkCount; i++) {
-      const chunkKey = `${key}_${i}`;
-      const chunkData = jsonString.substr(i * CACHE_CHUNK_SIZE, CACHE_CHUNK_SIZE);
-      chunks[chunkKey] = chunkData;
-    }
-    
-    cache.putAll(chunks, 21600);
-    cache.put(key, `__CHUNKED__${chunkCount}`, 21600);
+    folder.createFile(DRIVE_CACHE_FILENAME, jsonString, MimeType.PLAIN_TEXT);
   }
 }
 
-function loadFromCache(key) {
-  const cache = CacheService.getScriptCache();
-  const mainValue = cache.get(key);
-  
-  if (!mainValue) return null;
-
-  let finalJsonString = mainValue;
-
-  if (mainValue.startsWith('__CHUNKED__')) {
-    const count = parseInt(mainValue.replace('__CHUNKED__', ''));
-    const chunkKeys = [];
-    for (let i = 0; i < count; i++) {
-      chunkKeys.push(`${key}_${i}`);
+function loadFromCache() {
+  let files = DriveApp.getFilesByName(DRIVE_CACHE_FILENAME);
+  if (files.hasNext()) {
+    try {
+      const content = files.next().getContentAsString();
+      return JSON.parse(content, dataReviver);
+    } catch (e) {
+      Logger.log("Failed to parse Drive Cache: " + e.message);
+      return null;
     }
-    
-    const chunkMap = cache.getAll(chunkKeys);
-    finalJsonString = chunkKeys.map(k => chunkMap[k]).join('');
   }
-
-  return JSON.parse(finalJsonString, dataReviver);
+  return null;
 }
 
 function clearAggregatedDataCache(showAlert = true) {
-  const cache = CacheService.getScriptCache();
+  let files = DriveApp.getFilesByName(DRIVE_CACHE_FILENAME);
+  while (files.hasNext()) {
+    files.next().setTrashed(true);
+  }
   
-  [CACHE_KEY_ENTRIES, CACHE_KEY_HISTORY, CACHE_KEY_METRICS].forEach(key => {
-    const val = cache.get(key);
-    if (val && val.startsWith('__CHUNKED__')) {
-      const count = parseInt(val.replace('__CHUNKED__', ''));
-      const keysToRemove = [];
-      for (let i = 0; i < count; i++) keysToRemove.push(`${key}_${i}`);
-      cache.removeAll(keysToRemove);
-    }
-    cache.remove(key);
-  });
-
-  Logger.log('Aggregated data cache has been cleared.');
+  _MEMORY_CACHE = null; // Clear local execution memory too
+  
+  Logger.log('Aggregated data cache has been deleted from Drive.');
   if (showAlert) {
     try {
-      SpreadsheetApp.getUi().alert('Cache Cleared', 'The aggregated data cache has been cleared. The next report will run a full data refresh.', SpreadsheetApp.getUi().ButtonSet.OK);
+      SpreadsheetApp.getUi().alert('Cache Cleared', 'The Drive cache has been deleted. The next report will run a full data refresh.', SpreadsheetApp.getUi().ButtonSet.OK);
     } catch (e) { /* Ignore UI errors */ }
   }
 }
@@ -1120,16 +1107,15 @@ function getAggregatedData() {
     return _MEMORY_CACHE;
   }
 
-  const cachedEntries = loadFromCache(CACHE_KEY_ENTRIES);
-  const cachedHistory = loadFromCache(CACHE_KEY_HISTORY);
-  const cachedMetrics = loadFromCache(CACHE_KEY_METRICS);
-
-  if (cachedEntries != null && cachedHistory != null && cachedMetrics != null) { 
-    Logger.log('Retrieved all data parts from cache.');
-    _MEMORY_CACHE = { allEntries: cachedEntries, playthroughHistory: cachedHistory, metrics: cachedMetrics };
+  // 1. Try loading from the new Drive cache first
+  const cachedData = loadFromCache();
+  if (cachedData && cachedData.allEntries && cachedData.playthroughHistory && cachedData.metrics) {
+    Logger.log('Retrieved all data parts from Drive cache.');
+    _MEMORY_CACHE = cachedData;
     return _MEMORY_CACHE;
   }
 
+  // 2. If no cache exists, perform full aggregation from the sheet
   Logger.log('Cache incomplete or empty. Performing full data aggregation.');
   const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
   const masterSheet = ss.getSheetByName("Master");
@@ -1163,17 +1149,16 @@ function getAggregatedData() {
    
   const { allEntries, playthroughHistory, metrics } = aggregateMasterData(masterValues, statusColors, metadataMap);
 
+  // 3. Save the newly built data to the Drive cache
   try {
-    saveToCache(CACHE_KEY_ENTRIES, allEntries);
-    saveToCache(CACHE_KEY_HISTORY, playthroughHistory);
-    saveToCache(CACHE_KEY_METRICS, metrics);
-    Logger.log('Successfully stored data in cache.');
+    saveToCache({ allEntries, playthroughHistory, metrics });
+    Logger.log('Successfully stored data in Drive cache.');
   } catch (e) {
-    Logger.log(`Error caching data: ${e.message}`);
+    Logger.log(`Error caching data to Drive: ${e.message}`);
   }
 
   _MEMORY_CACHE = { allEntries, playthroughHistory, metrics };
-  return { allEntries, playthroughHistory, metrics };
+  return _MEMORY_CACHE;
 }
 
 function aggregateMasterData(values, statusColors, metadataMap) {
