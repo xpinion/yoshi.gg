@@ -462,12 +462,6 @@ function renderMonthlySummary(monthKey) {
   container.innerHTML = html;
 }
 
-  const [yearStr, monthStr] = monthKey.split('-');
-  const daysInMonth = new Date(parseInt(yearStr), parseInt(monthStr), 0).getDate();
-  html += `<tr class="grand-total-row"><td colspan="2" class="text-left">Grand Total</td><td class="text-center">${formatHHMM(totalSecondsInMonth)}</td><td class="text-center">'${monthData.allEntryDays.size}/${daysInMonth}</td><td colspan="8"></td></tr></tbody></table></div>`;
-  container.innerHTML = html;
-}
-
 function renderCompletions(year) {
   const container = document.getElementById('completions-list');
   const completions = Object.values(rawData.playthroughHistory).filter(pt => {
