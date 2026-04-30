@@ -174,6 +174,39 @@ function saveWebJsonFile(folder, fileName, dataObj) {
 }
 
 //================================================================//
+//                        DRIVE CACHE UTILITY                     //
+//================================================================//
+
+function saveToCache(data) {
+  const folderName = "Videogame Log Backups"; 
+  let folders = DriveApp.getFoldersByName(folderName);
+  let folder = folders.hasNext() ? folders.next() : DriveApp.createFolder(folderName);
+  
+  const jsonString = JSON.stringify(data, dataReplacer);
+  let files = folder.getFilesByName(DRIVE_CACHE_FILENAME);
+  
+  if (files.hasNext()) {
+    files.next().setContent(jsonString);
+  } else {
+    folder.createFile(DRIVE_CACHE_FILENAME, jsonString, MimeType.PLAIN_TEXT);
+  }
+}
+
+function loadFromCache() {
+  let files = DriveApp.getFilesByName(DRIVE_CACHE_FILENAME);
+  if (files.hasNext()) {
+    try {
+      const content = files.next().getContentAsString();
+      return JSON.parse(content, dataReviver);
+    } catch (e) {
+      Logger.log("Failed to parse Drive Cache: " + e.message);
+      return null;
+    }
+  }
+  return null;
+}
+
+//================================================================//
 //                        SHEET UTILITIES                         //
 //================================================================//
 
