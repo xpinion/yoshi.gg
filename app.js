@@ -427,11 +427,20 @@ function renderMonthlySummary(monthKey) {
 
   const sortedGames = Object.values(monthData.games).sort((a, b) => b.totalSeconds - a.totalSeconds);
 
+  // 1. Calculate the days in the month FIRST
+  const [yearStr, monthStr] = monthKey.split('-');
+  const daysInMonth = new Date(parseInt(yearStr), parseInt(monthStr), 0).getDate();
+
+  // 2. Build the headers
   let html = `<div class="monthly-table-wrapper"><table class="monthly-table"><thead>
     <tr><th rowspan="2">Videogame</th><th rowspan="2">System</th><th colspan="2">Active Month</th><th colspan="2">Playthrough Lifetime</th><th colspan="2">Game Lifetime</th><th rowspan="2">Date Started</th><th rowspan="2">Last Updated</th><th rowspan="2">Game Status</th><th rowspan="2">Playthrough Details</th></tr>
     <tr><th>Time</th><th>Days</th><th>Time</th><th>Days</th><th>Time</th><th>Days</th></tr>
     </thead><tbody>`;
 
+  // 3. Print the Grand Total row BEFORE the games
+  html += `<tr class="grand-total-row"><td colspan="2" class="text-left">Grand Total</td><td class="text-center">${formatHHMM(totalSecondsInMonth)}</td><td class="text-center">${monthData.allEntryDays.size}/${daysInMonth}</td><td colspan="8"></td></tr>`;
+
+  // 4. Print the games
   sortedGames.forEach(game => {
     const activeTags = Object.keys(game.activePlaythroughs);
     activeTags.forEach(ptTag => {
@@ -447,6 +456,11 @@ function renderMonthlySummary(monthKey) {
       }
     });
   });
+
+  // 5. Close it out
+  html += `</tbody></table></div>`;
+  container.innerHTML = html;
+}
 
   const [yearStr, monthStr] = monthKey.split('-');
   const daysInMonth = new Date(parseInt(yearStr), parseInt(monthStr), 0).getDate();
