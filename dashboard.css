@@ -244,16 +244,21 @@ body {
   font-size: 0.85rem; 
 }
 .top25-table th { 
-  background: var(--badge-bg); 
-  color: var(--badge-text); 
+  background-color: var(--primary-green); /* Switched to green */
+  color: white; 
+  font-weight: 700; /* Made the font bold like the others */
   padding: 10px; 
-  text-align: left; 
+  border: 1px solid #1a4a1c; /* Added the dark green border */
+  text-align: center; /* Centered the headers */
   position: sticky;
   top: 0;
+  z-index: 10;
 }
 .top25-table td { 
   padding: 8px 10px; 
-  border-bottom: 1px solid #eee; 
+  border: 1px solid #e0e0e0; /* Added the full grid lines */
+  text-align: center; /* Centered the data text */
+  vertical-align: middle;
 }
 .top25-table tr:nth-child(even) { background-color: #fafafa; }
 .top25-table tr:hover { background-color: #f1f1f1; }
