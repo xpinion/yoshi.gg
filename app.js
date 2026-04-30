@@ -110,18 +110,13 @@ async function initDashboard() {
 
 function parseTop25Data(top25Data) {
   allTop25Tables = [];
-  
-  // Extract values and the rich visual background data
   const values = top25Data.values;
   const backgrounds = top25Data.backgrounds;
 
   if (!values || !backgrounds) return;
 
-  // The exact theme colors defined in your Config.js
   const TITLE_BG = "#0000ff";
   const HEADER_BG = "#00ffff";
-
-  // Keep track of cells we've already parsed so we don't double-count overlapping areas
   const processed = new Set();
 
   for (let r = 0; r < values.length; r++) {
@@ -132,51 +127,56 @@ function parseTop25Data(top25Data) {
       const bg = backgrounds[r][c] ? backgrounds[r][c].toLowerCase() : "";
       const val = values[r][c];
 
-      // 1. Identify a Table Title by its blue background
+      // 1. Identify a Title
       if (bg === TITLE_BG && val && val.trim() !== "") {
         let title = val;
         let headers = [];
         let rowsData = [];
         
-        // 2. The next row down should contain the cyan headers
+        // 2. Check for headers immediately below this specific title cell
         let hr = r + 1;
         if (hr < values.length && backgrounds[hr][c] && backgrounds[hr][c].toLowerCase() === HEADER_BG) {
           
-          // Scan right to grab all headers until the cyan background stops
+          // Grab only headers that are part of THIS table (until the cyan background stops or a gap appears)
           let hc = c;
           while (hc < values[hr].length && backgrounds[hr][hc] && backgrounds[hr][hc].toLowerCase() === HEADER_BG) {
             if (values[hr][hc].trim() !== "") {
                headers.push(values[hr][hc]);
             }
-            processed.add(`${hr},${hc}`); // Mark as processed
+            processed.add(`${hr},${hc}`);
             hc++;
           }
           
-          // 3. Now grab the data rows directly below the headers
+          // 3. Grab data rows directly beneath these headers
           let dr = hr + 1;
           while (dr < values.length) {
-            let currentBg = backgrounds[dr][c] ? backgrounds[dr][c].toLowerCase() : "";
-            
-            // Stop parsing this table if we hit the start of a new table title or header
-            if (currentBg === TITLE_BG || currentBg === HEADER_BG) break;
-            
+            // Stop if we hit a new title or header block anywhere in these columns
+            let stopParsing = false;
+            for (let i = 0; i < headers.length; i++) {
+              let checkBg = backgrounds[dr][c + i] ? backgrounds[dr][c + i].toLowerCase() : "";
+              if (checkBg === TITLE_BG || checkBg === HEADER_BG) {
+                stopParsing = true;
+                break;
+              }
+            }
+            if (stopParsing) break;
+
             let rowHasData = false;
             let rowVals = [];
             for (let i = 0; i < headers.length; i++) {
               let cellVal = values[dr][c + i] || "";
               rowVals.push(cellVal);
               if (cellVal.trim() !== "") rowHasData = true;
-              processed.add(`${dr},${c+i}`); // Mark as processed
+              processed.add(`${dr},${c+i}`);
             }
             
-            // If the row is entirely blank across the table's width, the table is over
+            // If the row is blank specifically within the width of this table, the table is finished
             if (!rowHasData) break;
             
             rowsData.push(rowVals);
             dr++;
           }
           
-          // Save the completed table to the global array!
           if (rowsData.length > 0) {
             allTop25Tables.push({ title: title, headers: headers, rows: rowsData });
           }
@@ -185,7 +185,7 @@ function parseTop25Data(top25Data) {
     }
   }
   
-  // Populate the dropdown menu
+  // Populate dropdown
   const select = document.getElementById('random-top25-select');
   if (select && allTop25Tables.length > 0) {
      select.innerHTML = allTop25Tables.map(t => `<option value="${escapeHTML(t.title)}">${escapeHTML(t.title)}</option>`).join('');
