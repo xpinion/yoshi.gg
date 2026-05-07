@@ -112,87 +112,70 @@ function parseTop25Data(top25Data) {
   allTop25Tables = [];
   const values = top25Data.values;
   const backgrounds = top25Data.backgrounds;
-
-  if (!values || !backgrounds) return;
-
   const TITLE_BG = "#0000ff";
-  const HEADER_BG = "#00ffff";
-  const processed = new Set();
+
+  // Helper to extract a single table block from the grid
+  const extractTableBlock = (startRow, startCol, width) => {
+    let headers = [];
+    let rows = [];
+    
+    // Headers are 1 row below title
+    let hr = startRow + 1;
+    for (let c = startCol; c < startCol + width; c++) {
+      if (values[hr] && values[hr][c]) headers.push(values[hr][c]);
+    }
+
+    // Data rows
+    let dr = hr + 1;
+    while (dr < values.length) {
+      let rowHasData = false;
+      let rowVals = [];
+      for (let c = startCol; c < startCol + width; c++) {
+        let val = values[dr][c] || "";
+        rowVals.push(val);
+        if (val.trim() !== "") rowHasData = true;
+      }
+      // Stop if row is empty or we hit another title/header block
+      if (!rowHasData || (backgrounds[dr][startCol] && backgrounds[dr][startCol].toLowerCase() === TITLE_BG)) break;
+      rows.push(rowVals);
+      dr++;
+    }
+    return { headers, rows };
+  };
 
   for (let r = 0; r < values.length; r++) {
-    for (let c = 0; c < values[r].length; c++) {
-      const cellKey = `${r},${c}`;
-      if (processed.has(cellKey)) continue;
+    const bgA = backgrounds[r][0] ? backgrounds[r][0].toLowerCase() : "";
+    const titleA = values[r][0];
 
-      const bg = backgrounds[r][c] ? backgrounds[r][c].toLowerCase() : "";
-      const val = values[r][c];
+    if (bgA === TITLE_BG && titleA && titleA.trim() !== "") {
+      const bgG = backgrounds[r][6] ? backgrounds[r][6].toLowerCase() : "";
+      const titleG = values[r][6];
 
-      // 1. Identify a Title
-      if (bg === TITLE_BG && val && val.trim() !== "") {
-        let title = val;
-        let headers = [];
-        let rowsData = [];
-        
-        // 2. Check for headers immediately below this specific title cell
-        let hr = r + 1;
-        if (hr < values.length && backgrounds[hr][c] && backgrounds[hr][c].toLowerCase() === HEADER_BG) {
-          
-          // Grab only headers that are part of THIS table (until the cyan background stops or a gap appears)
-          let hc = c;
-          while (hc < values[hr].length && backgrounds[hr][hc] && backgrounds[hr][hc].toLowerCase() === HEADER_BG) {
-            if (values[hr][hc].trim() !== "") {
-               headers.push(values[hr][hc]);
-            }
-            processed.add(`${hr},${hc}`);
-            hc++;
-          }
-          
-          // 3. Grab data rows directly beneath these headers
-          let dr = hr + 1;
-          while (dr < values.length) {
-            // Stop if we hit a new title or header block anywhere in these columns
-            let stopParsing = false;
-            for (let i = 0; i < headers.length; i++) {
-              let checkBg = backgrounds[dr][c + i] ? backgrounds[dr][c + i].toLowerCase() : "";
-              if (checkBg === TITLE_BG || checkBg === HEADER_BG) {
-                stopParsing = true;
-                break;
-              }
-            }
-            if (stopParsing) break;
-
-            let rowHasData = false;
-            let rowVals = [];
-            for (let i = 0; i < headers.length; i++) {
-              let cellVal = values[dr][c + i] || "";
-              rowVals.push(cellVal);
-              if (cellVal.trim() !== "") rowHasData = true;
-              processed.add(`${dr},${c+i}`);
-            }
-            
-            // If the row is blank specifically within the width of this table, the table is finished
-            if (!rowHasData) break;
-            
-            rowsData.push(rowVals);
-            dr++;
-          }
-          
-          if (rowsData.length > 0) {
-            allTop25Tables.push({ title: title, headers: headers, rows: rowsData });
-          }
-        }
+      const leftData = extractTableBlock(r, 0, 5);
+      
+      // If there's a title in Col G, it's a Dual Spotlight
+      if (bgG === TITLE_BG && titleG && titleG.trim() !== "") {
+        const rightData = extractTableBlock(r, 6, 5);
+        allTop25Tables.push({
+          type: 'dual',
+          mainTitle: titleA, // Dropdown uses the Left Title
+          left: { title: titleA, ...leftData },
+          right: { title: titleG, ...rightData }
+        });
+      } else {
+        allTop25Tables.push({
+          type: 'single',
+          mainTitle: titleA,
+          ...leftData
+        });
       }
     }
   }
-  
-  // Populate dropdown
+
   const select = document.getElementById('random-top25-select');
   if (select && allTop25Tables.length > 0) {
-     select.innerHTML = allTop25Tables.map(t => `<option value="${escapeHTML(t.title)}">${escapeHTML(t.title)}</option>`).join('');
-     const randomIdx = Math.floor(Math.random() * allTop25Tables.length);
-     select.value = allTop25Tables[randomIdx].title;
-     select.addEventListener('change', renderRandomTop25);
-     renderRandomTop25();
+    select.innerHTML = allTop25Tables.map(t => `<option value="${escapeHTML(t.mainTitle)}">${escapeHTML(t.mainTitle)}</option>`).join('');
+    renderRandomTop25();
   }
 }
 
@@ -634,23 +617,36 @@ function renderOnThisDay() {
     `;
   }).join('');
 }
-
 function renderRandomTop25() {
   const selectedTitle = document.getElementById('random-top25-select').value;
-  const tableObj = allTop25Tables.find(t => t.title === selectedTitle);
-  if (!tableObj) return;
+  const pair = allTop25Tables.find(t => t.mainTitle === selectedTitle);
+  if (!pair) return;
 
-  document.getElementById('random-top25-content').innerHTML = `
-    <table class="top25-table">
-      <thead><tr>${tableObj.headers.map(h => `<th>${escapeHTML(h)}</th>`).join('')}</tr></thead>
-      <tbody>
-        ${tableObj.rows.map(r => `<tr>${r.map((c, idx) => {
-           // We don't know exactly which column holds the game name, 
-           // but adding hover-triggers to all cells is safe. The listener ignores empty data-game tags.
-           return `<td><span class="hover-trigger" data-game="${escapeHTML(c)}">${escapeHTML(c)}</span></td>`;
-        }).join('')}</tr>`).join('')}
-      </tbody>
-    </table>`;
+  const renderTableHtml = (table, subTitle) => `
+    <div class="spotlight-section">
+      <h3 class="spotlight-subtitle">${escapeHTML(subTitle)}</h3>
+      <table class="top25-table">
+        <thead><tr>${table.headers.map(h => `<th>${escapeHTML(h)}</th>`).join('')}</tr></thead>
+        <tbody>
+          ${table.rows.map(r => `<tr>${r.map(c => `<td><span class="hover-trigger" data-game="${escapeHTML(c)}">${escapeHTML(c)}</span></td>`).join('')}</tr>`).join('')}
+        </tbody>
+      </table>
+    </div>
+  `;
+
+  let html = '';
+  if (pair.type === 'dual') {
+    html = `
+      <div class="spotlight-dual-container">
+        ${renderTableHtml(pair.left, pair.left.title)}
+        ${renderTableHtml(pair.right, pair.right.title)}
+      </div>
+    `;
+  } else {
+    html = renderTableHtml(pair, pair.mainTitle);
+  }
+
+  document.getElementById('random-top25-content').innerHTML = html;
 }
 
 // --- ANALYSIS TABLES ---
