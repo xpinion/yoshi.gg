@@ -431,43 +431,42 @@ const buildDualTable = (titleLeft, titleRight, leftData, rightData, headersLeft,
     let prevValRight_Year = null;
 
     for (let i = 0; i < maxRows; i++) {
-        const row = Array(NUM_COLS).fill("");
-        let leftIsBold = false;
-        let rightIsBold = false;
+      const row = Array(NUM_COLS).fill("");
+      let leftIsBold = false;
+      let rightIsBold = false;
 
-        // --- Left Table (Cols A-E) ---
-        if (i < leftLen) {
-            const item = leftData[i];
-            const formatted = formatFnLeft(item, i, prevValLeft);
-            prevValLeft = formatted.valForTie;
-            row[0] = formatted.c1; row[1] = formatted.c2; row[2] = formatted.c3; row[3] = formatted.c4; row[4] = formatted.c5;
-            if (formatted.isBold) leftIsBold = true; 
-        }
-        
-        // --- Right Table (Cols G-K) ---
-        if (i < rightLen) {
-            const item = rightData[i]; 
-            const formatted = formatFnRight ? formatFnRight(item) : formatFnLeft(item.data, -1, null); 
-            row[6] = (item.year === prevValRight_Year) ? "" : item.year; 
-            prevValRight_Year = item.year;
-            row[7] = formatted.c2; row[8] = formatted.c3; row[9] = formatted.c4; row[10] = formatted.c5;
-            // FIXED: Capture bolding for the right side
-            if (formatted.isBold) rightIsBold = true;
-        }
-        
-        const rIdx = addRow(row);
-
-        // Apply Number Formats (e.g., [hh]:mm)
-        if (numberFormatColB) outputNumberFormats[rIdx][1] = numberFormatColB; 
-        if (numberFormatColH) outputNumberFormats[rIdx][7] = numberFormatColH; 
-
-        // Apply Bolding to the specific table columns
-        if (leftIsBold) {
-            for (let col = 0; col < 5; col++) outputFontWeights[rIdx][col] = "bold";
-        }
-        if (rightIsBold) {
-            for (let col = 6; col < 11; col++) outputFontWeights[rIdx][col] = "bold";
-        }
+      // Left Table
+      if (i < leftLen) {
+        const item = leftData[i];
+        const formatted = formatFnLeft(item, i, prevValLeft);
+        prevValLeft = formatted.valForTie; // Update for next tie check
+        row[0] = formatted.c1; row[1] = formatted.c2; row[2] = formatted.c3; row[3] = formatted.c4; row[4] = formatted.c5;
+        if (formatted.isBold) leftIsBold = true; 
+      }
+      
+      // Right Table
+      if (i < rightLen) {
+        const item = rightData[i]; 
+        const formatted = formatFnRight ? formatFnRight(item) : formatFnLeft(item.data, -1, null); 
+        row[6] = (item.year === prevValRight_Year) ? "" : item.year; 
+        prevValRight_Year = item.year;
+        row[7] = formatted.c2; row[8] = formatted.c3; row[9] = formatted.c4; row[10] = formatted.c5;
+        if (formatted.isBold) rightIsBold = true;
+      }
+      
+      const rIdx = addRow(row);
+      
+      // Apply the "bold" weight to the sheet's data array
+      if (leftIsBold) {
+        for (let col = 0; col < 5; col++) outputFontWeights[rIdx][col] = "bold";
+      }
+      if (rightIsBold) {
+        for (let col = 6; col < 11; col++) outputFontWeights[rIdx][col] = "bold";
+      }
+      
+      // Keep your number formats
+      if (numberFormatColB) outputNumberFormats[rIdx][1] = numberFormatColB; 
+      if (numberFormatColH) outputNumberFormats[rIdx][7] = numberFormatColH; 
     }
 };
 
