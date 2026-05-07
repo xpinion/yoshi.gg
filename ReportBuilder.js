@@ -405,9 +405,10 @@ function formatMetricsStreaksAndRecords(sheet, allStreaksData, currentYear, allT
     return outputValues.length - 1; 
   };
 
-  const buildDualTable = (titleLeft, titleRight, leftData, rightData, headersLeft, formatFnLeft, formatFnRight, numberFormatColB, numberFormatColH) => {
-    addRow(Array(NUM_COLS).fill(""));
+const buildDualTable = (titleLeft, titleRight, leftData, rightData, headersLeft, formatFnLeft, formatFnRight, numberFormatColB, numberFormatColH, headersRightOverride = null) => {
+    addRow(Array(NUM_COLS).fill("")); // Spacer
     const titleRowIdx = addRow([titleLeft, "", "", "", "", "", titleRight, "", "", "", ""]);
+    
     outputBackgrounds[titleRowIdx].fill(STYLES.TITLE_BG);
     outputFontColors[titleRowIdx].fill(STYLES.TITLE_FONT_COLOR);
     outputFontWeights[titleRowIdx].fill("bold");
@@ -415,8 +416,10 @@ function formatMetricsStreaksAndRecords(sheet, allStreaksData, currentYear, allT
     mergeRangesA1.push(`A${titleRowIdx + 1}:E${titleRowIdx + 1}`);
     mergeRangesA1.push(`G${titleRowIdx + 1}:K${titleRowIdx + 1}`);
 
-    const headersRight = [...headersLeft]; 
-    headersRight[0] = "Year"; 
+    // Use override if provided, otherwise default to left headers with 'Year' as the first col
+    const headersRight = headersRightOverride ? headersRightOverride : [...headersLeft]; 
+    if (!headersRightOverride) headersRight[0] = "Year"; 
+    
     const headerRowIdx = addRow([...headersLeft, "", ...headersRight]);
     outputBackgrounds[headerRowIdx].fill(STYLES.HEADER_BG);
     outputFontWeights[headerRowIdx].fill("bold");
@@ -431,6 +434,8 @@ function formatMetricsStreaksAndRecords(sheet, allStreaksData, currentYear, allT
     for (let i = 0; i < maxRows; i++) {
       const row = Array(NUM_COLS).fill("");
       let leftIsBold = false;
+      
+      // Left Table (Cols A-E)
       if (i < leftLen) {
         const item = leftData[i];
         const formatted = formatFnLeft(item, i, prevValLeft); 
@@ -438,6 +443,8 @@ function formatMetricsStreaksAndRecords(sheet, allStreaksData, currentYear, allT
         row[0] = formatted.c1; row[1] = formatted.c2; row[2] = formatted.c3; row[3] = formatted.c4; row[4] = formatted.c5;
         if (formatted.isBold) leftIsBold = true;
       }
+      
+      // Right Table (Cols G-K)
       if (i < rightLen) {
         const item = rightData[i]; 
         const formatted = formatFnRight ? formatFnRight(item) : formatFnLeft(item.data, -1, null); 
@@ -445,14 +452,16 @@ function formatMetricsStreaksAndRecords(sheet, allStreaksData, currentYear, allT
         prevValRight_Year = item.year;
         row[7] = formatted.c2; row[8] = formatted.c3; row[9] = formatted.c4; row[10] = formatted.c5;
       }
+      
       const rIdx = addRow(row);
       if (numberFormatColB) outputNumberFormats[rIdx][1] = numberFormatColB; 
       if (numberFormatColH) outputNumberFormats[rIdx][7] = numberFormatColH; 
+      
       if (leftIsBold) {
-         outputFontWeights[rIdx][0] = "bold"; outputFontWeights[rIdx][1] = "bold"; outputFontWeights[rIdx][2] = "bold"; outputFontWeights[rIdx][3] = "bold"; outputFontWeights[rIdx][4] = "bold";
+         outputFontWeights[rIdx].slice(0, 5).fill("bold");
       }
     }
-  };
+};
 
   // --- 4. Formatters ---
   const clipDateToYear = (date, year, isStartDate) => {
