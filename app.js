@@ -494,9 +494,15 @@ function renderMostDays(year) {
   if (!statsObj) { container.innerHTML = `<div class="loading-text">No playtime logged.</div>`; return; }
 
   const sortedDays = Object.entries(statsObj).map(([name, stats]) => {
-    const dayCount = Array.isArray(stats.days) ? stats.days.length : (stats.days && stats.days.data ? stats.days.data.length : 0);
-    const sysStr = Array.isArray(stats.systems) ? stats.systems.join(', ') : (stats.systems && stats.systems.data ? stats.systems.data.join(', ') : '');
-    return { name, days: dayCount, systems: sysStr };
+    const dayCount = stats.days instanceof Set 
+    ? stats.days.size 
+    : (Array.isArray(stats.days) ? stats.days.length : (stats.days && stats.days.data ? stats.days.data.length : 0));
+
+const sysStr = stats.systems instanceof Set 
+    ? Array.from(stats.systems).join(', ') 
+    : (Array.isArray(stats.systems) ? stats.systems.join(', ') : (stats.systems && stats.systems.data ? stats.systems.data.join(', ') : ''));
+
+return { name, days: dayCount, systems: sysStr };
   }).sort((a, b) => b.days - a.days).slice(0, 100); // <-- CHANGED TO 100
 
   container.innerHTML = sortedDays.map((game, index) => `
