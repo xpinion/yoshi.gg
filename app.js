@@ -109,7 +109,6 @@ async function initDashboard() {
 }
 
 // --- SPOTLIGHT PARSING (Grouped & Bolded) ---
-// --- SPOTLIGHT PARSING (Grouped & Bolded) ---
 function parseTop25Data(top25Data) {
   allTop25Tables = [];
   const { values, backgrounds, fontWeights } = top25Data;
@@ -122,8 +121,10 @@ function parseTop25Data(top25Data) {
     let rows = [];
     if (!values[r+1]) return { headers, rows };
     
+    // Grab headers from the row immediately below the title
     for (let i = 0; i < width; i++) headers.push(values[r+1][c+i]);
     
+    // Grab data rows until we hit another title background
     let dr = r + 2;
     while (dr < values.length && backgrounds[dr] && backgrounds[dr][c] !== TITLE_BG) {
       let rowHasData = false;
@@ -131,7 +132,7 @@ function parseTop25Data(top25Data) {
       for (let i = 0; i < width; i++) {
         const val = values[dr][c+i] || "";
         if (val.trim() !== "") rowHasData = true;
-        // Safety check for fontWeights (in case JSON hasn't refreshed yet)
+        // Check for "bold" weight provided by the sheet
         const isBold = fontWeights && fontWeights[dr] ? fontWeights[dr][c+i] === "bold" : false;
         rowVals.push({ val, isBold });
       }
@@ -142,6 +143,7 @@ function parseTop25Data(top25Data) {
     return { headers, rows };
   };
 
+  // Scan only Column A (Index 0) for titles to initiate a pairing
   for (let r = 0; r < values.length; r++) {
     if (backgrounds[r] && backgrounds[r][0] === TITLE_BG && values[r][0]) {
       const left = extractBlock(r, 0, 5);
@@ -149,7 +151,7 @@ function parseTop25Data(top25Data) {
       
       allTop25Tables.push({
         type: hasRight ? 'dual' : 'single',
-        mainTitle: values[r][0], 
+        mainTitle: values[r][0], // The left title is our key
         left: { title: values[r][0], ...left },
         right: hasRight ? { title: values[r][6], ...extractBlock(r, 6, 5) } : null
       });
@@ -192,7 +194,7 @@ function setupDropdowns() {
   const yearOptionsHtml = `<option value="All-Time">All-Time</option>` + years.map(y => `<option value="${y}">${y}</option>`).join('');
   const defaultChoice = Math.random() < 0.5 ? 'All-Time' : currentYear;
 
-  // Initialize the dropdown options and the master listener
+  // Initialize the dropdown options and attach the MASTER listener
   [compSelect, playedSelect, daysSelect, sessionSelect].forEach(select => {
     if (select) {
       select.innerHTML = yearOptionsHtml;
@@ -201,7 +203,7 @@ function setupDropdowns() {
     }
   });
 
-  // Perform initial render for all four
+  // Initial render for all four
   syncYearDropdowns(defaultChoice);
 
   // 2. Month Select (Independent)
@@ -214,7 +216,7 @@ function setupDropdowns() {
     renderMonthlySummary(monthKeys[0]);
   }
 
-  // --- 3. Rankings & Metadata (Keep these as they were) ---
+  // 3. Rankings & Metadata (Scores)
   const releaseYears = [...new Set(metaGames.map(g => g.releaseYear))].filter(y => y !== 'Unknown').sort().reverse();
   const franchises = [...new Set(metaGames.map(g => g.franchise))].filter(f => f !== 'Unknown' && f !== 'ZZNONE').sort();
   const genres = [...new Set(metaGames.map(g => g.genre))].filter(g => g !== 'Unknown').sort();
@@ -230,6 +232,9 @@ function setupDropdowns() {
     return Object.keys(counts).filter(val => counts[val] >= 3);
   };
 
+  const validFranchises = getValidRandoms('franchise');
+  const validGenres = getValidRandoms('genre');
+
   const top100Select = document.getElementById('top100-year-select');
   if (top100Select) {
     top100Select.innerHTML = `<option value="All-Time">All-Time</option>` + releaseYears.map(y => `<option value="${y}">${y}</option>`).join('');
@@ -241,11 +246,8 @@ function setupDropdowns() {
   const franchiseSelect = document.getElementById('franchise-select');
   if (franchiseSelect) {
     franchiseSelect.innerHTML = franchises.map(f => `<option value="${escapeHTML(f)}">${escapeHTML(f)}</option>`).join('');
-    
-    // Pick from the filtered pool of >=3 games. If none exist (unlikely), fallback to everything.
     const pool = validFranchises.length > 0 ? validFranchises : franchises;
     const randomFranchise = pool[Math.floor(Math.random() * pool.length)];
-    
     franchiseSelect.value = randomFranchise;
     franchiseSelect.addEventListener('change', (e) => renderRankings('franchise', e.target.value, 'franchise-list', 100));
     renderRankings('franchise', randomFranchise, 'franchise-list', 100);
@@ -254,49 +256,42 @@ function setupDropdowns() {
   const genreSelect = document.getElementById('genre-select');
   if (genreSelect) {
     genreSelect.innerHTML = genres.map(g => `<option value="${escapeHTML(g)}">${escapeHTML(g)}</option>`).join('');
-    
-    // Pick from the filtered pool of >=3 games.
     const pool = validGenres.length > 0 ? validGenres : genres;
     const randomGenre = pool[Math.floor(Math.random() * pool.length)];
-    
     genreSelect.value = randomGenre;
     genreSelect.addEventListener('change', (e) => renderRankings('genre', e.target.value, 'genre-list', 100));
     renderRankings('genre', randomGenre, 'genre-list', 100);
   }
+
   // 4. Analysis Dropdown
   const analysisSelect = document.getElementById('analysis-select');
   if (analysisSelect) {
     analysisSelect.addEventListener('change', (e) => renderAnalysis(e.target.value));
   }
 
-// 5. Heatmap Dropdown
+  // 5. Heatmap Dropdown
   const heatmapSelect = document.getElementById('heatmap-select');
   if (heatmapSelect) {
-    heatmapSelect.value = 'gameSummary'; // Force the default value
+    heatmapSelect.value = 'gameSummary'; 
     heatmapSelect.addEventListener('change', (e) => renderHeatmap(e.target.value));
   }
+
   // 6. Game History Dropdown
   const gameHistorySelect = document.getElementById('game-history-select');
   if (gameHistorySelect) {
-    // Get an alphabetical list of every unique game you've ever played
     const uniqueGames = [...new Set(rawData.allEntries.map(e => e.game))].sort((a,b) => a.localeCompare(b));
     gameHistorySelect.innerHTML = uniqueGames.map(g => `<option value="${escapeHTML(g)}">${escapeHTML(g)}</option>`).join('');
-    
-    // Smart Default: Find the game from the absolute last entry in your log
     const mostRecentGame = rawData.allEntries[rawData.allEntries.length - 1].game;
     gameHistorySelect.value = mostRecentGame;
-    
     gameHistorySelect.addEventListener('change', (e) => renderGameHistory(e.target.value));
   }
+
   // 7. Series Archive Dropdown
   const seriesArchiveSelect = document.getElementById('series-archive-select');
   if (seriesArchiveSelect) {
     seriesArchiveSelect.innerHTML = franchises.map(f => `<option value="${escapeHTML(f)}">${escapeHTML(f)}</option>`).join('');
-    
-    // Pick from the filtered pool of >=3 games
     const pool = validFranchises.length > 0 ? validFranchises : franchises;
     const randomSeries = pool[Math.floor(Math.random() * pool.length)];
-    
     seriesArchiveSelect.value = randomSeries;
     seriesArchiveSelect.addEventListener('change', (e) => renderSeriesArchive(e.target.value));
   }
