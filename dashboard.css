@@ -411,3 +411,41 @@ body {
   z-index: 10;
   box-shadow: 0 2px 4px rgba(0,0,0,0.1); /* Adds a tiny drop shadow when scrolling */
 }
+
+/* --- Spotlight Layout Updates --- */
+.spotlight-dual-container {
+  display: flex;
+  gap: 30px;
+  flex-wrap: wrap; /* Stack on mobile */
+  width: 100%;
+}
+
+.spotlight-section {
+  flex: 1;
+  min-width: 450px; /* Prevents tables from getting too narrow */
+}
+
+.spotlight-subtitle {
+  background: var(--primary-green);
+  color: white;
+  padding: 8px 15px;
+  font-size: 1rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin-bottom: 0; /* Attach to table */
+  border-radius: 8px 8px 0 0;
+  text-align: center;
+}
+
+/* Adjust table to fit with sub-header */
+.spotlight-section .top25-table {
+  border-top: none;
+}
+
+/* Mobile Tweak */
+@media (max-width: 1000px) {
+  .spotlight-section {
+    min-width: 100%;
+  }
+}
