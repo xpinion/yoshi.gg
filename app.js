@@ -108,34 +108,41 @@ async function initDashboard() {
   }
 }
 
+// --- TOP 25 / SPOTLIGHT PARSING ---
 function parseTop25Data(top25Data) {
   allTop25Tables = [];
   const values = top25Data.values;
   const backgrounds = top25Data.backgrounds;
-  const TITLE_BG = "#0000ff";
+  const weights = top25Data.fontWeights; // Capture the bolding data!
 
-  // Helper to extract a single table block from the grid
+  if (!values || !backgrounds || !weights) return;
+
+  const TITLE_BG = "#0000ff";
+  const HEADER_BG = "#00ffff";
+
+  // Helper to extract a table block (A-E or G-K) with bolding metadata
   const extractTableBlock = (startRow, startCol, width) => {
     let headers = [];
     let rows = [];
     
-    // Headers are 1 row below title
+    // 1. Get Headers (row below title)
     let hr = startRow + 1;
     for (let c = startCol; c < startCol + width; c++) {
       if (values[hr] && values[hr][c]) headers.push(values[hr][c]);
     }
 
-    // Data rows
+    // 2. Get Data Rows
     let dr = hr + 1;
     while (dr < values.length) {
       let rowHasData = false;
       let rowVals = [];
       for (let c = startCol; c < startCol + width; c++) {
         let val = values[dr][c] || "";
-        rowVals.push(val);
+        let isBold = weights[dr][c] === "bold"; // Detect if the sheet marked this bold
+        rowVals.push({ val, isBold });
         if (val.trim() !== "") rowHasData = true;
       }
-      // Stop if row is empty or we hit another title/header block
+      // Stop if row is empty or we hit another title block
       if (!rowHasData || (backgrounds[dr][startCol] && backgrounds[dr][startCol].toLowerCase() === TITLE_BG)) break;
       rows.push(rowVals);
       dr++;
@@ -143,24 +150,25 @@ function parseTop25Data(top25Data) {
     return { headers, rows };
   };
 
+  // Scan only Column A for "Main" titles to initiate pairing
   for (let r = 0; r < values.length; r++) {
     const bgA = backgrounds[r][0] ? backgrounds[r][0].toLowerCase() : "";
     const titleA = values[r][0];
 
     if (bgA === TITLE_BG && titleA && titleA.trim() !== "") {
+      const leftTable = extractTableBlock(r, 0, 5);
+      
+      // Check if there is a Right-side title in Column G (index 6)
       const bgG = backgrounds[r][6] ? backgrounds[r][6].toLowerCase() : "";
       const titleG = values[r][6];
 
-      const leftData = extractTableBlock(r, 0, 5);
-      
-      // If there's a title in Col G, it's a Dual Spotlight
       if (bgG === TITLE_BG && titleG && titleG.trim() !== "") {
-        const rightData = extractTableBlock(r, 6, 5);
+        const rightTable = extractTableBlock(r, 6, 5);
         allTop25Tables.push({
           type: 'dual',
-          mainTitle: titleA, // Dropdown uses the Left Title
-          left: { title: titleA, ...leftData },
-          right: { title: titleG, ...rightData }
+          mainTitle: titleA,
+          left: { title: titleA, ...leftTable },
+          right: { title: titleG, ...rightTable }
         });
       } else {
         allTop25Tables.push({
@@ -171,11 +179,18 @@ function parseTop25Data(top25Data) {
       }
     }
   }
-
+  
+  // Populate dropdown
   const select = document.getElementById('random-top25-select');
   if (select && allTop25Tables.length > 0) {
-    select.innerHTML = allTop25Tables.map(t => `<option value="${escapeHTML(t.mainTitle)}">${escapeHTML(t.mainTitle)}</option>`).join('');
-    renderRandomTop25();
+     select.innerHTML = allTop25Tables.map(t => `<option value="${escapeHTML(t.mainTitle)}">${escapeHTML(t.mainTitle)}</option>`).join('');
+     const randomIdx = Math.floor(Math.random() * allTop25Tables.length);
+     select.value = allTop25Tables[randomIdx].mainTitle;
+     
+     // RE-ATTACH Listener
+     select.removeEventListener('change', renderRandomTop25);
+     select.addEventListener('change', renderRandomTop25);
+     renderRandomTop25();
   }
 }
 
@@ -628,25 +643,29 @@ function renderRandomTop25() {
       <table class="top25-table">
         <thead><tr>${table.headers.map(h => `<th>${escapeHTML(h)}</th>`).join('')}</tr></thead>
         <tbody>
-          ${table.rows.map(r => `<tr>${r.map(c => `<td><span class="hover-trigger" data-game="${escapeHTML(c)}">${escapeHTML(c)}</span></td>`).join('')}</tr>`).join('')}
+          ${table.rows.map(row => `
+            <tr>
+              ${row.map(cell => {
+                const boldStyle = cell.isBold ? 'style="font-weight: 900; color: #000;"' : '';
+                return `<td ${boldStyle}><span class="hover-trigger" data-game="${escapeHTML(cell.val)}">${escapeHTML(cell.val)}</span></td>`;
+              }).join('')}
+            </tr>`).join('')}
         </tbody>
       </table>
     </div>
   `;
 
-  let html = '';
+  let htmlContent = '';
   if (pair.type === 'dual') {
-    html = `
-      <div class="spotlight-dual-container">
-        ${renderTableHtml(pair.left, pair.left.title)}
-        ${renderTableHtml(pair.right, pair.right.title)}
-      </div>
-    `;
+    htmlContent = `<div class="spotlight-dual-container">
+      ${renderTableHtml(pair.left, pair.left.title)}
+      ${renderTableHtml(pair.right, pair.right.title)}
+    </div>`;
   } else {
-    html = renderTableHtml(pair, pair.mainTitle);
+    htmlContent = renderTableHtml(pair, pair.mainTitle);
   }
 
-  document.getElementById('random-top25-content').innerHTML = html;
+  document.getElementById('random-top25-content').innerHTML = htmlContent;
 }
 
 // --- ANALYSIS TABLES ---
