@@ -74,7 +74,9 @@ async function initDashboard() {
     rawData = JSON.parse(rawText, (key, value) => {
       // ONLY Revive Sets (Leave Dates as strings so .startsWith() and .split() work!)
       if (value && typeof value === 'object' && value._dataType === 'Set') {
-        return new Set(value.data);
+        // Look for the array in value.value, falling back to value.data just in case
+        const arrayItems = value.value || value.data || [];
+        return new Set(arrayItems);
       }
       return value;
     });
