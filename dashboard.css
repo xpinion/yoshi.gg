@@ -412,30 +412,32 @@ body {
   box-shadow: 0 2px 4px rgba(0,0,0,0.1); /* Adds a tiny drop shadow when scrolling */
 }
 
-/* --- Spotlight Layout Updates --- */
 .spotlight-dual-container {
-  display: flex;
-  gap: 30px;
-  flex-wrap: wrap; /* Stack on mobile */
-  width: 100%;
+    display: flex;
+    gap: 20px;
+    flex-wrap: wrap;
 }
 
 .spotlight-section {
-  flex: 1;
-  min-width: 450px; /* Prevents tables from getting too narrow */
+    flex: 1;
+    min-width: 400px;
 }
 
 .spotlight-subtitle {
   background: var(--primary-green);
-  color: white;
-  padding: 8px 15px;
-  font-size: 1rem;
+  color: #fff;
+  padding: 10px;
+  font-size: 0.9rem;
   font-weight: 800;
-  text-transform: uppercase;
-  letter-spacing: 1px;
-  margin-bottom: 0; /* Attach to table */
-  border-radius: 8px 8px 0 0;
   text-align: center;
+  border-radius: 8px 8px 0 0;
+  margin: 0;
+  text-transform: uppercase;
+}
+
+/* Ensure bolded items pop */
+.top25-table td[style*="font-weight"] {
+    border-left: 3px solid var(--primary-green); /* Optional: adds a green stripe to bolded rows */
 }
 
 /* Adjust table to fit with sub-header */
