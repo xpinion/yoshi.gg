@@ -113,6 +113,8 @@ body {
 
 /* List Item Styles (The mockup rows) */
 .list-item {
+  padding: 8px 12px;
+  margin-bottom: 8px;
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -140,7 +142,7 @@ body {
 .item-rank {
   font-weight: 800;
   color: var(--text-muted);
-  font-size: 1.1rem;
+  font-size: 0.95rem;
   min-width: 45px;
 }
 
@@ -148,29 +150,34 @@ body {
   display: flex;
   flex-direction: column;
 }
-
 .item-title {
+  font-size: 0.9rem; /* Shrunk down from 1.05rem */
+  
+  /* Existing properties */
   font-weight: 700;
-  font-size: 1.05rem;
   color: #222;
 }
 
 .item-sub {
-  font-size: 0.8rem;
+  font-size: 0.75rem; /* Shrunk down from 0.8rem */
+  
+  /* Existing properties */
   color: #aaa;
   font-weight: 600;
   margin-top: 2px;
 }
 
 .item-badge {
+  font-size: 0.8rem; /* Shrunk down from 0.9rem */
+  padding: 4px 10px; /* Reduced padding inside the badge */
+  
+  /* Existing properties */
   background: var(--badge-bg);
   color: var(--badge-text);
-  padding: 6px 12px;
-  border-radius: 6px;
-  font-weight: 800;
-  font-size: 0.95rem;
-  white-space: nowrap;
-  letter-spacing: 0.5px;
+  border-radius: 20px;
+  font-weight: 700;
+  min-width: 80px;
+  text-align: center;
 }
 
 .loading-text {
