@@ -412,17 +412,6 @@ body {
   box-shadow: 0 2px 4px rgba(0,0,0,0.1); /* Adds a tiny drop shadow when scrolling */
 }
 
-.spotlight-dual-container {
-    display: flex;
-    gap: 20px;
-    flex-wrap: wrap;
-}
-
-.spotlight-section {
-    flex: 1;
-    min-width: 400px;
-}
-
 .spotlight-subtitle {
   background: var(--primary-green);
   color: #fff;
@@ -435,9 +424,20 @@ body {
   text-transform: uppercase;
 }
 
-/* Ensure bolded items pop */
-.top25-table td[style*="font-weight"] {
-    border-left: 3px solid var(--primary-green); /* Optional: adds a green stripe to bolded rows */
+/* Highlight bolded entries in spotlight with a subtle green tint */
+.top25-table td[style*="font-weight: 800"] {
+  border-left: 4px solid var(--primary-green);
+}
+
+.spotlight-dual-container {
+  display: flex;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+
+.spotlight-section {
+  flex: 1;
+  min-width: 400px;
 }
 
 /* Adjust table to fit with sub-header */
