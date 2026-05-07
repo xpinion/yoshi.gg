@@ -109,27 +109,31 @@ async function initDashboard() {
 }
 
 // --- SPOTLIGHT PARSING (Grouped & Bolded) ---
+// --- SPOTLIGHT PARSING (Grouped & Bolded) ---
 function parseTop25Data(top25Data) {
   allTop25Tables = [];
   const { values, backgrounds, fontWeights } = top25Data;
-  if (!values || !backgrounds || !fontWeights) return;
+  if (!values || !backgrounds) return;
 
   const TITLE_BG = "#0000ff";
 
   const extractBlock = (r, c, width) => {
     let headers = [];
     let rows = [];
+    if (!values[r+1]) return { headers, rows };
+    
     for (let i = 0; i < width; i++) headers.push(values[r+1][c+i]);
     
     let dr = r + 2;
-    while (dr < values.length && backgrounds[dr][c] !== TITLE_BG) {
+    while (dr < values.length && backgrounds[dr] && backgrounds[dr][c] !== TITLE_BG) {
       let rowHasData = false;
       let rowVals = [];
       for (let i = 0; i < width; i++) {
         const val = values[dr][c+i] || "";
         if (val.trim() !== "") rowHasData = true;
-        // Capture bolding from the fontWeights array
-        rowVals.push({ val, isBold: fontWeights[dr][c+i] === "bold" });
+        // Safety check for fontWeights (in case JSON hasn't refreshed yet)
+        const isBold = fontWeights && fontWeights[dr] ? fontWeights[dr][c+i] === "bold" : false;
+        rowVals.push({ val, isBold });
       }
       if (!rowHasData) break;
       rows.push(rowVals);
@@ -139,13 +143,13 @@ function parseTop25Data(top25Data) {
   };
 
   for (let r = 0; r < values.length; r++) {
-    if (backgrounds[r][0] === TITLE_BG && values[r][0]) {
+    if (backgrounds[r] && backgrounds[r][0] === TITLE_BG && values[r][0]) {
       const left = extractBlock(r, 0, 5);
       const hasRight = backgrounds[r][6] === TITLE_BG;
       
       allTop25Tables.push({
         type: hasRight ? 'dual' : 'single',
-        mainTitle: values[r][0], // Use the title in A as the master key
+        mainTitle: values[r][0], 
         left: { title: values[r][0], ...left },
         right: hasRight ? { title: values[r][6], ...extractBlock(r, 6, 5) } : null
       });
@@ -155,7 +159,6 @@ function parseTop25Data(top25Data) {
   const select = document.getElementById('random-top25-select');
   if (select && allTop25Tables.length > 0) {
     select.innerHTML = allTop25Tables.map(t => `<option value="${escapeHTML(t.mainTitle)}">${escapeHTML(t.mainTitle)}</option>`).join('');
-    // Use .onchange to clear old listeners and prevent the "nothing changes" bug
     select.onchange = renderRandomTop25; 
     renderRandomTop25();
   }
@@ -173,10 +176,12 @@ function setupDropdowns() {
   const sessionSelect = document.getElementById('year-select-session');
 
   const syncYearDropdowns = (val) => {
-    const selects = [compSelect, playedSelect, daysSelect, sessionSelect];
-    selects.forEach(s => { if (s) s.value = val; });
+    // Update all dropdown values to match
+    [compSelect, playedSelect, daysSelect, sessionSelect].forEach(s => {
+      if (s) s.value = val;
+    });
     
-    // Fire all 4 render functions
+    // Refresh all 4 cards simultaneously
     renderCompletions(val);
     renderMostPlayed(val);
     renderMostDays(val);
@@ -187,6 +192,7 @@ function setupDropdowns() {
   const yearOptionsHtml = `<option value="All-Time">All-Time</option>` + years.map(y => `<option value="${y}">${y}</option>`).join('');
   const defaultChoice = Math.random() < 0.5 ? 'All-Time' : currentYear;
 
+  // Initialize the dropdown options and the master listener
   [compSelect, playedSelect, daysSelect, sessionSelect].forEach(select => {
     if (select) {
       select.innerHTML = yearOptionsHtml;
@@ -195,10 +201,10 @@ function setupDropdowns() {
     }
   });
 
-  // Initial render
+  // Perform initial render for all four
   syncYearDropdowns(defaultChoice);
 
-  // 2. Month Select
+  // 2. Month Select (Independent)
   const monthKeys = Object.keys(rawData.metrics.monthlyStats).sort().reverse();
   const monthSelect = document.getElementById('month-select');
   if (monthSelect && monthKeys.length > 0) {
@@ -208,52 +214,11 @@ function setupDropdowns() {
     renderMonthlySummary(monthKeys[0]);
   }
 
-  // --- NEW YEAR DROPDOWN LOGIC ---
-  const years = Object.keys(rawData.metrics.yearlyGameStats).sort().reverse();
-  const yearOptionsHtml = `<option value="All-Time">All-Time</option>` + years.map(y => `<option value="${y}">${y}</option>`).join('');
-  
-  const compSelect = document.getElementById('year-select-comp');
-  const playedSelect = document.getElementById('year-select-played');
-  const daysSelect = document.getElementById('year-select-days');
-  const sessionSelect = document.getElementById('year-select-session');
-
-  // Randomize the default selection on page load (50/50 chance)
-  const defaultChoice = Math.random() < 0.5 ? 'All-Time' : currentYear;
-
-  if (compSelect) {
-    compSelect.innerHTML = yearOptionsHtml; 
-    compSelect.value = defaultChoice;
-    compSelect.addEventListener('change', (e) => renderCompletions(e.target.value));
-    renderCompletions(defaultChoice);
-  }
-
-  if (playedSelect) {
-    playedSelect.innerHTML = yearOptionsHtml;
-    playedSelect.value = defaultChoice; 
-    playedSelect.addEventListener('change', (e) => renderMostPlayed(e.target.value));
-    renderMostPlayed(defaultChoice); 
-  }
-
-  if (daysSelect) {
-    daysSelect.innerHTML = yearOptionsHtml;
-    daysSelect.value = defaultChoice; 
-    daysSelect.addEventListener('change', (e) => renderMostDays(e.target.value));
-    renderMostDays(defaultChoice); 
-  }
-
-  if (sessionSelect) {
-    sessionSelect.innerHTML = yearOptionsHtml;
-    sessionSelect.value = defaultChoice; 
-    sessionSelect.addEventListener('change', (e) => renderLongestSession(e.target.value));
-    renderLongestSession(defaultChoice); 
-  }
-
-// 3. Rankings Dropdowns
+  // --- 3. Rankings & Metadata (Keep these as they were) ---
   const releaseYears = [...new Set(metaGames.map(g => g.releaseYear))].filter(y => y !== 'Unknown').sort().reverse();
   const franchises = [...new Set(metaGames.map(g => g.franchise))].filter(f => f !== 'Unknown' && f !== 'ZZNONE').sort();
   const genres = [...new Set(metaGames.map(g => g.genre))].filter(g => g !== 'Unknown').sort();
 
-  // --- NEW: Helper to find categories with at least 3 rated games ---
   const getValidRandoms = (key) => {
     const counts = {};
     metaGames.filter(g => g.score !== null).forEach(g => {
@@ -264,9 +229,6 @@ function setupDropdowns() {
     });
     return Object.keys(counts).filter(val => counts[val] >= 3);
   };
-
-  const validFranchises = getValidRandoms('franchise');
-  const validGenres = getValidRandoms('genre');
 
   const top100Select = document.getElementById('top100-year-select');
   if (top100Select) {
