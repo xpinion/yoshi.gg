@@ -468,9 +468,13 @@ function renderMostPlayed(year) {
   if (!statsObj) { container.innerHTML = `<div class="loading-text">No playtime logged.</div>`; return; }
 
   const sortedGames = Object.entries(statsObj).map(([name, stats]) => {
-    const sysStr = Array.isArray(stats.systems) ? stats.systems.join(', ') : (stats.systems && stats.systems.data ? stats.systems.data.join(', ') : '');
+    // Apply the exact same Set logic we used for the 'days' column
+    const sysStr = stats.systems instanceof Set 
+        ? Array.from(stats.systems).join(', ') 
+        : (Array.isArray(stats.systems) ? stats.systems.join(', ') : (stats.systems && stats.systems.data ? stats.systems.data.join(', ') : ''));
+        
     return { name, seconds: stats.totalSeconds, systems: sysStr };
-  }).sort((a, b) => b.seconds - a.seconds).slice(0, 100); // <-- CHANGED TO 100
+  }).sort((a, b) => b.seconds - a.seconds).slice(0, 100);
 
   container.innerHTML = sortedGames.map((game, index) => `
     <div class="list-item">
