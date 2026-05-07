@@ -70,7 +70,18 @@ async function initDashboard() {
       fetch('top25_data.json')
     ]);
 
-    rawData = await rawResponse.json();
+    const rawText = await rawResponse.text();
+rawData = JSON.parse(rawText, (key, value) => {
+  // Revive Dates
+  if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/.test(value)) {
+    return new Date(value);
+  }
+  // Revive Sets
+  if (value && typeof value === 'object' && value._dataType === 'Set') {
+    return new Set(value.data);
+  }
+  return value;
+});
     const metaData = await metaResponse.json();
     const top25Data = await top25Response.json();
 
