@@ -533,20 +533,24 @@ function renderLongestSession(year) {
     
   if (sessions.length === 0) { container.innerHTML = `<div class="loading-text">No sessions logged.</div>`; return; }
 
-  const sortedSessions = sessions.sort((a, b) => b.time - a.time).slice(0, 100); // <-- CHANGED TO 100
+  const sortedSessions = sessions.sort((a, b) => b.time - a.time).slice(0, 100);
   
-  container.innerHTML = sortedSessions.map((s, index) => `
+  container.innerHTML = sortedSessions.map((s, index) => {
+    // Choose the format based on the 'year' dropdown selection
+    const displayDate = year === 'All-Time' ? formatFullDate(s.date) : formatShortDate(s.date);
+    
+    return `
     <div class="list-item">
       <div class="item-info">
         <span class="item-rank">#${index + 1}</span>
         <div class="item-text">
           <span class="item-title hover-trigger" data-game="${escapeHTML(s.game)}">${escapeHTML(s.game)}${s.system ? ` (${escapeHTML(s.system)})` : ''}</span>
-          <span class="item-sub">on ${formatShortDate(s.date)}</span>
+          <span class="item-sub">on ${displayDate}</span>
         </div>
       </div>
       <div class="item-badge">${formatTime(s.time)}</div>
     </div>
-  `).join('');
+  `}).join('');
 }
 
 function renderRankings(filterType, filterValue, containerId, limit) {
