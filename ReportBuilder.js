@@ -629,7 +629,7 @@ const buildDualTable = (titleLeft, titleRight, leftData, rightData, headersLeft,
           return { c2: item.maxCount, c3: "-", c4: "-", c5: "(Many games tied at 1 year)", valForTie: item.maxCount };
       }
       let detail = "";
-      if (item.leaders.length > 1) {
+      if (item.leaders.length > 15) {
           detail = `(${item.leaders.length} Games Tied at ${item.maxCount} Years)`;
       } else {
           detail = item.leaders.map(l => `${l.game} (${Array.from(l.systems || []).join(', ')})`).join(' / ');
