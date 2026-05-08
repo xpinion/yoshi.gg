@@ -164,8 +164,6 @@ function writeTop25Report(sheet, allEntries, playthroughHistory, metrics) {
   // --- END OF ADDED CODE ---
 
   const processPresence = (presenceObj) => Object.values(presenceObj).map(item => ({
-
-  const processPresence = (presenceObj) => Object.values(presenceObj).map(item => ({
       name: item.name, 
       count: item.years ? item.years.size : item.months.size,
       values: Array.from(item.years || item.months).sort((a, b) => (typeof a === 'string') ? a.localeCompare(b) : a - b),
