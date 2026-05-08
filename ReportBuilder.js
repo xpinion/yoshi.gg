@@ -172,7 +172,7 @@ function writeTop25Report(sheet, allEntries, playthroughHistory, metrics) {
             data: item,
             isTie: metrics.yearlySystemStreaks[year].length > 1
         }))),
-    oneSittingCompletions: metrics.oneSittingCompletions,
+    oneSittingCompletions: getTopList(metrics.oneSittingCompletions, i => timeStringToSeconds(i.finalPtLifetime)),
     yearlyOneSittingCompletions: getYearlyBests('event', metrics.oneSittingCompletions.map(i => ({...i, seconds: timeStringToSeconds(i.finalPtLifetime)})), 'seconds', 'lastDate'),
     
     topGamingStreaks: getTopList(metrics.gamingStreaks, i => i.length),
