@@ -407,7 +407,7 @@ function renderMonthlySummary(monthKey) {
   html += `<tr class="grand-total-row"><td colspan="2" class="text-left">Grand Total</td><td class="text-center">${formatHHMM(totalSecondsInMonth)}</td><td class="text-center">${monthData.allEntryDays.size}/${daysInMonth}</td><td colspan="8"></td></tr>`;
 
   // 4. Print the games
-  sortedGames.forEach(game, index => {
+  sortedGames.forEach((game, index) => {
     const activeTags = Object.keys(game.activePlaythroughs);
     activeTags.forEach(ptTag => {
       const ptLocal = game.activePlaythroughs[ptTag]; const ptHistory = rawData.playthroughHistory[ptTag];
