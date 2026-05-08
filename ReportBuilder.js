@@ -126,6 +126,45 @@ function writeTop25Report(sheet, allEntries, playthroughHistory, metrics) {
       systems: metrics.allTimeGameStats[game].systems 
   }));
 
+  // --- ADDED IN STEP 1: Calculate running leader for "Most Years Played" ---
+  let minPresenceYear = currentYear;
+  for (const years of Object.values(metrics.gameYearlyPresence)) {
+      for (const y of years) {
+          if (parseInt(y) < minPresenceYear) minPresenceYear = parseInt(y);
+      }
+  }
+  
+  const yearlyRunningYearsPlayed = [];
+  for (let y = currentYear; y >= minPresenceYear; y--) {
+      let maxYearsCount = 0;
+      let leaders = [];
+      
+      for (const [game, yearsSet] of Object.entries(metrics.gameYearlyPresence)) {
+          // Only count years that occurred ON or BEFORE the current evaluation year
+          const playedYearsUpToY = Array.from(yearsSet).filter(yearStr => parseInt(yearStr) <= y);
+          const count = playedYearsUpToY.length;
+          
+          if (count > maxYearsCount) {
+              maxYearsCount = count;
+              leaders = [{ game, count, systems: metrics.allTimeGameStats[game].systems }];
+          } else if (count === maxYearsCount && maxYearsCount > 0) {
+              leaders.push({ game, count, systems: metrics.allTimeGameStats[game].systems });
+          }
+      }
+      
+      // Break ties by looking at total all-time playtime
+      leaders.sort((a, b) => metrics.allTimeGameStats[b.game].totalSeconds - metrics.allTimeGameStats[a.game].totalSeconds);
+
+      yearlyRunningYearsPlayed.push({
+          year: y,
+          maxCount: maxYearsCount,
+          leaders: leaders
+      });
+  }
+  // --- END OF ADDED CODE ---
+
+  const processPresence = (presenceObj) => Object.values(presenceObj).map(item => ({
+
   const processPresence = (presenceObj) => Object.values(presenceObj).map(item => ({
       name: item.name, 
       count: item.years ? item.years.size : item.months.size,
@@ -189,6 +228,7 @@ function writeTop25Report(sheet, allEntries, playthroughHistory, metrics) {
 
     topGamesByYearCount: getTopList(gamesByYearCountProcessed, i => i.count, (a,b) => b.lastPlayed - a.lastPlayed),
     yearlyMostPlayedGame: getYearlyBests('stats', null, 'totalSeconds', metrics.yearlyGameStats),
+    yearlyRunningYearsPlayed: yearlyRunningYearsPlayed,
 
     topGamesByMonthCount: getTopList(gamesByMonthCountProcessed, i => i.count, (a,b) => b.lastPlayed - a.lastPlayed),
     yearlyGamesByMonthCount: getYearlyBests('stats', null, 'months.size', metrics.gameMonthlyPresencePerYear),
@@ -344,7 +384,7 @@ function formatMetricsStreaksAndRecords(sheet, allStreaksData, currentYear, allT
   const {
     topGamingStreaks, yearlyGamingStreaks, systemStreaks, yearlySystemStreaks,
     oneSittingCompletions, yearlyOneSittingCompletions, topBreakStreaks, yearlyBreakStreaks,
-    topSameGameStreaks, yearlySameGameStreaks, topGamesByYearCount, yearlyMostPlayedGame, 
+    topSameGameStreaks, yearlySameGameStreaks, topGamesByYearCount, yearlyMostPlayedGame, yearlyRunningYearsPlayed,
     topGamesByMonthCount, yearlyGamesByMonthCount, yearlySeriesByMonthCount, yearlyGenreByMonthCount,
     yearlyDeveloperByMonthCount, yearlyPublisherByMonthCount, topGameOverlaps, yearlyGameOverlaps,
     topSeries, yearlySeries, topMultiplayerGames, yearlyMultiplayerGames,
@@ -585,7 +625,32 @@ const buildDualTable = (titleLeft, titleRight, leftData, rightData, headersLeft,
   buildDualTable("Top 25 Same-Game Streaks", "Longest Same-Game Streak by Year", topSameGameStreaks, yearlySameGameStreaks, ["Rank", "Length (Days)", "Start Date", "End Date", "Videogame [Time Spent]"], fmt_SameGameStreak, fmt_SameGameStreak_Yearly, "0", "0");
   buildDualTable("Top 25 Consecutive Entries for One System", "Longest System Streak by Year", systemStreaks, yearlySystemStreaks, ["Rank", "Entries", "Start", "End", "System"], (item, i, prev) => { const val = item.length; const rank = (val === prev) ? "" : `'${i + 1}`; return { c1: rank, c2: val, c3: formatDate(item.start, true), c4: formatDate(item.end, true), c5: item.system, valForTie: val, isBold: (item.end instanceof Date && item.end.getFullYear() === currentYear) }; }, (w) => { const item = w.data; if (!item) return { c2: "", c3: "", c4: "", c5: "" }; return { c2: item.value, c3: formatDate(item.minDate, true), c4: formatDate(item.maxDate, true), c5: item.system, valForTie: item.value }; }, "0", "0");
   buildDualTable("Top 25 One-Sitting Completions", "Longest One-Sitting Clear by Year", oneSittingCompletions, yearlyOneSittingCompletions, ["Rank", "Time", "Date", "System", "Game [Note]"], (item, i, prev) => { const val = timeStringToSeconds(item.finalPtLifetime); const rank = (val === prev) ? "" : `'${i + 1}`; const detail = `${item.gameName} (${item.system}) [${item.finalNote}]`; return { c1: rank, c2: item.finalPtLifetime, c3: formatDate(item.lastDate, true), c4: item.system, c5: detail, valForTie: val, isBold: (item.lastDate instanceof Date && item.lastDate.getFullYear() === currentYear) }; }, (w) => { const d = w.data; if (!d) return { c2: "", c3: "", c4: "", c5: "" }; return { c2: d.finalPtLifetime, c3: formatDate(d.lastDate, true), c4: d.system, c5: `${d.gameName} (${d.system}) [${d.finalNote}]`, valForTie: timeStringToSeconds(d.finalPtLifetime) }; }, "[hh]:mm", "[hh]:mm" );
-  buildDualTable("Games Played Across Most Years", "Most Played Game by Year", topGamesByYearCount, yearlyMostPlayedGame, ["Rank", "# Years", "Start", "Last", "Game [Years]"], (item, i, prev) => { const val = item.count; const rank = (val === prev) ? "" : `'${i + 1}`; const systems = item.systems ? `(${Array.from(item.systems).join(', ')}) ` : ""; const detail = `${item.game} ${systems}[${compressYearRanges(item.years).join(', ')}]`; return { c1: rank, c2: val, c3: formatDate(item.firstPlayed, true), c4: formatDate(item.lastPlayed, true), c5: detail, valForTie: val, isBold: item.lastPlayed instanceof Date && item.lastPlayed.getFullYear()===currentYear }; }, fmt_Stats_Right, "0", "[hh]:mm");
+  const fmt_RunningYears_Yearly = (item) => {
+      // Catch the 2015 tie state you requested, or any year with no repeat games
+      if (item.maxCount <= 1 || (item.year === 2015 && item.maxCount === 1)) {
+          return { c2: item.maxCount, c3: "-", c4: "-", c5: "(Many games tied at 1 year)", valForTie: item.maxCount };
+      }
+      let detail = "";
+      if (item.leaders.length > 3) {
+          detail = `(${item.leaders.length} Games Tied at ${item.maxCount} Years)`;
+      } else {
+          detail = item.leaders.map(l => `${l.game} (${Array.from(l.systems || []).join(', ')})`).join(' / ');
+      }
+      return { c2: item.maxCount, c3: "-", c4: "-", c5: detail, valForTie: item.maxCount };
+  };
+
+  buildDualTable(
+      "Games Played Across Most Years", 
+      "Active Leader (Most Years) by Year", 
+      topGamesByYearCount, 
+      yearlyRunningYearsPlayed, 
+      ["Rank", "# Years", "Start", "Last", "Game [Years]"], 
+      (item, i, prev) => { const val = item.count; const rank = (val === prev) ? "" : `'${i + 1}`; const systems = item.systems ? `(${Array.from(item.systems).join(', ')}) ` : ""; const detail = `${item.game} ${systems}[${compressYearRanges(item.years).join(', ')}]`; return { c1: rank, c2: val, c3: formatDate(item.firstPlayed, true), c4: formatDate(item.lastPlayed, true), c5: detail, valForTie: val, isBold: item.lastPlayed instanceof Date && item.lastPlayed.getFullYear()===currentYear }; }, 
+      fmt_RunningYears_Yearly, 
+      "0", 
+      "0",
+      ["Year", "# Years", "-", "-", "Active Leader(s)"]
+  );
   buildDualTable("Games Played Across Most Months", "Game Played Across Most Months during Calendar Year", topGamesByMonthCount, yearlyGamesByMonthCount, ["Rank", "# Months", "First", "Last", "Game [Months]"], (item, i, prev) => { const val = item.count; const rank = (val === prev) ? "" : `'${i + 1}`; const systems = item.systems ? `(${Array.from(item.systems).join(', ')}) ` : ""; const detail = `${item.game} ${systems}[${item.months.join(', ')}]`; return { c1: rank, c2: val, c3: formatDate(item.firstPlayed, true), c4: formatDate(item.lastPlayed, true), c5: detail, valForTie: val, isBold: item.lastPlayed instanceof Date && item.lastPlayed.getFullYear() === currentYear }; }, fmt_Stats_Count_Right, "0", "0");
   buildDualTable("Top 25 Most Played Series", "Most Played Series by Year (Min 2 Games)", topSeries, yearlySeries, ["Rank", "Total Time", "Start", "End", "Series"], (item, i, p) => fmt_Stats(item, i, p), fmt_Stats_Right, "[hh]:mm", "[hh]:mm");
   buildDualTable("Top 25 Multiplayer Games", "Top Multiplayer Game by Year", topMultiplayerGames, yearlyMultiplayerGames, ["Rank", "Total Time", "Start", "End", "Videogame"], (item, i, p) => { const name = item.name; const totalSeconds = item.totalSeconds; return { c1: (totalSeconds===p?"":`'${i+1}`), c2: secondsToTimeString(totalSeconds), c3: formatDate(item.minDate, true), c4: formatDate(item.maxDate, true), c5: `${name} (${Array.from(item.systems).join(', ')})`, valForTie: totalSeconds, isBold: item.maxDate instanceof Date && item.maxDate.getFullYear()===currentYear }; }, fmt_Stats_Right, "[hh]:mm", "[hh]:mm");
