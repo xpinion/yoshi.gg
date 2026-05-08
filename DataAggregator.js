@@ -297,7 +297,8 @@ function createMetricsObject() {
     milestones: [],
     firsts: { system: new Set(), genre: new Set(), releaseYear: new Set() },
     totalTimeSec: 0, uniqueGamesPlayed: new Set(), systemTimeSec: {},
-    genreUniqueGames: {}, devUniqueGames: {}, pubUniqueGames: {},
+    genreUniqueGames: {}, devUniqueGames: {}, pubUniqueGames: {}, seriesUniqueGames: {},
+    anniversariesHit: new Set(),
     
     multiplayerGameData: {}, busiestMultiplayerMonthData: {}, busiestMultiplayerDayData: {},
     yearlyMultiplayerGameStats: {}, allMultiplayerEntries: [],
@@ -582,19 +583,19 @@ function updateMetadataStats(metrics, ctx) {
 function updateRankingSnapshots(metrics, previousRankings) {
   previousRankings.time = new Map(Object.entries(metrics.allTimeGameStats)
     .sort((a, b) => b[1].totalSeconds - a[1].totalSeconds)
-    .slice(0, 10).map(([name,], i) => [name, i + 1]));
+    .slice(0, 25).map(([name,], i) => [name, i + 1]));
 
   previousRankings.days = new Map(Object.entries(metrics.allTimeGameStats)
     .sort((a, b) => b[1].days.size - a[1].days.size)
-    .slice(0, 10).map(([name,], i) => [name, i + 1]));
+    .slice(0, 25).map(([name,], i) => [name, i + 1]));
 
   previousRankings.sessions = new Map(metrics.singleDaySessions
     .sort((a, b) => b.time - a.time)
-    .slice(0, 10).map((s, i) => [`${s.game}-${s.date.getTime()}`, i + 1]));
+    .slice(0, 25).map((s, i) => [`${s.game}-${s.date.getTime()}`, i + 1]));
 
   previousRankings.systems = new Map(Object.entries(metrics.allTimeSystemStats)
     .sort((a, b) => b[1] - a[1])
-    .slice(0, 10).map(([name,], i) => [name, i + 1]));
+    .slice(0, 25).map(([name,], i) => [name, i + 1]));
 }
 
 function checkMilestones(metrics, ctx, index, oldRanks, yearlyGameLeader, yearlySystemLeader, yearlyTopSession) {
@@ -643,62 +644,67 @@ function checkMilestones(metrics, ctx, index, oldRanks, yearlyGameLeader, yearly
     }
   }
 
+  // --- NEW: Franchise Tracking & Metadata ---
   const metaChecks = [
-    { key: 'genre', name: 'Genre', target: metrics.genreUniqueGames },
-    { key: 'developer', name: 'Developer', target: metrics.devUniqueGames },
-    { key: 'publisher', name: 'Publisher', target: metrics.pubUniqueGames }
+    { key: 'genre', name: 'Genre', target: metrics.genreUniqueGames, freq: 10 },
+    { key: 'developer', name: 'Developer', target: metrics.devUniqueGames, freq: 10 },
+    { key: 'publisher', name: 'Publisher', target: metrics.pubUniqueGames, freq: 10 },
+    { key: 'series', name: 'Franchise', target: metrics.seriesUniqueGames, freq: 5 }
   ];
   metaChecks.forEach(check => {
     const val = entry[check.key];
-    if (val && val !== "N/A") {
+    if (val && val !== "N/A" && val !== "ZZNONE") {
       if (!check.target[val]) check.target[val] = new Set();
       const prevSize = check.target[val].size;
       check.target[val].add(game);
-      if (check.target[val].size > prevSize && check.target[val].size > 0 && check.target[val].size % 10 === 0) {
+      
+      if (check.target[val].size > prevSize && check.target[val].size > 0 && check.target[val].size % check.freq === 0) {
         let detStr = `Played the ${check.target[val].size}th unique game from ${check.name.toLowerCase()} ${val}`;
         if (check.key === 'genre') detStr = `Played the ${check.target[val].size}th unique ${val} game`;
+        if (check.key === 'series') detStr = `Played the ${check.target[val].size}th unique game in the ${val} franchise`;
         metrics.milestones.push({ date: entry.date, details: `${detStr}: ${gameWithSystem}.` });
       }
     }
   });
 
-  const newTop10Time = Object.entries(metrics.allTimeGameStats).sort((a, b) => b[1].totalSeconds - a[1].totalSeconds).slice(0, 10);
-  newTop10Time.forEach(([gameName, stats], i) => {
+  // --- NEW: Top 25 Tracker ---
+  const newTop25Time = Object.entries(metrics.allTimeGameStats).sort((a, b) => b[1].totalSeconds - a[1].totalSeconds).slice(0, 25);
+  newTop25Time.forEach(([gameName, stats], i) => {
     const newRank = i + 1;
     const oldRank = oldRanks.time.get(gameName);
     if (!oldRank || newRank < oldRank) {
-      const details = oldRank ? `jumped from #${oldRank} to #${newRank} in Most Played` : `entered the Top 10 Most Played at #${newRank}`;
+      const details = oldRank ? `jumped from #${oldRank} to #${newRank} in Most Played` : `entered the Top 25 Most Played at #${newRank}`;
       metrics.milestones.push({ date: entry.date, details: `${gameName} (${Array.from(stats.systems).join(', ')}) ${details} with ${secondsToTimeString(stats.totalSeconds)}.` });
     }
   });
 
-  const newTop10Days = Object.entries(metrics.allTimeGameStats).sort((a, b) => b[1].days.size - a[1].days.size).slice(0, 10);
-  newTop10Days.forEach(([gameName, stats], i) => {
+  const newTop25Days = Object.entries(metrics.allTimeGameStats).sort((a, b) => b[1].days.size - a[1].days.size).slice(0, 25);
+  newTop25Days.forEach(([gameName, stats], i) => {
     const newRank = i + 1;
     const oldRank = oldRanks.days.get(gameName);
     if (!oldRank || newRank < oldRank) {
-      const details = oldRank ? `jumped from #${oldRank} to #${newRank} in Most Days Played` : `entered the Top 10 Most Days Played at #${newRank}`;
+      const details = oldRank ? `jumped from #${oldRank} to #${newRank} in Most Days Played` : `entered the Top 25 Most Days Played at #${newRank}`;
       metrics.milestones.push({ date: entry.date, details: `${gameName} (${Array.from(stats.systems).join(', ')}) ${details} with ${stats.days.size} days.` });
     }
   });
 
-  const newTop10Systems = Object.entries(metrics.allTimeSystemStats).sort((a, b) => b[1] - a[1]).slice(0, 10);
-  newTop10Systems.forEach(([systemName, time], i) => {
+  const newTop25Systems = Object.entries(metrics.allTimeSystemStats).sort((a, b) => b[1] - a[1]).slice(0, 25);
+  newTop25Systems.forEach(([systemName, time], i) => {
     const newRank = i + 1;
     const oldRank = oldRanks.systems.get(systemName);
     if (!oldRank || newRank < oldRank) {
-      const details = oldRank ? `jumped from #${oldRank} to #${newRank} in Most Played Systems` : `entered the Top 10 Most Played Systems at #${newRank}`;
+      const details = oldRank ? `jumped from #${oldRank} to #${newRank} in Most Played Systems` : `entered the Top 25 Most Played Systems at #${newRank}`;
       metrics.milestones.push({ date: entry.date, details: `${systemName} ${details} with ${secondsToTimeString(time)}.` });
     }
   });
 
-  const newTop10Sessions = metrics.singleDaySessions.sort((a, b) => b.time - a.time).slice(0, 10);
-  newTop10Sessions.forEach((session, i) => {
+  const newTop25Sessions = metrics.singleDaySessions.sort((a, b) => b.time - a.time).slice(0, 25);
+  newTop25Sessions.forEach((session, i) => {
     const newRank = i + 1;
     const sessionKey = `${session.game}-${session.date.getTime()}`;
     const oldRank = oldRanks.sessions.get(sessionKey);
     if (!oldRank) {
-      metrics.milestones.push({ date: session.date, details: `A session of ${session.game} (${session.system}) entered the Top 10 Longest Single Sessions at #${newRank} with a time of ${secondsToTimeString(session.time)}.` });
+      metrics.milestones.push({ date: session.date, details: `A session of ${session.game} (${session.system}) entered the Top 25 Longest Single Sessions at #${newRank} with a time of ${secondsToTimeString(session.time)}.` });
     }
   });
 
@@ -724,6 +730,26 @@ function checkMilestones(metrics, ctx, index, oldRanks, yearlyGameLeader, yearly
   if (timeSec > currentTopSessionTime) {
     metrics.milestones.push({ date: entry.date, details: `A session of ${gameWithSystem} became the longest single session of ${year} with a time of ${secondsToTimeString(timeSec)}.` });
     yearlyTopSession[year] = { game: game, time: timeSec };
+  }
+
+  // --- NEW: Anniversaries ---
+  const firstPlayed = metrics.allTimeGameStats[game].firstPlayedDate;
+  if (firstPlayed && entry.date > firstPlayed) {
+      // Check if it's the exact same month and day
+      if (entry.date.getMonth() === firstPlayed.getMonth() && entry.date.getDate() === firstPlayed.getDate()) {
+          const diffYears = entry.date.getFullYear() - firstPlayed.getFullYear();
+          if (diffYears > 0) {
+              const anniKey = `${game}-${diffYears}`;
+              // Make sure we only log it once per anniversary day
+              if (!metrics.anniversariesHit.has(anniKey)) {
+                  metrics.anniversariesHit.add(anniKey);
+                  metrics.milestones.push({
+                      date: entry.date,
+                      details: `Happy Anniversary! Played ${gameWithSystem} exactly ${diffYears} year${diffYears > 1 ? 's' : ''} after first starting it.`
+                  });
+              }
+          }
+      }
   }
 }
 
