@@ -288,7 +288,14 @@ function writeTop25Report(sheet, allEntries, playthroughHistory, metrics) {
      yearlyMonthlyConcentration: getYearlyBests('event', metrics.monthlyConcentration, 'percent', 'minDate'),
 
      topYearlyConcentration: getTopList(metrics.yearlyConcentration, i => i.percent),
-     yearlyYearlyConcentration: metrics.yearlyConcentration.map(item => ({ year: parseInt(item.year), data: item })).sort((a, b) => b.year - a.year),
+     yearlyYearlyConcentration: Object.values(metrics.yearlyConcentration.reduce((acc, item) => {
+         const y = parseInt(item.year);
+         // Only keep the game if it's the first one for this year OR has a higher percentage
+         if (!acc[y] || item.percent > acc[y].data.percent) {
+             acc[y] = { year: y, data: item };
+         }
+         return acc;
+     }, {})).sort((a, b) => b.year - a.year),
 
     topGameHiatuses: getTopList(metrics.gameHiatuses, i => i.gapDays),
     yearlyGameHiatuses: getYearlyBests('event', metrics.gameHiatuses, 'gapDays', 'endDate'),
@@ -304,11 +311,20 @@ function writeTop25Report(sheet, allEntries, playthroughHistory, metrics) {
     })), i => i.numGames, (a,b) => b.totalTime - a.totalTime), 
     yearlyDiverseDays: getYearlyBests('event', Object.keys(metrics.dailyVariety).map(dateStr => ({ date: new Date(dateStr + 'T12:00:00Z'), numGames: metrics.dailyVariety[dateStr].size, totalTime: metrics.dailyTimeTotals[dateStr], games: Array.from(metrics.dailyVariety[dateStr]).join(', ') })), 'numGames', 'date'),
 
-    ssortedLongestCompletionsByTime: getTopList(metrics.longestCompletionsByTime.map(i => ({...i, seconds: timeStringToSeconds(i.finalPtLifetime)})), i => i.seconds),
+    sortedLongestCompletionsByTime: getTopList(metrics.longestCompletionsByTime, i => timeStringToSeconds(i.finalPtLifetime)),
     yearlyCompletionsByTime: getYearlyBests('event', metrics.longestCompletionsByTime.map(i => ({...i, seconds: timeStringToSeconds(i.finalPtLifetime)})), 'seconds', 'lastDate'),
 
-    topFastestCompletions: getTopList(metrics.fastestCompletionsByTime.map(i => ({...i, seconds: timeStringToSeconds(i.finalPtLifetime)})), i => -i.seconds),
-    yearlyFastestCompletions: getYearlyBests('event', metrics.fastestCompletionsByTime.map(i => ({...i, seconds: timeStringToSeconds(i.finalPtLifetime), invertedSeconds: -timeStringToSeconds(i.finalPtLifetime)})), 'invertedSeconds', 'lastDate'),
+    topFastestCompletions: getTopList(metrics.fastestCompletionsByTime, i => -timeStringToSeconds(i.finalPtLifetime)),
+    yearlyFastestCompletions: Object.values(metrics.fastestCompletionsByTime.reduce((acc, item) => {
+        if (!item.lastDate) return acc;
+        const year = new Date(item.lastDate).getUTCFullYear();
+        const sec = timeStringToSeconds(item.finalPtLifetime);
+        // Find the SMALLEST time for each year bucket
+        if (!acc[year] || sec < acc[year].sec) {
+            acc[year] = { year: parseInt(year), data: item, sec: sec };
+        }
+        return acc;
+    }, {})).sort((a, b) => b.year - a.year),
     
     sortedLongestCompletionsByDays: getTopList(metrics.longestCompletionsByDays, i => i.durationDays),
     yearlyCompletionsByDays: getYearlyBests('event', metrics.longestCompletionsByDays, 'durationDays', 'lastDate'),
@@ -687,16 +703,24 @@ const buildDualTable = (titleLeft, titleRight, leftData, rightData, headersLeft,
   buildDualTable("Top 25 Busiest Multiplayer Months", "Busiest Multiplayer Month by Year", topBusiestMultiplayerMonths, yearlyBusiestMultiplayerMonths, ["Rank", "Total Time", "Start", "End", "Month / Top 3"], (item, i, p) => { const val = item.totalSeconds; const rank = val === p ? "" : `'${i + 1}`; const top3 = item.top3Games && item.top3Games.length > 0 ? ` [${item.top3Games.map(g => `${g.name} [${secondsToTimeString(g.time)}]`).join(', ')}]` : ""; return { c1: rank, c2: secondsToTimeString(val), c3: formatDate(item.minDate, true), c4: formatDate(item.maxDate, true), c5: `${item.monthKey}${top3}`, valForTie: val, isBold: item.maxDate instanceof Date && item.maxDate.getFullYear() === currentYear }; }, (w) => { const d = w.data; const top3 = d.top3Games && d.top3Games.length > 0 ? ` [${d.top3Games.map(g => `${g.name} [${secondsToTimeString(g.time)}]`).join(', ')}]` : ""; return { c2: secondsToTimeString(d.totalSeconds), c3: formatDate(d.minDate, true), c4: formatDate(d.maxDate, true), c5: `${d.monthKey}${top3}` }; }, "[hh]:mm", "[hh]:mm");
   buildDualTable("Top 25 Hiatuses", "Longest Hiatus Ending by Year", topGameHiatuses, yearlyGameHiatuses, ["Rank", "Gap Days", "Start", "End", "Game"], fmt_Event('gapDays', 'startDate', 'endDate', (i)=>`${i.game} (${i.prevSystem}->${i.currentSystem})`), fmt_Event_Yearly_NoClipStart('gapDays', 'startDate', 'endDate', (i)=>`${i.game} (${i.prevSystem}->${i.currentSystem})`), "0", "0");
   buildDualTable("Top 25 Diverse Days", "Most Diverse Day by Year", topDiverseDays, yearlyDiverseDays, ["Rank", "# Games", "Time", "Date", "Games"], (item, i, p) => ({ c1: (item.numGames===p?"":`'${i+1}`), c2: item.numGames, c3: secondsToTimeString(item.totalTime), c4: formatDate(item.date, true), c5: item.games, valForTie: item.numGames, isBold: item.date instanceof Date && item.date.getFullYear()===currentYear }), (w) => { const d=w.data; return { c2:d.numGames, c3:secondsToTimeString(d.totalTime), c4:formatDate(d.date,true), c5:d.games }; }, "0", "0");
-  buildDualTable("Longest Completions (Time)", "Longest Completion (Time) by Year", sortedLongestCompletionsByTime, yearlyCompletionsByTime, ["Rank", "Time", "Start", "End", "Game [Note]"], fmt_Event('seconds', 'startDate', 'lastDate', (i)=>`${i.gameName} (${i.system}) [${i.finalNote}]`), fmt_Event_Yearly_NoClipStart('seconds', 'startDate', 'lastDate', (i)=>`${i.gameName} (${i.system}) [${i.finalNote}]`), "[hh]:mm", "[hh]:mm");
+  buildDualTable("Longest Completions (Time)", "Longest Completion (Time) by Year", sortedLongestCompletionsByTime, yearlyCompletionsByTime, ["Rank", "Time", "Start", "End", "Game [Note]"], (item, i, prev) => { const val = timeStringToSeconds(item.finalPtLifetime); const rank = (val === prev) ? "" : `'${i + 1}`; const detail = `${item.gameName} (${item.system}) [${item.finalNote}]`; return { c1: rank, c2: item.finalPtLifetime, c3: formatDate(item.startDate, true), c4: formatDate(item.lastDate, true), c5: detail, valForTie: val, isBold: item.lastDate instanceof Date && item.lastDate.getFullYear() === currentYear }; }, fmt_Event_Yearly_NoClipStart('seconds', 'startDate', 'lastDate', (i)=>`${i.gameName} (${i.system}) [${i.finalNote}]`), "[hh]:mm", "[hh]:mm");
   buildDualTable("Longest Completions (Days)", "Longest Completion (Days) by Year", sortedLongestCompletionsByDays, yearlyCompletionsByDays, ["Rank", "Days", "Start", "End", "Game [Note]"], fmt_Event('durationDays', 'startDate', 'lastDate', (i)=>`${i.gameName} (${i.system}) [${i.finalNote}]`), fmt_Event_Yearly_NoClipStart('durationDays', 'startDate', 'lastDate', (i)=>`${i.gameName} (${i.system}) [${i.finalNote}]`), "0", "0");
-  buildDualTable("Fastest Completions (Time)", "Fastest Completion by Year", topFastestCompletions, yearlyFastestCompletions, ["Rank", "Time", "Start", "End", "Game [Note]"], fmt_Event('seconds', 'startDate', 'lastDate', (i)=>`${i.gameName} (${i.system}) [${i.finalNote}]`), fmt_Event_Yearly_NoClipStart('seconds', 'startDate', 'lastDate', (i)=>`${i.gameName} (${i.system}) [${i.finalNote}]`), "[hh]:mm", "[hh]:mm");
+  buildDualTable("Fastest Completions (Time)", "Fastest Completion by Year", topFastestCompletions, yearlyFastestCompletions, ["Rank", "Time", "Start", "End", "Game [Note]"], (item, i, prev) => { const val = timeStringToSeconds(item.finalPtLifetime); const rank = (val === prev) ? "" : `'${i + 1}`; const detail = `${item.gameName} (${item.system}) [${item.finalNote}]`; return { c1: rank, c2: item.finalPtLifetime, c3: formatDate(item.startDate, true), c4: formatDate(item.lastDate, true), c5: detail, valForTie: val, isBold: item.lastDate instanceof Date && item.lastDate.getFullYear() === currentYear }; }, (w) => { const d = w.data; if (!d) return { c2: "", c3: "", c4: "", c5: "" }; return { c2: d.finalPtLifetime, c3: formatDate(d.startDate, true), c4: formatDate(d.lastDate, true), c5: `${d.gameName} (${d.system}) [${d.finalNote}]`, valForTie: timeStringToSeconds(d.finalPtLifetime) }; }, "[hh]:mm", "[hh]:mm" );
   buildDualTable("Top 25 Longest to Abandon", "Longest Abandon by Year", topAbandoned, yearlyAbandoned, ["Rank", "Time Invested", "Start", "End", "Game"], fmt_Event('totalSeconds', 'startDate', 'lastDate', (i)=>`${i.gameName} (${i.system})`), fmt_Event_Yearly_NoClipStart('totalSeconds', 'startDate', 'lastDate', (i)=>`${i.gameName} (${i.system})`), "[hh]:mm", "[hh]:mm");
   buildDualTable("Completion Streaks", "Longest Completion Streak by Year", topCompletionStreaks, yearlyCompletionStreaks, ["Rank", "Count", "Start", "End", "Start / End / Broken By"], 
     fmt_Event('length', 'startDate', 'endDate', (i)=>`${i.games[0]} / ${i.games[i.games.length-1]} / ${i.brokenBy||''}`), 
     (w) => {
       const item = w.data;
       if (!item) return { c2: "", c3: "", c4: "", c5: "" };
-      const detail = `${item.clippedGames[0]} / ${item.clippedGames[item.clippedGames.length-1]} / ${item.brokenBy||''}`;
+      
+      let brokenText = item.brokenBy || '';
+      
+      // Check if the streak's true end date extends into a future year
+      if (item.endDate && new Date(item.endDate).getUTCFullYear() > w.year) {
+          brokenText = "Streak Active at Year End";
+      }
+      
+      const detail = `${item.clippedGames[0]} / ${item.clippedGames[item.clippedGames.length-1]} / ${brokenText}`;
       return { c2: item.clippedLength, c3: formatDate(item.clippedStart, true), c4: formatDate(item.clippedEnd, true), c5: detail, valForTie: item.clippedLength };
     }, "0", "0");
   buildDualTable("Top 25 Busiest Completion Days", "Busiest Completion Day by Year", topCompletionDays, yearlyCompletionDays, ["Rank", "# Completions", "Date", "", "Games"], fmt_Event('count', 'date', null, (i) => i.games.map(g => `${g.name} (${g.system})`).join(', ')), fmt_CompletionDay_Yearly, "0", "0");
