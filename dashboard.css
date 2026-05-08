@@ -458,3 +458,19 @@ body {
     min-width: 100%;
   }
 }
+
+/* Monthly Summary Accordion Styles */
+.accordion-toggle-row {
+  transition: background-color 0.2s ease;
+}
+
+.accordion-toggle-row:hover {
+  background-color: rgba(0, 0, 0, 0.08) !important; /* Slightly darkens when you mouse over */
+}
+
+.toggle-icon {
+  display: inline-block;
+  width: 16px; /* Keeps spacing consistent between ▶ and ▼ */
+  text-align: center;
+  font-size: 0.8rem;
+}
