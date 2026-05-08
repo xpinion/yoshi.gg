@@ -407,20 +407,52 @@ function renderMonthlySummary(monthKey) {
   html += `<tr class="grand-total-row"><td colspan="2" class="text-left">Grand Total</td><td class="text-center">${formatHHMM(totalSecondsInMonth)}</td><td class="text-center">${monthData.allEntryDays.size}/${daysInMonth}</td><td colspan="8"></td></tr>`;
 
   // 4. Print the games
-  sortedGames.forEach(game => {
+  sortedGames.forEach(game, index => {
     const activeTags = Object.keys(game.activePlaythroughs);
     activeTags.forEach(ptTag => {
       const ptLocal = game.activePlaythroughs[ptTag]; const ptHistory = rawData.playthroughHistory[ptTag];
       const sysStr = Array.from(ptLocal.timeframeSystems).join(', '); const bgColor = getStatusColor(ptHistory.finalStatus);
       html += `<tr class="active-row"><td class="text-left"><span class="hover-trigger" data-game="${escapeHTML(game.name)}">${escapeHTML(game.name)}</span></td><td class="text-center">${escapeHTML(sysStr)}</td><td class="text-center">${formatHHMM(ptLocal.timeframeTime)}</td><td class="text-center">${ptLocal.timeframeDays.size}</td><td class="text-center">${ptLocal.lastPtLifetime}</td><td class="text-center">${ptLocal.lastPtLifetimeDays}</td><td class="text-center">${game.latestGameLifetime}</td><td class="text-center">${game.latestGameLifetimeDays}</td><td class="text-center">${formatFullDate(ptHistory.startDate)}</td><td class="text-center">${formatFullDate(ptLocal.lastDate)}</td><td class="text-center status-cell" style="background-color: ${bgColor};">${ptLocal.lastStatus}</td><td class="text-left">${escapeHTML(ptLocal.latestNote)}</td></tr>`;
     });
-    const allGamePlaythroughs = Object.keys(rawData.playthroughHistory).filter(tag => rawData.playthroughHistory[tag].gameName === game.name);
-    allGamePlaythroughs.forEach(oldTag => {
-      if (!activeTags.includes(oldTag)) {
-        const oldPt = rawData.playthroughHistory[oldTag]; const bgColor = getStatusColor(oldPt.finalStatus);
-        html += `<tr class="inactive-row"><td class="text-left"><span class="hover-trigger" data-game="${escapeHTML(game.name)}">${escapeHTML(game.name)}</span></td><td class="text-center">${escapeHTML(oldPt.system)}</td><td class="text-center">00:00</td><td class="text-center">0</td><td class="text-center">${oldPt.finalPtLifetime}</td><td class="text-center">${oldPt.finalPtLifetimeDays}</td><td class="text-center">${game.latestGameLifetime}</td><td class="text-center">${game.latestGameLifetimeDays}</td><td class="text-center">${formatFullDate(oldPt.startDate)}</td><td class="text-center">${formatFullDate(oldPt.lastDate)}</td><td class="text-center status-cell" style="background-color: ${bgColor};">${oldPt.finalStatus}</td><td class="text-left">${escapeHTML(oldPt.finalNote)}</td></tr>`;
-      }
-    });
+const allGamePlaythroughs = Object.keys(rawData.playthroughHistory).filter(tag => rawData.playthroughHistory[tag].gameName === game.name);
+    
+    // Filter out the ones we already printed as active
+    const inactiveTags = allGamePlaythroughs.filter(oldTag => !activeTags.includes(oldTag));
+    
+    if (inactiveTags.length > 0) {
+      const safeGameId = `collapse-${index}`;
+      
+      // 1. The Toggle Button Row
+      html += `
+        <tr class="accordion-toggle-row" onclick="toggleAccordion('${safeGameId}', this)" style="cursor: pointer; background-color: rgba(0,0,0,0.03);">
+          <td colspan="12" class="text-left" style="padding: 6px 12px; font-size: 0.85rem; color: #666;">
+            <span class="toggle-icon">▶</span> Show ${inactiveTags.length} Past Playthrough${inactiveTags.length !== 1 ? 's' : ''}
+          </td>
+        </tr>
+      `;
+
+      // 2. The Hidden Inactive Rows
+      inactiveTags.forEach(oldTag => {
+        const oldPt = rawData.playthroughHistory[oldTag]; 
+        const bgColor = getStatusColor(oldPt.finalStatus);
+        
+        // Notice the added class: ${safeGameId} and inline style: display: none;
+        html += `<tr class="inactive-row ${safeGameId}" style="display: none; opacity: 0.65;">
+          <td class="text-left"><span class="hover-trigger" data-game="${escapeHTML(game.name)}">${escapeHTML(game.name)}</span></td>
+          <td class="text-center">${escapeHTML(oldPt.system)}</td>
+          <td class="text-center">00:00</td>
+          <td class="text-center">0</td>
+          <td class="text-center">${oldPt.finalPtLifetime}</td>
+          <td class="text-center">${oldPt.finalPtLifetimeDays}</td>
+          <td class="text-center">${game.latestGameLifetime}</td>
+          <td class="text-center">${game.latestGameLifetimeDays}</td>
+          <td class="text-center">${formatFullDate(oldPt.startDate)}</td>
+          <td class="text-center">${formatFullDate(oldPt.lastDate)}</td>
+          <td class="text-center status-cell" style="background-color: ${bgColor};">${oldPt.finalStatus}</td>
+          <td class="text-left">${escapeHTML(oldPt.finalNote)}</td>
+        </tr>`;
+      });
+    }
   });
 
   // 5. Close it out
@@ -1082,5 +1114,30 @@ function renderSeriesArchive(seriesName) {
   `;
   container.innerHTML = html;
 }
+
+// Accordion Helper
+window.toggleAccordion = function(targetClass, toggleRow) {
+  const rows = document.querySelectorAll(`.${targetClass}`);
+  const icon = toggleRow.querySelector('.toggle-icon');
+  
+  let isHidden = true;
+  rows.forEach(row => {
+    if (row.style.display === 'none') {
+      row.style.display = 'table-row';
+      isHidden = false;
+    } else {
+      row.style.display = 'none';
+    }
+  });
+
+  // Update the text and icon direction based on the state
+  if (!isHidden) {
+    icon.innerHTML = '▼';
+    toggleRow.innerHTML = toggleRow.innerHTML.replace(/Show \d+ Past/, "Hide Past");
+  } else {
+    icon.innerHTML = '▶';
+    toggleRow.innerHTML = toggleRow.innerHTML.replace("Hide Past", `Show ${rows.length} Past`);
+  }
+};
 
 initDashboard();
