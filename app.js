@@ -866,6 +866,9 @@ function renderHeatmap(mode) {
                        
                    return `<td style="font-size: 0.75rem; text-align: left;">[${formatHHMM(top5[i].totalSeconds)}] ${escapeHTML(top5[i].name)} (${escapeHTML(sysStr)})</td>`;
                } else {
+                   return `<td style="font-size: 0.75rem; text-align: left;">[${formatHHMM(top5[i].totalSeconds)}] ${escapeHTML(top5[i].name)}</td>`;
+               }
+           } else {
                return `<td></td>`;
            }
         }).join('')}
