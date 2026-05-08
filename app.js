@@ -836,7 +836,10 @@ function renderHeatmap(mode) {
       if (statsForDays) {
           Object.values(statsForDays).forEach(item => {
               if (item.days) {
-                  const daysArr = Array.isArray(item.days) ? item.days : (item.days.data || []);
+                  // Safely handle Sets, Arrays, or raw data objects
+                  const daysArr = item.days instanceof Set 
+                      ? Array.from(item.days) 
+                      : (Array.isArray(item.days) ? item.days : (item.days.data || []));
                   daysArr.forEach(d => totalDaysSet.add(d));
               }
           });
@@ -856,12 +859,13 @@ function renderHeatmap(mode) {
         ${[0,1,2,3,4].map(i => {
            if (top5[i]) {
                if (isGame) {
-                   const sysStr = Array.isArray(top5[i].systems) ? top5[i].systems.join(', ') : (top5[i].systems && top5[i].systems.data ? top5[i].systems.data.join(', ') : '');
+                   // Safely handle Sets, Arrays, or raw data objects for Systems
+                   const sysStr = top5[i].systems instanceof Set 
+                       ? Array.from(top5[i].systems).join(', ') 
+                       : (Array.isArray(top5[i].systems) ? top5[i].systems.join(', ') : (top5[i].systems && top5[i].systems.data ? top5[i].systems.data.join(', ') : ''));
+                       
                    return `<td style="font-size: 0.75rem; text-align: left;">[${formatHHMM(top5[i].totalSeconds)}] ${escapeHTML(top5[i].name)} (${escapeHTML(sysStr)})</td>`;
                } else {
-                   return `<td style="font-size: 0.75rem; text-align: left;">[${formatHHMM(top5[i].totalSeconds)}] ${escapeHTML(top5[i].name)}</td>`;
-               }
-           } else {
                return `<td></td>`;
            }
         }).join('')}
