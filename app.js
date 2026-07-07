@@ -462,19 +462,29 @@ const allGamePlaythroughs = Object.keys(rawData.playthroughHistory).filter(tag =
 
 function renderCompletions(year) {
   const container = document.getElementById('completions-list');
+  
+  // 1. Filter and assign the correct display date
   const completions = Object.values(rawData.playthroughHistory).filter(pt => {
-    if (!['Completed', 'M-Completed'].includes(pt.finalStatus)) return false;
-    if (year === 'All-Time') return true; // <-- NEW LINE ADDED HERE
-    return new Date(pt.lastDate).getUTCFullYear().toString() === year;
+    // Include games marked Postgame, or games that have a logged completion date array
+    const isComp = (pt.completionDates && pt.completionDates.length > 0) || ['Completed', 'M-Completed', 'Postgame'].includes(pt.finalStatus);
+    if (!isComp) return false;
+    
+    // Grab the actual completion date (fallback to lastDate if needed)
+    const cDate = (pt.completionDates && pt.completionDates.length > 0) ? new Date(pt.completionDates[0]) : new Date(pt.lastDate);
+    pt.displayDate = cDate;
+    
+    if (year === 'All-Time') return true;
+    return cDate.getUTCFullYear().toString() === year;
   });
 
   completions.forEach(pt => {
-    const finalEntry = rawData.allEntries.slice().reverse().find(e => e.ptTag === pt.ptTag && e.status === pt.finalStatus);
+    const finalEntry = rawData.allEntries.slice().reverse().find(e => e.ptTag === pt.ptTag && ['Completed', 'M-Completed', 'Postgame'].includes(e.status));
     pt.entryNum = finalEntry ? Number(finalEntry.entryNum) : 0;
   });
 
+  // 2. Sort chronologically
   completions.sort((a, b) => {
-    const dateDiff = new Date(a.lastDate).getTime() - new Date(b.lastDate).getTime();
+    const dateDiff = a.displayDate.getTime() - b.displayDate.getTime();
     if (dateDiff !== 0) return dateDiff;
     return a.entryNum - b.entryNum;
   });
@@ -484,10 +494,42 @@ function renderCompletions(year) {
 
   if (completions.length === 0) { container.innerHTML = `<div class="loading-text">No completions logged for ${year}.</div>`; return; }
 
+  // 3. Render HTML
   container.innerHTML = completions.map(pt => {
     const score = metaScores.get(pt.gameName) || '-';
     const badgeHTML = score !== '-' ? `<div class="item-badge">${score}</div>` : `<div class="item-badge" style="background: #eee; color: #888;">-</div>`;
-    return `<div class="list-item"><div class="item-info"><span class="item-date">${formatShortDate(pt.lastDate)}</span><div class="item-text"><span class="item-title hover-trigger" data-game="${escapeHTML(pt.gameName)}">${escapeHTML(pt.gameName)} (${escapeHTML(pt.system)})</span><span class="item-sub">(#${pt.yearRank})</span></div></div>${badgeHTML}</div>`;
+    
+    let pastCompletionsHtml = '';
+    
+    // Find the overall game stats to look for legacy completions
+    if (rawData.metrics && rawData.metrics.completionStats) {
+        const allTimeGameData = rawData.metrics.completionStats.find(g => g.gameName === pt.gameName);
+        
+        if (allTimeGameData && allTimeGameData.completionDates.length > 1) {
+            const pastDates = allTimeGameData.completionDates
+                .map(d => formatFullDate(d))
+                .filter(d => year !== 'All-Time' && !d.startsWith(year)); // Hide the note on All-Time view or if the date is in the current year filter
+                
+            if (pastDates.length > 0) {
+                const uniquePastDates = [...new Set(pastDates)];
+                pastCompletionsHtml = `<div class="past-completion-note" style="font-size: 0.85rem; font-style: italic; color: #888; margin-top: 4px;">Also completed on: ${uniquePastDates.join(', ')}</div>`;
+            }
+        }
+    }
+
+    return `
+      <div class="list-item">
+        <div class="item-info">
+          <span class="item-date">${formatShortDate(pt.displayDate)}</span>
+          <div class="item-text">
+            <span class="item-title hover-trigger" data-game="${escapeHTML(pt.gameName)}">${escapeHTML(pt.gameName)} (${escapeHTML(pt.system)})</span>
+            <span class="item-sub">(#${pt.yearRank})</span>
+            ${pastCompletionsHtml}
+          </div>
+        </div>
+        ${badgeHTML}
+      </div>
+    `;
   }).join('');
 }
 
