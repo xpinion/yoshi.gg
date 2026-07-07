@@ -1192,4 +1192,96 @@ window.toggleAccordion = function(targetClass, toggleRow) {
   }
 };
 
+function renderSideBySideMetrics(year) {
+  const systemsContainer = document.getElementById('most-played-systems-list');
+  const franchisesContainer = document.getElementById('most-played-franchises-list');
+  const genresContainer = document.getElementById('most-played-genres-list');
+
+  if (!rawData || !rawData.allEntries) return;
+
+  // Filter entries based on the selected timeline dropdown
+  const entries = year === 'All-Time' 
+    ? rawData.allEntries 
+    : rawData.allEntries.filter(e => e.date && e.date.startsWith(year));
+
+  const systems = {};
+  const franchises = {};
+  const genres = {};
+
+  // Helper helper to initialize object maps
+  const initMetricObj = (name) => ({ name: name, totalSeconds: 0, uniqueGames: new Set(), gamePlaytimes: {} });
+
+  // Single-pass computation loop across the filtered dataset
+  entries.forEach(e => {
+    const sys = e.system;
+    const fran = e.series || "N/A"; // Maps to the backend series metadata
+    const gen = e.genre || "N/A";
+    const seconds = timeStringToSeconds(e.time);
+
+    if (sys && sys !== "N/A") {
+      if (!systems[sys]) systems[sys] = initMetricObj(sys);
+      systems[sys].totalSeconds += seconds;
+      systems[sys].uniqueGames.add(e.game);
+      systems[sys].gamePlaytimes[e.game] = (systems[sys].gamePlaytimes[e.game] || 0) + seconds;
+    }
+
+    if (fran && fran !== "N/A" && fran.toUpperCase() !== 'ZZNONE') {
+      if (!franchises[fran]) franchises[fran] = initMetricObj(fran);
+      franchises[fran].totalSeconds += seconds;
+      franchises[fran].uniqueGames.add(e.game);
+      franchises[fran].gamePlaytimes[e.game] = (franchises[fran].gamePlaytimes[e.game] || 0) + seconds;
+    }
+
+    if (gen && gen !== "N/A") {
+      if (!genres[gen]) genres[gen] = initMetricObj(gen);
+      genres[gen].totalSeconds += seconds;
+      genres[gen].uniqueGames.add(e.game);
+      genres[gen].gamePlaytimes[e.game] = (genres[gen].gamePlaytimes[e.game] || 0) + seconds;
+    }
+  });
+
+  // Helper to extract the highest playtime game name and string duration
+  const getTopGameString = (gamePlaytimes) => {
+    let topGame = "";
+    let maxSeconds = -1;
+    for (const [game, seconds] of Object.entries(gamePlaytimes)) {
+      if (seconds > maxSeconds) {
+        maxSeconds = seconds;
+        topGame = game;
+      }
+    }
+    return maxSeconds > 0 ? `${topGame} (${formatTime(maxSeconds)})` : "N/A";
+  };
+
+  // Helper to turn the mapped data into clean ranked HTML template blocks
+  const generateListHtml = (metricsObj, unitLabel) => {
+    const sorted = Object.values(metricsObj).sort((a, b) => b.totalSeconds - a.totalSeconds);
+    if (sorted.length === 0) return `<div class="loading-text">No data logged.</div>`;
+
+    return sorted.map((item, index) => {
+      const topGameInfo = getTopGameString(item.gamePlaytimes);
+      return `
+        <div class="list-item" style="align-items: flex-start; flex-direction: column; padding: 10px 0; border-bottom: 1px solid rgba(0,0,0,0.05);">
+          <div style="display: flex; justify-content: space-between; width: 100%; align-items: center;">
+            <span class="item-title" style="font-weight: bold;">#${index + 1} ${escapeHTML(item.name)}</span>
+            <div class="item-badge">${formatTime(item.totalSeconds)}</div>
+          </div>
+          <div class="item-sub" style="font-size: 0.8rem; color: #666; margin-top: 4px; width: 100%;">
+            <div style="display: flex; justify-content: space-between;">
+              <span>Total Catalog: <strong>${item.uniqueGames.size} game${item.uniqueGames.size !== 1 ? 's' : ''}</strong></span>
+            </div>
+            <div style="margin-top: 2px; text-overflow: ellipsis; overflow: hidden; white-space: nowrap;">
+              Top Game: <span class="hover-trigger" data-game="${escapeHTML(topGameInfo.split(' (')[0])}" style="color: #0056b3; cursor: pointer;">${escapeHTML(topGameInfo)}</span>
+            </div>
+          </div>
+        </div>
+      `;
+    }).join('');
+  };
+
+  systemsContainer.innerHTML = generateListHtml(systems, "Systems");
+  franchisesContainer.innerHTML = generateListHtml(franchises, "Franchises");
+  genresContainer.innerHTML = generateListHtml(genres, "Genres");
+}
+
 initDashboard();
