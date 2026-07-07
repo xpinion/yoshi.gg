@@ -506,10 +506,13 @@ function renderCompletions(year) {
         const allTimeGameData = rawData.metrics.completionStats.find(g => g.gameName === pt.gameName);
         
         if (allTimeGameData && allTimeGameData.completionDates.length > 1) {
-            const pastDates = allTimeGameData.completionDates
-                .map(d => formatFullDate(d))
-                .filter(d => year !== 'All-Time' && !d.startsWith(year)); // Hide the note on All-Time view or if the date is in the current year filter
-                
+          // Get the date string for the current playthrough card being drawn
+          const currentCompletionStr = formatFullDate(pt.displayDate);
+          
+          // Filter out the current date so we only show OTHER times you beat it
+          const pastDates = allTimeGameData.completionDates
+              .map(d => formatFullDate(d))
+              .filter(d => d !== currentCompletionStr);
             if (pastDates.length > 0) {
                 const uniquePastDates = [...new Set(pastDates)];
                 pastCompletionsHtml = `<div class="past-completion-note" style="font-size: 0.85rem; font-style: italic; color: #888; margin-top: 4px;">Also completed on: ${uniquePastDates.join(', ')}</div>`;
