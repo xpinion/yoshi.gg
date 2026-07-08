@@ -187,17 +187,20 @@ function setupDropdowns() {
   const daysSelect = document.getElementById('year-select-days');
   const sessionSelect = document.getElementById('year-select-session');
 
-  const syncYearDropdowns = (val) => {
+const syncYearDropdowns = (val) => {
     // Update all dropdown values to match
     [compSelect, playedSelect, daysSelect, sessionSelect].forEach(s => {
       if (s) s.value = val;
     });
     
-    // Refresh all 4 cards simultaneously
+    // Refresh all 4 original cards simultaneously
     renderCompletions(val);
     renderMostPlayed(val);
     renderMostDays(val);
     renderLongestSession(val);
+
+    // NEW: Refresh your new side-by-side metric leaderboards
+    renderSideBySideMetrics(val);
   };
 
   const years = Object.keys(rawData.metrics.yearlyGameStats).sort().reverse();
