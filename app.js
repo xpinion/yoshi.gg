@@ -1203,7 +1203,6 @@ function renderSideBySideMetrics(year) {
 
   if (!rawData || !rawData.allEntries) return;
 
-  // Filter entries based on the selected timeline dropdown
   const entries = year === 'All-Time' 
     ? rawData.allEntries 
     : rawData.allEntries.filter(e => e.date && e.date.startsWith(year));
@@ -1212,21 +1211,36 @@ function renderSideBySideMetrics(year) {
   const franchises = {};
   const genres = {};
 
-  // Helper helper to initialize object maps
-  const initMetricObj = (name) => ({ name: name, totalSeconds: 0, uniqueGames: new Set(), gamePlaytimes: {} });
+  const initMetricObj = (name) => ({ 
+    name: name, 
+    totalSeconds: 0, 
+    uniqueGames: new Set(), 
+    gamePlaytimes: {},
+    days: new Set(),
+    firstPlayed: null,
+    lastPlayed: null
+  });
 
-  // Single-pass computation loop across the filtered dataset
   entries.forEach(e => {
     const sys = e.system;
-    const fran = e.series || "N/A"; // Maps to the backend series metadata
+    const fran = e.series || "N/A"; 
     const gen = e.genre || "N/A";
     const seconds = timeStringToSeconds(e.time);
+    const dateStr = e.date.split('T')[0];
+    const entryDate = new Date(e.date);
+
+    const updateObj = (obj) => {
+        obj.totalSeconds += seconds;
+        obj.uniqueGames.add(e.game);
+        obj.gamePlaytimes[e.game] = (obj.gamePlaytimes[e.game] || 0) + seconds;
+        obj.days.add(dateStr);
+        if (!obj.firstPlayed || entryDate < obj.firstPlayed) obj.firstPlayed = entryDate;
+        if (!obj.lastPlayed || entryDate > obj.lastPlayed) obj.lastPlayed = entryDate;
+    };
 
     if (sys && sys !== "N/A") {
       if (!systems[sys]) systems[sys] = initMetricObj(sys);
-      systems[sys].totalSeconds += seconds;
-      systems[sys].uniqueGames.add(e.game);
-      systems[sys].gamePlaytimes[e.game] = (systems[sys].gamePlaytimes[e.game] || 0) + seconds;
+      updateObj(systems[sys]);
     }
 
     if (fran && fran !== "N/A" && fran.toUpperCase() !== 'ZZNONE') {
@@ -1244,7 +1258,6 @@ function renderSideBySideMetrics(year) {
     }
   });
 
-  // Helper to extract the highest playtime game name and string duration
   const getTopGameString = (gamePlaytimes) => {
     let topGame = "";
     let maxSeconds = -1;
@@ -1257,13 +1270,22 @@ function renderSideBySideMetrics(year) {
     return maxSeconds > 0 ? `${topGame} (${formatTime(maxSeconds)})` : "N/A";
   };
 
-  // Helper to turn the mapped data into clean ranked HTML template blocks
-  const generateListHtml = (metricsObj, unitLabel) => {
+  const generateListHtml = (metricsObj) => {
     const sorted = Object.values(metricsObj).sort((a, b) => b.totalSeconds - a.totalSeconds);
     if (sorted.length === 0) return `<div class="loading-text">No data logged.</div>`;
 
     return sorted.map((item, index) => {
       const topGameInfo = getTopGameString(item.gamePlaytimes);
+      
+      // Updated: Format as yyyy/mm/dd
+      const formatDate = (d) => {
+         if (!d) return '';
+         return `${d.getUTCFullYear()}/${String(d.getUTCMonth() + 1).padStart(2, '0')}/${String(d.getUTCDate()).padStart(2, '0')}`;
+      };
+      
+      const firstDateStr = formatDate(item.firstPlayed);
+      const lastDateStr = formatDate(item.lastPlayed);
+      
       return `
         <div class="list-item" style="align-items: flex-start; flex-direction: column; padding: 10px 0; border-bottom: 1px solid rgba(0,0,0,0.05);">
           <div style="display: flex; justify-content: space-between; width: 100%; align-items: center;">
@@ -1271,10 +1293,11 @@ function renderSideBySideMetrics(year) {
             <div class="item-badge">${formatTime(item.totalSeconds)}</div>
           </div>
           <div class="item-sub" style="font-size: 0.8rem; color: #666; margin-top: 4px; width: 100%;">
-            <div style="display: flex; justify-content: space-between;">
-              <span>Total Catalog: <strong>${item.uniqueGames.size} game${item.uniqueGames.size !== 1 ? 's' : ''}</strong></span>
+            <div style="display: flex; justify-content: space-between; margin-bottom: 2px;">
+              <span><strong>${item.uniqueGames.size}</strong> game${item.uniqueGames.size !== 1 ? 's' : ''} | <strong>${item.days.size}</strong> days</span>
+              <span style="font-size: 0.75rem;">${firstDateStr} - ${lastDateStr}</span>
             </div>
-            <div style="margin-top: 2px; text-overflow: ellipsis; overflow: hidden; white-space: nowrap;">
+            <div style="text-overflow: ellipsis; overflow: hidden; white-space: nowrap;">
               Top Game: <span class="hover-trigger" data-game="${escapeHTML(topGameInfo.split(' (')[0])}" style="color: #0056b3; cursor: pointer;">${escapeHTML(topGameInfo)}</span>
             </div>
           </div>
@@ -1283,9 +1306,9 @@ function renderSideBySideMetrics(year) {
     }).join('');
   };
 
-  systemsContainer.innerHTML = generateListHtml(systems, "Systems");
-  franchisesContainer.innerHTML = generateListHtml(franchises, "Franchises");
-  genresContainer.innerHTML = generateListHtml(genres, "Genres");
+  systemsContainer.innerHTML = generateListHtml(systems);
+  franchisesContainer.innerHTML = generateListHtml(franchises);
+  genresContainer.innerHTML = generateListHtml(genres);
 }
 
 initDashboard();
