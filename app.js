@@ -1205,7 +1205,7 @@ function renderSideBySideMetrics(year) {
 
   const entries = year === 'All-Time' 
     ? rawData.allEntries 
-    : rawData.allEntries.filter(e => e.date && e.date.startsWith(year));
+    : rawData.allEntries.filter(e => e.date && e.date.toISOString().startsWith(year));
 
   const systems = {};
   const franchises = {};
@@ -1222,39 +1222,35 @@ function renderSideBySideMetrics(year) {
   });
 
   entries.forEach(e => {
-    const sys = e.system;
-    const fran = e.series || "N/A"; 
-    const gen = e.genre || "N/A";
+    // 1. Prepare data
     const seconds = timeStringToSeconds(e.time);
-    const dateStr = e.date.split('T')[0];
+    const dateKey = e.date.toISOString().split('T')[0]; // Using ISO string for consistent date keys
     const entryDate = new Date(e.date);
 
+    // 2. Helper to update object
     const updateObj = (obj) => {
         obj.totalSeconds += seconds;
         obj.uniqueGames.add(e.game);
         obj.gamePlaytimes[e.game] = (obj.gamePlaytimes[e.game] || 0) + seconds;
-        obj.days.add(dateStr);
+        obj.days.add(dateKey);
         if (!obj.firstPlayed || entryDate < obj.firstPlayed) obj.firstPlayed = entryDate;
         if (!obj.lastPlayed || entryDate > obj.lastPlayed) obj.lastPlayed = entryDate;
     };
 
-    if (sys && sys !== "N/A") {
-      if (!systems[sys]) systems[sys] = initMetricObj(sys);
-      updateObj(systems[sys]);
+    // 3. Update Maps
+    if (e.system && e.system !== "N/A") {
+      if (!systems[e.system]) systems[e.system] = initMetricObj(e.system);
+      updateObj(systems[e.system]);
     }
 
-    if (fran && fran !== "N/A" && fran.toUpperCase() !== 'ZZNONE') {
-      if (!franchises[fran]) franchises[fran] = initMetricObj(fran);
-      franchises[fran].totalSeconds += seconds;
-      franchises[fran].uniqueGames.add(e.game);
-      franchises[fran].gamePlaytimes[e.game] = (franchises[fran].gamePlaytimes[e.game] || 0) + seconds;
+    if (e.series && e.series !== "N/A" && e.series.toUpperCase() !== 'ZZNONE') {
+      if (!franchises[e.series]) franchises[e.series] = initMetricObj(e.series);
+      updateObj(franchises[e.series]);
     }
 
-    if (gen && gen !== "N/A") {
-      if (!genres[gen]) genres[gen] = initMetricObj(gen);
-      genres[gen].totalSeconds += seconds;
-      genres[gen].uniqueGames.add(e.game);
-      genres[gen].gamePlaytimes[e.game] = (genres[gen].gamePlaytimes[e.game] || 0) + seconds;
+    if (e.genre && e.genre !== "N/A") {
+      if (!genres[e.genre]) genres[e.genre] = initMetricObj(e.genre);
+      updateObj(genres[e.genre]);
     }
   });
 
@@ -1276,15 +1272,7 @@ function renderSideBySideMetrics(year) {
 
     return sorted.map((item, index) => {
       const topGameInfo = getTopGameString(item.gamePlaytimes);
-      
-      // Updated: Format as yyyy/mm/dd
-      const formatDate = (d) => {
-         if (!d) return '';
-         return `${d.getUTCFullYear()}/${String(d.getUTCMonth() + 1).padStart(2, '0')}/${String(d.getUTCDate()).padStart(2, '0')}`;
-      };
-      
-      const firstDateStr = formatDate(item.firstPlayed);
-      const lastDateStr = formatDate(item.lastPlayed);
+      const formatDate = (d) => d ? `${d.getUTCFullYear()}/${String(d.getUTCMonth() + 1).padStart(2, '0')}/${String(d.getUTCDate()).padStart(2, '0')}` : '';
       
       return `
         <div class="list-item" style="align-items: flex-start; flex-direction: column; padding: 10px 0; border-bottom: 1px solid rgba(0,0,0,0.05);">
@@ -1294,8 +1282,8 @@ function renderSideBySideMetrics(year) {
           </div>
           <div class="item-sub" style="font-size: 0.8rem; color: #666; margin-top: 4px; width: 100%;">
             <div style="display: flex; justify-content: space-between; margin-bottom: 2px;">
-              <span><strong>${item.uniqueGames.size}</strong> game${item.uniqueGames.size !== 1 ? 's' : ''} | <strong>${item.days.size}</strong> days</span>
-              <span style="font-size: 0.75rem;">${firstDateStr} - ${lastDateStr}</span>
+              <span><strong>${item.uniqueGames.size}</strong> games | <strong>${item.days.size}</strong> days</span>
+              <span style="font-size: 0.75rem;">${formatDate(item.firstPlayed)} - ${formatDate(item.lastPlayed)}</span>
             </div>
             <div style="text-overflow: ellipsis; overflow: hidden; white-space: nowrap;">
               Top Game: <span class="hover-trigger" data-game="${escapeHTML(topGameInfo.split(' (')[0])}" style="color: #0056b3; cursor: pointer;">${escapeHTML(topGameInfo)}</span>
