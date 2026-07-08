@@ -1203,9 +1203,10 @@ function renderSideBySideMetrics(year) {
 
   if (!rawData || !rawData.allEntries) return;
 
+  // Filter based on the string date (no .toISOString() needed)
   const entries = year === 'All-Time' 
     ? rawData.allEntries 
-    : rawData.allEntries.filter(e => e.date && e.date.toISOString().startsWith(year));
+    : rawData.allEntries.filter(e => e.date && e.date.startsWith(year));
 
   const systems = {};
   const franchises = {};
@@ -1222,12 +1223,10 @@ function renderSideBySideMetrics(year) {
   });
 
   entries.forEach(e => {
-    // 1. Prepare data
     const seconds = timeStringToSeconds(e.time);
-    const dateKey = e.date.toISOString().split('T')[0]; // Using ISO string for consistent date keys
+    const dateKey = e.date.split('T')[0]; // Safe string split
     const entryDate = new Date(e.date);
 
-    // 2. Helper to update object
     const updateObj = (obj) => {
         obj.totalSeconds += seconds;
         obj.uniqueGames.add(e.game);
@@ -1237,7 +1236,6 @@ function renderSideBySideMetrics(year) {
         if (!obj.lastPlayed || entryDate > obj.lastPlayed) obj.lastPlayed = entryDate;
     };
 
-    // 3. Update Maps
     if (e.system && e.system !== "N/A") {
       if (!systems[e.system]) systems[e.system] = initMetricObj(e.system);
       updateObj(systems[e.system]);
