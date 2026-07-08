@@ -186,35 +186,38 @@ function setupDropdowns() {
   const playedSelect = document.getElementById('year-select-played');
   const daysSelect = document.getElementById('year-select-days');
   const sessionSelect = document.getElementById('year-select-session');
+  const metricSelect1 = document.getElementById('year-select-metrics');
+const metricSelect2 = document.getElementById('year-select-metrics-2');
+const metricSelect3 = document.getElementById('year-select-metrics-3');
 
 const syncYearDropdowns = (val) => {
-    // Update all dropdown values to match
-    [compSelect, playedSelect, daysSelect, sessionSelect].forEach(s => {
-      if (s) s.value = val;
-    });
-    
-    // Refresh all 4 original cards simultaneously
-    renderCompletions(val);
-    renderMostPlayed(val);
-    renderMostDays(val);
-    renderLongestSession(val);
-
-    // NEW: Refresh your new side-by-side metric leaderboards
-    renderSideBySideMetrics(val);
-  };
+  // Update all dropdown values to match
+  [compSelect, playedSelect, daysSelect, sessionSelect, metricSelect1, metricSelect2, metricSelect3].forEach(s => {
+    if (s) s.value = val;
+  });
+  
+  // Refresh all 4 original cards
+  renderCompletions(val);
+  renderMostPlayed(val);
+  renderMostDays(val);
+  renderLongestSession(val);
+  
+  // NEW: Refresh the 3 new cards
+  renderSideBySideMetrics(val);
+};
 
   const years = Object.keys(rawData.metrics.yearlyGameStats).sort().reverse();
   const yearOptionsHtml = `<option value="All-Time">All-Time</option>` + years.map(y => `<option value="${y}">${y}</option>`).join('');
   const defaultChoice = Math.random() < 0.5 ? 'All-Time' : currentYear;
 
   // Initialize the dropdown options and attach the MASTER listener
-  [compSelect, playedSelect, daysSelect, sessionSelect].forEach(select => {
-    if (select) {
-      select.innerHTML = yearOptionsHtml;
-      select.value = defaultChoice;
-      select.addEventListener('change', (e) => syncYearDropdowns(e.target.value));
-    }
-  });
+[compSelect, playedSelect, daysSelect, sessionSelect, metricSelect1, metricSelect2, metricSelect3].forEach(select => {
+  if (select) {
+    select.innerHTML = yearOptionsHtml;
+    select.value = defaultChoice;
+    select.addEventListener('change', (e) => syncYearDropdowns(e.target.value));
+  }
+});
 
   // Initial render for all four
   syncYearDropdowns(defaultChoice);
