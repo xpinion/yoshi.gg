@@ -10,6 +10,8 @@ let allTop25Tables = [];
 const META_GAME = 0;
 const META_RELEASE_YEAR = 1;
 const META_GENRE = 2;
+const META_DEVELOPER = 3;
+const META_PUBLISHER = 4;
 const META_SERIES = 5;
 const META_YOSCORE = 6;
 
@@ -90,7 +92,8 @@ async function initDashboard() {
         const score = parseFloat(row[META_YOSCORE]);
         metaGames.push({
           name: row[META_GAME], releaseYear: row[META_RELEASE_YEAR] || 'Unknown',
-          genre: row[META_GENRE] || 'Unknown', franchise: row[META_SERIES] || 'Unknown',
+          genre: row[META_GENRE] || 'Unknown', developer: row[META_DEVELOPER] || 'Unknown',
+          publisher: row[META_PUBLISHER] || 'Unknown', franchise: row[META_SERIES] || 'Unknown',
           score: isNaN(score) ? null : score
         });
         metaScores.set(row[META_GAME], isNaN(score) ? '-' : score);
@@ -467,13 +470,10 @@ const allGamePlaythroughs = Object.keys(rawData.playthroughHistory).filter(tag =
 function renderCompletions(year) {
   const container = document.getElementById('completions-list');
   
-  // 1. Filter and assign the correct display date
   const completions = Object.values(rawData.playthroughHistory).filter(pt => {
-    // Include games marked Postgame, or games that have a logged completion date array
     const isComp = (pt.completionDates && pt.completionDates.length > 0) || ['Completed', 'M-Completed', 'Postgame'].includes(pt.finalStatus);
     if (!isComp) return false;
     
-    // Grab the actual completion date (fallback to lastDate if needed)
     const cDate = (pt.completionDates && pt.completionDates.length > 0) ? new Date(pt.completionDates[0]) : new Date(pt.lastDate);
     pt.displayDate = cDate;
     
@@ -486,7 +486,6 @@ function renderCompletions(year) {
     pt.entryNum = finalEntry ? Number(finalEntry.entryNum) : 0;
   });
 
-  // 2. Sort chronologically
   completions.sort((a, b) => {
     const dateDiff = a.displayDate.getTime() - b.displayDate.getTime();
     if (dateDiff !== 0) return dateDiff;
@@ -498,43 +497,50 @@ function renderCompletions(year) {
 
   if (completions.length === 0) { container.innerHTML = `<div class="loading-text">No completions logged for ${year}.</div>`; return; }
 
-  // 3. Render HTML
   container.innerHTML = completions.map(pt => {
     const score = metaScores.get(pt.gameName) || '-';
     const badgeHTML = score !== '-' ? `<div class="item-badge">${score}</div>` : `<div class="item-badge" style="background: #eee; color: #888;">-</div>`;
     
     let pastCompletionsHtml = '';
-    
-    // Find the overall game stats to look for legacy completions
     if (rawData.metrics && rawData.metrics.completionStats) {
         const allTimeGameData = rawData.metrics.completionStats.find(g => g.gameName === pt.gameName);
-        
         if (allTimeGameData && allTimeGameData.completionDates.length > 1) {
-          // Get the date string for the current playthrough card being drawn
           const currentCompletionStr = formatFullDate(pt.displayDate);
-          
-          // Filter out the current date so we only show OTHER times you beat it
           const pastDates = allTimeGameData.completionDates
               .map(d => formatFullDate(d))
               .filter(d => d !== currentCompletionStr);
             if (pastDates.length > 0) {
                 const uniquePastDates = [...new Set(pastDates)];
-                pastCompletionsHtml = `<div class="past-completion-note" style="font-size: 0.85rem; font-style: italic; color: #888; margin-top: 4px;">Also completed on: ${uniquePastDates.join(', ')}</div>`;
+                pastCompletionsHtml = `<br><span style="font-style: italic; color: var(--text-sub);">Also completed on: ${uniquePastDates.join(', ')}</span>`;
             }
         }
     }
 
     return `
-      <div class="list-item">
-        <div class="item-info">
-          <span class="item-date">${formatShortDate(pt.displayDate)}</span>
-          <div class="item-text">
-            <span class="item-title hover-trigger" data-game="${escapeHTML(pt.gameName)}">${escapeHTML(pt.gameName)} (${escapeHTML(pt.system)})</span>
-            <span class="item-sub">(#${pt.yearRank})</span>
-            ${pastCompletionsHtml}
+      <div class="list-item" style="align-items: flex-start; padding: 12px 16px;">
+        <div style="display: flex; width: 100%; align-items: center;">
+          <!-- Left Date -->
+          <div style="font-weight: 700; color: var(--text-main); margin-right: 15px; min-width: 45px;">
+            ${formatShortDate(pt.displayDate)}
+          </div>
+          <!-- Middle Info Block -->
+          <div style="display: flex; flex-direction: column; flex: 1;">
+            <span class="item-title hover-trigger" data-game="${escapeHTML(pt.gameName)}" style="font-weight: bold;">
+              ${escapeHTML(pt.gameName)} (${escapeHTML(pt.system)})
+            </span>
+            <div class="item-sub" style="display: flex; justify-content: space-between; margin-top: 2px;">
+              <span style="color: var(--text-muted);">
+                (#${pt.yearRank}) &bull; ${pt.finalPtLifetime} (${pt.finalPtLifetimeDays} Day${pt.finalPtLifetimeDays == 1 ? '' : 's'})
+                ${pastCompletionsHtml}
+              </span>
+              <span style="color: var(--text-sub);">${formatFullDate(pt.startDate)} - ${formatFullDate(pt.lastDate)}</span>
+            </div>
+          </div>
+          <!-- Right Badge -->
+          <div style="margin-left: 15px;">
+            ${badgeHTML}
           </div>
         </div>
-        ${badgeHTML}
       </div>
     `;
   }).join('');
@@ -543,29 +549,34 @@ function renderCompletions(year) {
 // Most Played Time
 function renderMostPlayed(year) {
   const container = document.getElementById('most-played-list');
-  // Route data based on selection
   const statsObj = year === 'All-Time' ? rawData.metrics.allTimeGameStats : rawData.metrics.yearlyGameStats[year];
   
   if (!statsObj) { container.innerHTML = `<div class="loading-text">No playtime logged.</div>`; return; }
 
   const sortedGames = Object.entries(statsObj).map(([name, stats]) => {
-    // Apply the exact same Set logic we used for the 'days' column
-    const sysStr = stats.systems instanceof Set 
-        ? Array.from(stats.systems).join(', ') 
-        : (Array.isArray(stats.systems) ? stats.systems.join(', ') : (stats.systems && stats.systems.data ? stats.systems.data.join(', ') : ''));
-        
-    return { name, seconds: stats.totalSeconds, systems: sysStr };
+    const sysStr = stats.systems instanceof Set ? Array.from(stats.systems).join(', ') : (Array.isArray(stats.systems) ? stats.systems.join(', ') : (stats.systems && stats.systems.data ? stats.systems.data.join(', ') : ''));
+    const daysSet = stats.days instanceof Set ? Array.from(stats.days) : (Array.isArray(stats.days) ? stats.days : (stats.days && stats.days.data ? stats.days.data : []));
+    const daysArr = daysSet.sort();
+    
+    // Check Date Objects (All-Time) or fallback to String parsing (Yearly)
+    const minDate = stats.firstPlayedDate ? formatFullDate(stats.firstPlayedDate) : (daysArr.length > 0 ? daysArr[0].replace(/-/g, '/') : "N/A");
+    const maxDate = stats.lastPlayedDate ? formatFullDate(stats.lastPlayedDate) : (daysArr.length > 0 ? daysArr[daysArr.length - 1].replace(/-/g, '/') : "N/A");
+
+    return { name, seconds: stats.totalSeconds, days: daysArr.length, systems: sysStr, minDate, maxDate };
   }).sort((a, b) => b.seconds - a.seconds).slice(0, 100);
 
   container.innerHTML = sortedGames.map((game, index) => `
-    <div class="list-item">
-      <div class="item-info">
-        <span class="item-rank">#${index + 1}</span>
-        <div class="item-text">
-          <span class="item-title hover-trigger" data-game="${escapeHTML(game.name)}">${escapeHTML(game.name)}${game.systems ? ` (${escapeHTML(game.systems)})` : ''}</span>
-        </div>
+    <div class="list-item" style="align-items: flex-start; flex-direction: column; padding: 10px 12px;">
+      <div style="display: flex; justify-content: space-between; width: 100%; align-items: center;">
+        <span class="item-title" style="font-weight: bold;">
+          <span style="color: var(--text-muted); margin-right: 5px;">#${index + 1}</span><span class="hover-trigger" data-game="${escapeHTML(game.name)}">${escapeHTML(game.name)}</span> ${game.systems ? `(${escapeHTML(game.systems)})` : ''}
+        </span>
+        <div class="item-badge">${formatTime(game.seconds)}</div>
       </div>
-      <div class="item-badge">${formatTime(game.seconds)}</div>
+      <div class="item-sub" style="display: flex; justify-content: space-between; width: 100%; margin-top: 4px;">
+        <span><strong>${game.days}</strong> Days Played</span>
+        <span>${game.minDate} - ${game.maxDate}</span>
+      </div>
     </div>
   `).join('');
 }
@@ -573,32 +584,33 @@ function renderMostPlayed(year) {
 // Most Days Played
 function renderMostDays(year) {
   const container = document.getElementById('most-days-list');
-  // Route data based on selection
   const statsObj = year === 'All-Time' ? rawData.metrics.allTimeGameStats : rawData.metrics.yearlyGameStats[year];
   
   if (!statsObj) { container.innerHTML = `<div class="loading-text">No playtime logged.</div>`; return; }
 
   const sortedDays = Object.entries(statsObj).map(([name, stats]) => {
-    const dayCount = stats.days instanceof Set 
-    ? stats.days.size 
-    : (Array.isArray(stats.days) ? stats.days.length : (stats.days && stats.days.data ? stats.days.data.length : 0));
+    const sysStr = stats.systems instanceof Set ? Array.from(stats.systems).join(', ') : (Array.isArray(stats.systems) ? stats.systems.join(', ') : (stats.systems && stats.systems.data ? stats.systems.data.join(', ') : ''));
+    const daysSet = stats.days instanceof Set ? Array.from(stats.days) : (Array.isArray(stats.days) ? stats.days : (stats.days && stats.days.data ? stats.days.data : []));
+    const daysArr = daysSet.sort();
+    
+    const minDate = stats.firstPlayedDate ? formatFullDate(stats.firstPlayedDate) : (daysArr.length > 0 ? daysArr[0].replace(/-/g, '/') : "N/A");
+    const maxDate = stats.lastPlayedDate ? formatFullDate(stats.lastPlayedDate) : (daysArr.length > 0 ? daysArr[daysArr.length - 1].replace(/-/g, '/') : "N/A");
 
-const sysStr = stats.systems instanceof Set 
-    ? Array.from(stats.systems).join(', ') 
-    : (Array.isArray(stats.systems) ? stats.systems.join(', ') : (stats.systems && stats.systems.data ? stats.systems.data.join(', ') : ''));
-
-return { name, days: dayCount, systems: sysStr };
-  }).sort((a, b) => b.days - a.days).slice(0, 100); // <-- CHANGED TO 100
+    return { name, seconds: stats.totalSeconds, days: daysArr.length, systems: sysStr, minDate, maxDate };
+  }).sort((a, b) => b.days - a.days).slice(0, 100);
 
   container.innerHTML = sortedDays.map((game, index) => `
-    <div class="list-item">
-      <div class="item-info">
-        <span class="item-rank">#${index + 1}</span>
-        <div class="item-text">
-          <span class="item-title hover-trigger" data-game="${escapeHTML(game.name)}">${escapeHTML(game.name)}${game.systems ? ` (${escapeHTML(game.systems)})` : ''}</span>
-        </div>
+    <div class="list-item" style="align-items: flex-start; flex-direction: column; padding: 10px 12px;">
+      <div style="display: flex; justify-content: space-between; width: 100%; align-items: center;">
+        <span class="item-title" style="font-weight: bold;">
+          <span style="color: var(--text-muted); margin-right: 5px;">#${index + 1}</span><span class="hover-trigger" data-game="${escapeHTML(game.name)}">${escapeHTML(game.name)}</span> ${game.systems ? `(${escapeHTML(game.systems)})` : ''}
+        </span>
+        <div class="item-badge">${game.days} Days</div>
       </div>
-      <div class="item-badge">${game.days} Days</div>
+      <div class="item-sub" style="display: flex; justify-content: space-between; width: 100%; margin-top: 4px;">
+        <span><strong>${formatTime(game.seconds)}</strong> Played</span>
+        <span>${game.minDate} - ${game.maxDate}</span>
+      </div>
     </div>
   `).join('');
 }
@@ -607,7 +619,6 @@ return { name, days: dayCount, systems: sysStr };
 function renderLongestSession(year) {
   const container = document.getElementById('longest-session-list');
   
-  // Route data based on selection (either everything, or filter by year)
   const sessions = year === 'All-Time' 
     ? rawData.metrics.singleDaySessions 
     : rawData.metrics.singleDaySessions.filter(s => new Date(s.date).getUTCFullYear().toString() === year);
@@ -617,19 +628,24 @@ function renderLongestSession(year) {
   const sortedSessions = sessions.sort((a, b) => b.time - a.time).slice(0, 100);
   
   container.innerHTML = sortedSessions.map((s, index) => {
-    // Choose the format based on the 'year' dropdown selection
     const displayDate = year === 'All-Time' ? formatFullDate(s.date) : formatShortDate(s.date);
     
+    // Calculate the percentage of total playtime this single session represents
+    const totalGameSecs = rawData.metrics.allTimeGameStats[s.game] ? rawData.metrics.allTimeGameStats[s.game].totalSeconds : s.time;
+    const pct = ((s.time / totalGameSecs) * 100).toFixed(1);
+    
     return `
-    <div class="list-item">
-      <div class="item-info">
-        <span class="item-rank">#${index + 1}</span>
-        <div class="item-text">
-          <span class="item-title hover-trigger" data-game="${escapeHTML(s.game)}">${escapeHTML(s.game)}${s.system ? ` (${escapeHTML(s.system)})` : ''}</span>
-          <span class="item-sub">on ${displayDate}</span>
-        </div>
+    <div class="list-item" style="align-items: flex-start; flex-direction: column; padding: 10px 12px;">
+      <div style="display: flex; justify-content: space-between; width: 100%; align-items: center;">
+        <span class="item-title" style="font-weight: bold;">
+          <span style="color: var(--text-muted); margin-right: 5px;">#${index + 1}</span><span class="hover-trigger" data-game="${escapeHTML(s.game)}">${escapeHTML(s.game)}</span> ${s.system ? `(${escapeHTML(s.system)})` : ''}
+        </span>
+        <div class="item-badge">${formatTime(s.time)}</div>
       </div>
-      <div class="item-badge">${formatTime(s.time)}</div>
+      <div class="item-sub" style="display: flex; justify-content: space-between; width: 100%; margin-top: 4px;">
+        <span>Accounts for <strong>${pct}%</strong> of total playtime (${formatTime(totalGameSecs)})</span>
+        <span>${displayDate}</span>
+      </div>
     </div>
   `}).join('');
 }
@@ -654,7 +670,26 @@ function renderRankings(filterType, filterValue, containerId, limit) {
     let rankText = game.score !== lastScore ? `#${actualPosition}` : '';
     lastScore = game.score; actualPosition++;
     const displayScore = Number.isInteger(game.score) ? game.score : game.score.toFixed(1);
-    return `<div class="list-item"><div class="item-info"><span class="item-rank">${rankText}</span><div class="item-text"><span class="item-title hover-trigger" data-game="${escapeHTML(game.name)}">${escapeHTML(game.name)}</span></div></div><div class="item-badge">${displayScore}</div></div>`;
+    
+    // Grab the aggregated stats to display playtime next to the score
+    const gameStats = rawData.metrics.allTimeGameStats[game.name];
+    const timeStr = gameStats ? formatTime(gameStats.totalSeconds) : "0m";
+    const daysCount = gameStats && gameStats.days ? (gameStats.days.size || gameStats.days.length || (gameStats.days.data ? gameStats.days.data.length : 0)) : 0;
+    
+    return `
+    <div class="list-item" style="align-items: flex-start; flex-direction: column; padding: 10px 12px;">
+      <div style="display: flex; justify-content: space-between; width: 100%; align-items: center;">
+        <span class="item-title" style="font-weight: bold;">
+          <span style="color: var(--text-muted); margin-right: 5px; min-width: 25px; display: inline-block;">${rankText}</span><span class="hover-trigger" data-game="${escapeHTML(game.name)}">${escapeHTML(game.name)}</span>
+        </span>
+        <div class="item-badge">${displayScore}</div>
+      </div>
+      <div class="item-sub" style="display: flex; justify-content: space-between; width: 100%; margin-top: 4px;">
+        <span>Dev: <strong>${escapeHTML(game.developer)}</strong> (${escapeHTML(game.releaseYear)})</span>
+        <span><strong>${timeStr}</strong> | ${daysCount} Days</span>
+      </div>
+    </div>
+    `;
   }).join('');
 }
 
