@@ -6,16 +6,30 @@
   <title>yoshi xcx's Videogame Dashboard</title>
   <link rel="stylesheet" href="dashboard.css">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800;900&display=swap" rel="stylesheet">
+  <!-- ADD CHART.JS -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
 
   <header class="dashboard-header">
     <h1>yoshi xcx's videogame dashboard</h1>
+    <!-- ADD THEME TOGGLE -->
+    <button id="theme-toggle" class="theme-btn">🌙 Dark Mode</button>
   </header>
+
+  <!-- ADD STICKY NAVIGATION -->
+  <nav class="sticky-nav">
+    <a href="#section-summary">Summaries</a>
+    <a href="#section-rankings">Rankings</a>
+    <a href="#section-metrics">Metrics & Charts</a>
+    <a href="#section-heatmaps">Heatmaps</a>
+    <a href="#section-archives">Archives</a>
+  </nav>
 
   <main class="dashboard-container">
     
-    <section class="card-row grid-1">
+    <!-- ADD ID FOR NAVIGATION -->
+    <section id="section-summary" class="card-row grid-1">
       <div class="card">
         <div class="card-header">
           <h2>Monthly Summary: <select id="month-select" class="header-dropdown"></select></h2>
@@ -26,7 +40,8 @@
       </div>
     </section>
 
-    <section class="card-row grid-4">
+    <!-- ADD ID FOR NAVIGATION -->
+    <section id="section-rankings" class="card-row grid-4">
       <div class="card">
         <div class="card-header">
           <h2><select id="year-select-comp" class="header-dropdown"></select> Completions</h2>
@@ -79,8 +94,8 @@
       </div>
     </section>
 
-    <!-- NEW SECTION: Side-by-Side Aggregated Metrics -->
-    <section class="card-row grid-3">
+    <!-- ADD ID FOR NAVIGATION -->
+    <section id="section-metrics" class="card-row grid-3">
       <div class="card">
         <div class="card-header">
           <h2>Most Played Systems <select id="year-select-metrics" class="header-dropdown"></select></h2>
@@ -102,7 +117,26 @@
         <div class="card-content" id="most-played-genres-list"></div>
       </div>
     </section>
-    <!-- END NEW SECTION -->
+
+    <!-- NEW SECTION: CHART.JS VISUALIZATIONS -->
+    <section class="card-row grid-2">
+      <div class="card">
+        <div class="card-header">
+          <h2>Playtime by System (All-Time)</h2>
+        </div>
+        <div class="card-content">
+          <canvas id="systemChart"></canvas>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-header">
+          <h2>Playtime by Genre (All-Time)</h2>
+        </div>
+        <div class="card-content">
+          <canvas id="genreChart"></canvas>
+        </div>
+      </div>
+    </section>
 
     <section class="card-row" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); gap: 20px;">
       <div class="card">
@@ -147,7 +181,8 @@
       </div>
     </section>
     
-    <section class="card-row grid-1">
+    <!-- ADD ID FOR NAVIGATION -->
+    <section id="section-heatmaps" class="card-row grid-1">
       <div class="card">
         <div class="card-header">
           <h2>Metrics & Heatmaps: 
@@ -164,22 +199,26 @@
       </div>
     </section>
     
-    <section class="card-row grid-1">
+    <!-- ADD ID FOR NAVIGATION AND UPDATE TO LIVE SEARCH -->
+    <section id="section-archives" class="card-row grid-1">
       <div class="card">
         <div class="card-header">
           <h2>Full Game Archive: 
-            <select id="game-history-select" class="header-dropdown" style="max-width: 60%;"></select>
+            <input type="text" id="game-search" list="game-datalist" class="header-dropdown search-input" placeholder="Type to search games...">
+            <datalist id="game-datalist"></datalist>
           </h2>
         </div>
         <div class="card-content" id="game-history-content" style="padding: 0;"></div>
       </div>
     </section>
 
+    <!-- UPDATE TO LIVE SEARCH -->
     <section class="card-row grid-1">
       <div class="card">
         <div class="card-header">
           <h2>Series Archive: 
-            <select id="series-archive-select" class="header-dropdown" style="max-width: 60%;"></select>
+            <input type="text" id="series-search" list="series-datalist" class="header-dropdown search-input" placeholder="Type to search series...">
+            <datalist id="series-datalist"></datalist>
           </h2>
         </div>
         <div class="card-content" id="series-archive-content" style="padding: 0;"></div>
