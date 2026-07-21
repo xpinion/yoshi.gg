@@ -107,8 +107,6 @@ async function initDashboard() {
     renderMilestones();
     renderAnalysis('playthrough');
     renderHeatmap('gameSummary');
-    renderGameHistory(document.getElementById('game-history-select').value);
-    renderSeriesArchive(document.getElementById('series-archive-select').value);
 
     // Trigger the staggered fade-in animations for all cards
     document.querySelectorAll('.card').forEach((card, index) => {
@@ -1334,6 +1332,11 @@ function setupLiveSearch() {
     const uniqueGames = [...new Set(rawData.allEntries.map(e => e.game))].sort((a,b) => a.localeCompare(b));
     gameDatalist.innerHTML = uniqueGames.map(g => `<option value="${escapeHTML(g)}">`).join('');
     
+    // Set initial value to the most recently played game
+    const mostRecentGame = rawData.allEntries[rawData.allEntries.length - 1].game;
+    gameSearch.value = mostRecentGame;
+    renderGameHistory(mostRecentGame);
+
     // Listen for typing/selection
     gameSearch.addEventListener('input', (e) => {
       const val = e.target.value;
@@ -1348,6 +1351,18 @@ function setupLiveSearch() {
     const franchises = [...new Set(metaGames.map(g => g.franchise))].filter(f => f !== 'Unknown' && f !== 'ZZNONE').sort();
     seriesDatalist.innerHTML = franchises.map(f => `<option value="${escapeHTML(f)}">`).join('');
     
+    // Find the most recently played franchise for the initial render
+    let initialSeries = franchises.length > 0 ? franchises[0] : "";
+    for (let i = rawData.allEntries.length - 1; i >= 0; i--) {
+        if (rawData.allEntries[i].series && rawData.allEntries[i].series !== "N/A" && rawData.allEntries[i].series.toUpperCase() !== 'ZZNONE') {
+            initialSeries = rawData.allEntries[i].series;
+            break;
+        }
+    }
+    
+    seriesSearch.value = initialSeries;
+    renderSeriesArchive(initialSeries);
+
     // Listen for typing/selection
     seriesSearch.addEventListener('input', (e) => {
       const val = e.target.value;
