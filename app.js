@@ -499,7 +499,7 @@ function renderCompletions(year) {
 
   container.innerHTML = completions.map(pt => {
     const score = metaScores.get(pt.gameName) || '-';
-    const badgeHTML = score !== '-' ? `<div class="item-badge">${score}</div>` : `<div class="item-badge" style="background: #eee; color: #888;">-</div>`;
+    const badgeHTML = score !== '-' ? `<div class="item-badge">${score}</div>` : `<div class="item-badge" style="background: var(--heatmap-empty); color: var(--text-muted);">-</div>`;
     
     let pastCompletionsHtml = '';
     if (rawData.metrics && rawData.metrics.completionStats) {
@@ -511,35 +511,43 @@ function renderCompletions(year) {
               .filter(d => d !== currentCompletionStr);
             if (pastDates.length > 0) {
                 const uniquePastDates = [...new Set(pastDates)];
-                pastCompletionsHtml = `<br><span style="font-style: italic; color: var(--text-sub);">Also completed on: ${uniquePastDates.join(', ')}</span>`;
+                pastCompletionsHtml = `<div style="font-size: 0.75rem; font-style: italic; color: var(--text-sub); margin-top: 4px;">Also completed on: ${uniquePastDates.join(', ')}</div>`;
             }
         }
     }
 
+    // Standardize the time output (turns "13:45" into "13h 45m")
+    const formattedTime = formatTime(timeStringToSeconds(pt.finalPtLifetime));
+
     return `
-      <div class="list-item" style="align-items: flex-start; padding: 12px 16px;">
+      <div class="list-item" style="align-items: center; padding: 12px 16px;">
         <div style="display: flex; width: 100%; align-items: center;">
-          <!-- Left Date -->
-          <div style="font-weight: 700; color: var(--text-main); margin-right: 15px; min-width: 45px;">
-            ${formatShortDate(pt.displayDate)}
+          
+          <!-- Left Column: Date & Rank -->
+          <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; margin-right: 15px; min-width: 45px;">
+            <span style="font-weight: 800; color: var(--text-main); font-size: 0.95rem;">${formatShortDate(pt.displayDate)}</span>
+            <span style="color: var(--text-muted); font-size: 0.75rem; font-weight: 700; margin-top: 2px;">(#${pt.yearRank})</span>
           </div>
-          <!-- Middle Info Block -->
-          <div style="display: flex; flex-direction: column; flex: 1;">
-            <span class="item-title hover-trigger" data-game="${escapeHTML(pt.gameName)}" style="font-weight: bold;">
+          
+          <!-- Middle Column: Game Info & Stats -->
+          <div style="display: flex; flex-direction: column; flex: 1; overflow: hidden; padding-right: 10px;">
+            <span class="item-title hover-trigger" data-game="${escapeHTML(pt.gameName)}" style="font-weight: bold; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
               ${escapeHTML(pt.gameName)} (${escapeHTML(pt.system)})
             </span>
             <div class="item-sub" style="display: flex; justify-content: space-between; margin-top: 2px;">
               <span style="color: var(--text-muted);">
-                (#${pt.yearRank}) &bull; ${pt.finalPtLifetime} (${pt.finalPtLifetimeDays} Day${pt.finalPtLifetimeDays == 1 ? '' : 's'})
-                ${pastCompletionsHtml}
+                <strong>${formattedTime}</strong> (${pt.finalPtLifetimeDays} Day${pt.finalPtLifetimeDays == 1 ? '' : 's'})
               </span>
-              <span style="color: var(--text-sub);">${formatFullDate(pt.startDate)} - ${formatFullDate(pt.lastDate)}</span>
+              <span style="color: var(--text-sub);">Started: ${formatFullDate(pt.startDate)}</span>
             </div>
+            ${pastCompletionsHtml}
           </div>
-          <!-- Right Badge -->
-          <div style="margin-left: 15px;">
+          
+          <!-- Right Column: Score Badge -->
+          <div style="margin-left: auto;">
             ${badgeHTML}
           </div>
+          
         </div>
       </div>
     `;
