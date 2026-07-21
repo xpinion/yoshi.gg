@@ -101,7 +101,6 @@ async function initDashboard() {
     setupDropdowns();
     setupThemeToggle();
     setupLiveSearch();
-    renderCharts();
     setupHoverHistory();
     renderOnThisDay();
     renderMilestones();
@@ -1315,8 +1314,6 @@ function setupThemeToggle() {
     localStorage.setItem('yoshi-theme', isDark ? 'dark' : 'light');
     btn.innerText = isDark ? '☀️ Light Mode' : '🌙 Dark Mode';
     
-    // Re-render charts to update text colors against the new background
-    renderCharts();
   });
 }
 
@@ -1368,93 +1365,6 @@ function setupLiveSearch() {
       const val = e.target.value;
       if (franchises.includes(val)) {
         renderSeriesArchive(val);
-      }
-    });
-  }
-}
-
-// --- CHART.JS VISUALIZATION ---
-let sysChartInstance = null;
-let genreChartInstance = null;
-
-function renderCharts() {
-  if (!rawData || !rawData.metrics) return;
-
-  // Determine current theme colors for Chart text
-  const isDark = document.body.classList.contains('dark-theme');
-  const textColor = isDark ? '#e0e0e0' : '#333';
-
-  // 1. Prepare System Data (Top 10 to keep pie chart readable)
-  const systemStats = Object.entries(rawData.metrics.allTimeSystemStats)
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 10);
-    
-  const sysLabels = systemStats.map(s => s[0]);
-  const sysData = systemStats.map(s => Math.floor(s[1] / 3600)); // Convert to Hours
-
-  // Chart.js Color Palette
-  const bgColors = [
-    '#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF',
-    '#FF9F40', '#E7E9ED', '#8D6E63', '#71B37C', '#F3A4B5'
-  ];
-
-  // Render System Chart
-  const ctxSys = document.getElementById('systemChart');
-  if (sysChartInstance) sysChartInstance.destroy();
-  if (ctxSys) {
-    sysChartInstance = new Chart(ctxSys, {
-      type: 'doughnut',
-      data: {
-        labels: sysLabels,
-        datasets: [{
-          data: sysData,
-          backgroundColor: bgColors,
-          borderWidth: isDark ? 0 : 2
-        }]
-      },
-      options: {
-        responsive: true,
-        plugins: {
-          legend: { position: 'right', labels: { color: textColor } },
-          tooltip: { callbacks: { label: (ctx) => ` ${ctx.label}: ${ctx.raw} Hours` } }
-        }
-      }
-    });
-  }
-
-  // 2. Prepare Genre Data (Top 10)
-  const genreStats = Object.entries(rawData.metrics.allTimeGenreStats)
-    .sort((a, b) => b[1].totalSeconds - a[1].totalSeconds)
-    .slice(0, 10);
-    
-  const genreLabels = genreStats.map(g => g[0]);
-  const genreData = genreStats.map(g => Math.floor(g[1].totalSeconds / 3600)); // Convert to Hours
-
-  // Render Genre Chart
-  const ctxGenre = document.getElementById('genreChart');
-  if (genreChartInstance) genreChartInstance.destroy();
-  if (ctxGenre) {
-    genreChartInstance = new Chart(ctxGenre, {
-      type: 'bar',
-      data: {
-        labels: genreLabels,
-        datasets: [{
-          label: 'Hours Played',
-          data: genreData,
-          backgroundColor: '#36A2EB',
-          borderRadius: 4
-        }]
-      },
-      options: {
-        responsive: true,
-        scales: {
-          y: { ticks: { color: textColor }, grid: { color: isDark ? '#333' : '#eee' } },
-          x: { ticks: { color: textColor }, grid: { display: false } }
-        },
-        plugins: {
-          legend: { display: false },
-          tooltip: { callbacks: { label: (ctx) => ` ${ctx.raw} Hours` } }
-        }
       }
     });
   }
