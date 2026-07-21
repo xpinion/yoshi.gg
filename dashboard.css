@@ -1,5 +1,6 @@
+/* --- GLOBAL THEME VARIABLES --- */
 :root {
-  --primary-green: #2e7d32; /* Matches the green in your mockups */
+  --primary-green: #2e7d32;
   --bg-color: #f4f5f7;
   --card-bg: #ffffff;
   --text-main: #1a1a1a;
@@ -7,6 +8,79 @@
   --badge-bg: #222222;
   --badge-text: #ffffff;
   --item-bg: #fafafa;
+  
+  /* UI & Structural Colors */
+  --text-header: #111111;
+  --text-title: #222222;
+  --text-sub: #aaaaaa;
+  --border-light: #f0f0f0;
+  --border-table: #e0e0e0;
+  --scrollbar-track: #f1f1f1;
+  --scrollbar-thumb: #cccccc;
+  --scrollbar-thumb-hover: #aaaaaa;
+  
+  /* Table Specific Colors */
+  --active-row-bg: #ffffff;
+  --inactive-row-bg: #f9f9f9;
+  --inactive-row-text: #666666;
+  --grand-total-bg: #111111;
+  --grand-total-text: #ffffff;
+  --grand-total-border: #000000;
+  --table-row-even: #fafafa;
+  --table-row-hover: #f1f1f1;
+  --highlight-green-bg: #e8f5e9;
+  
+  /* Heatmap & Accordion Colors */
+  --heatmap-th: #555555;
+  --heatmap-border: #ffffff;
+  --heatmap-empty: #eeeeee;
+  --accordion-hover: rgba(0, 0, 0, 0.08);
+  
+  /* Nav Colors */
+  --nav-bg: #ffffff;
+  --nav-shadow: rgba(0,0,0,0.1);
+}
+
+body.dark-theme {
+  --primary-green: #4caf50; /* Slightly brighter green for dark mode contrast */
+  --bg-color: #121212;
+  --card-bg: #1e1e1e;
+  --text-main: #e0e0e0;
+  --text-muted: #aaaaaa;
+  --badge-bg: #333333;
+  --badge-text: #e0e0e0;
+  --item-bg: #2a2a2a;
+  
+  /* UI & Structural Colors */
+  --text-header: #ffffff;
+  --text-title: #e0e0e0;
+  --text-sub: #888888;
+  --border-light: #333333;
+  --border-table: #444444;
+  --scrollbar-track: #2a2a2a;
+  --scrollbar-thumb: #555555;
+  --scrollbar-thumb-hover: #777777;
+  
+  /* Table Specific Colors */
+  --active-row-bg: #222222;
+  --inactive-row-bg: #1a1a1a;
+  --inactive-row-text: #888888;
+  --grand-total-bg: #000000;
+  --grand-total-text: #4caf50;
+  --grand-total-border: #333333;
+  --table-row-even: #252525;
+  --table-row-hover: #333333;
+  --highlight-green-bg: #1a3320;
+  
+  /* Heatmap & Accordion Colors */
+  --heatmap-th: #aaaaaa;
+  --heatmap-border: #121212;
+  --heatmap-empty: #2a2a2a;
+  --accordion-hover: rgba(255, 255, 255, 0.08);
+  
+  /* Nav Colors */
+  --nav-bg: #1e1e1e;
+  --nav-shadow: rgba(0,0,0,0.5);
 }
 
 * {
@@ -20,6 +94,7 @@ body {
   background-color: var(--bg-color);
   color: var(--text-main);
   padding: 30px 20px;
+  transition: background-color 0.3s ease, color 0.3s ease;
 }
 
 .dashboard-header h1 {
@@ -28,7 +103,7 @@ body {
   margin-bottom: 40px;
   font-size: 2.5rem;
   font-weight: 900;
-  color: #111;
+  color: var(--text-header);
 }
 
 .dashboard-container {
@@ -39,8 +114,56 @@ body {
   gap: 30px;
 }
 
+/* --- THEME TOGGLE BUTTON --- */
+.theme-btn {
+  background: var(--card-bg);
+  color: var(--text-main);
+  border: 1px solid var(--border-table);
+  padding: 8px 16px;
+  border-radius: 20px;
+  cursor: pointer;
+  font-weight: bold;
+  transition: all 0.2s;
+  position: absolute;
+  right: 20px;
+  top: 20px;
+  box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+}
+.theme-btn:hover {
+  box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+  transform: translateY(-2px);
+}
+
+/* --- STICKY NAVIGATION --- */
+.sticky-nav {
+  position: sticky;
+  top: 0;
+  background-color: var(--nav-bg);
+  padding: 15px;
+  text-align: center;
+  z-index: 1000;
+  box-shadow: 0 2px 10px var(--nav-shadow);
+  display: flex;
+  justify-content: center;
+  gap: 20px;
+  flex-wrap: wrap;
+  margin: -30px -20px 30px -20px; /* Pulls nav flush with viewport edges */
+}
+.sticky-nav a {
+  text-decoration: none;
+  color: var(--text-main);
+  font-weight: 800;
+  font-size: 0.9rem;
+  text-transform: uppercase;
+  transition: color 0.2s;
+}
+.sticky-nav a:hover {
+  color: var(--primary-green);
+}
+
 /* Grid Layouts */
 .grid-1 { display: grid; grid-template-columns: 1fr; gap: 20px; }
+.grid-2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); gap: 20px; }
 .grid-3 { display: grid; grid-template-columns: repeat(auto-fit, minmax(350px, 1fr)); gap: 20px; }
 .grid-4 { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; }
 
@@ -52,11 +175,13 @@ body {
   padding: 25px;
   display: flex;
   flex-direction: column;
-  max-height: 1200px; /* Keeps lists uniform */
+  max-height: 1200px;
+  opacity: 0; 
+  animation: fadeInUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
 .card-header {
-  border-bottom: 2px solid #f0f0f0;
+  border-bottom: 2px solid var(--border-light);
   padding-bottom: 15px;
   margin-bottom: 20px;
   text-align: center;
@@ -93,9 +218,24 @@ body {
 }
 
 .header-dropdown option {
-  color: #111;
+  color: var(--text-main);
+  background-color: var(--card-bg);
   font-size: 1rem;
   font-weight: normal;
+}
+
+/* --- LIVE SEARCH INPUTS --- */
+.search-input {
+  width: 250px;
+  font-size: 1rem;
+  padding: 4px 8px;
+  border-radius: 4px;
+  border: 1px solid var(--primary-green);
+  color: var(--text-main);
+}
+.search-input::placeholder {
+  color: var(--text-muted);
+  font-weight: 400;
 }
 
 /* Scrollable Content Area */
@@ -107,11 +247,11 @@ body {
 
 /* Scrollbar styling */
 .card-content::-webkit-scrollbar { width: 6px; }
-.card-content::-webkit-scrollbar-track { background: #f1f1f1; border-radius: 4px; }
-.card-content::-webkit-scrollbar-thumb { background: #ccc; border-radius: 4px; }
-.card-content::-webkit-scrollbar-thumb:hover { background: #aaa; }
+.card-content::-webkit-scrollbar-track { background: var(--scrollbar-track); border-radius: 4px; }
+.card-content::-webkit-scrollbar-thumb { background: var(--scrollbar-thumb); border-radius: 4px; }
+.card-content::-webkit-scrollbar-thumb:hover { background: var(--scrollbar-thumb-hover); }
 
-/* List Item Styles (The mockup rows) */
+/* List Item Styles */
 .list-item {
   padding: 8px 12px;
   margin-bottom: 8px;
@@ -151,27 +291,21 @@ body {
   flex-direction: column;
 }
 .item-title {
-  font-size: 0.9rem; /* Shrunk down from 1.05rem */
-  
-  /* Existing properties */
+  font-size: 0.9rem;
   font-weight: 700;
-  color: #222;
+  color: var(--text-title);
 }
 
 .item-sub {
-  font-size: 0.75rem; /* Shrunk down from 0.8rem */
-  
-  /* Existing properties */
-  color: #aaa;
+  font-size: 0.75rem;
+  color: var(--text-sub);
   font-weight: 600;
   margin-top: 2px;
 }
 
 .item-badge {
-  font-size: 0.8rem; /* Shrunk down from 0.9rem */
-  padding: 4px 10px; /* Reduced padding inside the badge */
-  
-  /* Existing properties */
+  font-size: 0.8rem;
+  padding: 4px 10px;
   background: var(--badge-bg);
   color: var(--badge-text);
   border-radius: 20px;
@@ -190,7 +324,7 @@ body {
 /* --- Monthly Detailed Table Styles --- */
 .monthly-table-wrapper {
   width: 100%;
-  overflow-x: auto; /* Allows side-scrolling on small screens */
+  overflow-x: auto;
   padding-bottom: 10px;
 }
 
@@ -198,7 +332,7 @@ body {
   width: 100%;
   border-collapse: collapse;
   font-size: 0.85rem;
-  min-width: 1200px; /* Ensures columns don't crush together */
+  min-width: 1200px;
 }
 
 .monthly-table th {
@@ -206,42 +340,46 @@ body {
   color: white;
   font-weight: 700;
   padding: 10px;
-  border: 1px solid #1a4a1c;
+  border: 1px solid rgba(0,0,0,0.2);
   text-align: center;
   white-space: nowrap;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
 }
 
 .monthly-table td {
   padding: 8px 10px;
-  border: 1px solid #e0e0e0;
+  border: 1px solid var(--border-table);
   vertical-align: middle;
 }
 
 .monthly-table tr.active-row {
   font-weight: 700;
-  background-color: #ffffff;
+  background-color: var(--active-row-bg);
 }
 
 .monthly-table tr.inactive-row {
   font-weight: 400;
-  background-color: #f9f9f9;
-  color: #666;
+  background-color: var(--inactive-row-bg);
+  color: var(--inactive-row-text);
 }
 
 .monthly-table td.text-left { text-align: left; }
 .monthly-table td.text-center { text-align: center; }
 
 .status-cell {
-  color: #000; /* Dark text for readability against bright colors */
-  text-shadow: 0 0 2px rgba(255,255,255,0.5); /* Helps legibility */
+  color: #000;
+  text-shadow: 0 0 2px rgba(255,255,255,0.5);
 }
 
 .grand-total-row td {
-  background-color: #111;
-  color: #fff;
+  background-color: var(--grand-total-bg);
+  color: var(--grand-total-text);
   font-weight: 800;
   font-size: 0.95rem;
-  border-color: #000;
+  border-color: var(--grand-total-border);
 }
 
 /* --- Top 25 Spotlight Table --- */
@@ -249,26 +387,55 @@ body {
   width: 100%; 
   border-collapse: collapse; 
   font-size: 0.85rem; 
+  border-top: none;
 }
 .top25-table th { 
-  background-color: var(--primary-green); /* Switched to green */
+  background-color: var(--primary-green);
   color: white; 
-  font-weight: 700; /* Made the font bold like the others */
+  font-weight: 700;
   padding: 10px; 
-  border: 1px solid #1a4a1c; /* Added the dark green border */
-  text-align: center; /* Centered the headers */
+  border: 1px solid rgba(0,0,0,0.2);
+  text-align: center;
   position: sticky;
   top: 0;
   z-index: 10;
 }
 .top25-table td { 
   padding: 8px 10px; 
-  border: 1px solid #e0e0e0; /* Added the full grid lines */
-  text-align: center; /* Centered the data text */
+  border: 1px solid var(--border-table);
+  text-align: center;
   vertical-align: middle;
 }
-.top25-table tr:nth-child(even) { background-color: #fafafa; }
-.top25-table tr:hover { background-color: #f1f1f1; }
+.top25-table tr:nth-child(even) { background-color: var(--table-row-even); }
+.top25-table tr:hover { background-color: var(--table-row-hover); }
+
+/* Highlight bolded entries in spotlight */
+.top25-table td[style*="font-weight: 800"] {
+  border-left: 4px solid var(--primary-green);
+}
+
+.spotlight-subtitle {
+  background: var(--primary-green);
+  color: #fff;
+  padding: 10px;
+  font-size: 0.9rem;
+  font-weight: 800;
+  text-align: center;
+  border-radius: 8px 8px 0 0;
+  margin: 0;
+  text-transform: uppercase;
+}
+
+.spotlight-dual-container {
+  display: flex;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+
+.spotlight-section {
+  flex: 1;
+  min-width: 400px;
+}
 
 /* --- Hover History Tooltip --- */
 .hover-trigger { 
@@ -295,7 +462,7 @@ body {
 }
 .game-tooltip.visible { 
   opacity: 1; 
-  pointer-events: auto; /* <--- ADDED HERE */
+  pointer-events: auto;
 }
 .game-tooltip h3 { 
   color: #4CAF50; 
@@ -313,7 +480,6 @@ body {
 .tooltip-meta { font-weight: bold; color: #aaa; margin-bottom: 3px; }
 .tooltip-note { color: #ddd; line-height: 1.4; }
 
-/* Scrollbar for tooltip */
 .game-tooltip::-webkit-scrollbar { width: 4px; }
 .game-tooltip::-webkit-scrollbar-thumb { background: #666; border-radius: 4px; }
 
@@ -328,7 +494,7 @@ body {
   background-color: var(--primary-green);
   color: white;
   padding: 10px;
-  border: 1px solid #1a4a1c;
+  border: 1px solid rgba(0,0,0,0.2);
   text-align: center;
   position: sticky;
   top: 0;
@@ -336,12 +502,12 @@ body {
 }
 .analysis-table td {
   padding: 8px;
-  border: 1px solid #e0e0e0;
+  border: 1px solid var(--border-table);
   text-align: center;
 }
-.analysis-table tr:nth-child(even) { background-color: #fafafa; }
-.analysis-table tr:hover { background-color: #f1f1f1; }
-.analysis-table tr.all-time-row td { font-weight: bold; background-color: #e8f5e9; }
+.analysis-table tr:nth-child(even) { background-color: var(--table-row-even); }
+.analysis-table tr:hover { background-color: var(--table-row-hover); }
+.analysis-table tr.all-time-row td { font-weight: bold; background-color: var(--highlight-green-bg); }
 
 /* --- Milestone Tracker --- */
 .milestone-item {
@@ -359,11 +525,12 @@ body {
   height: 10px;
   border-radius: 50%;
   background: var(--primary-green);
-  box-shadow: 0 0 0 3px #e8f5e9;
+  box-shadow: 0 0 0 3px var(--highlight-green-bg);
+  transition: box-shadow 0.3s ease;
 }
 .milestone-item:last-child { border-left-color: transparent; }
 .milestone-date { font-weight: 800; color: var(--primary-green); font-size: 0.85rem; margin-bottom: 5px; }
-.milestone-detail { font-size: 0.9rem; color: #333; line-height: 1.4; }
+.milestone-detail { font-size: 0.9rem; color: var(--text-title); line-height: 1.4; }
 
 /* --- Heatmap --- */
 .heatmap-table {
@@ -373,13 +540,13 @@ body {
 }
 .heatmap-table th {
   padding: 4px;
-  color: #555;
+  color: var(--heatmap-th);
   font-weight: bold;
 }
 .heatmap-table td {
   width: 25px;
   height: 25px;
-  border: 1px solid #fff;
+  border: 1px solid var(--heatmap-border);
   text-align: center;
   cursor: crosshair;
   transition: transform 0.1s;
@@ -390,9 +557,23 @@ body {
   z-index: 5;
   position: relative;
 }
-.heatmap-empty { background-color: #eee; }
+.heatmap-empty { background-color: var(--heatmap-empty); }
 
-/* --- Dashboard Entrance Animations --- */
+/* --- Monthly Summary Accordion Styles --- */
+.accordion-toggle-row {
+  transition: background-color 0.2s ease;
+}
+.accordion-toggle-row:hover {
+  background-color: var(--accordion-hover) !important;
+}
+.toggle-icon {
+  display: inline-block;
+  width: 16px;
+  text-align: center;
+  font-size: 0.8rem;
+}
+
+/* --- Animations --- */
 @keyframes fadeInUp {
   0% {
     opacity: 0;
@@ -404,73 +585,9 @@ body {
   }
 }
 
-.card {
-  /* This ensures the cards are invisible before the animation fires */
-  opacity: 0; 
-  /* cubic-bezier gives it that buttery smooth "snap into place" feel */
-  animation: fadeInUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-}
-
-/* --- Sticky Headers for Monthly Summary --- */
-.monthly-table th {
-  position: sticky;
-  top: 0;
-  z-index: 10;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.1); /* Adds a tiny drop shadow when scrolling */
-}
-
-.spotlight-subtitle {
-  background: var(--primary-green);
-  color: #fff;
-  padding: 10px;
-  font-size: 0.9rem;
-  font-weight: 800;
-  text-align: center;
-  border-radius: 8px 8px 0 0;
-  margin: 0;
-  text-transform: uppercase;
-}
-
-/* Highlight bolded entries in spotlight with a subtle green tint */
-.top25-table td[style*="font-weight: 800"] {
-  border-left: 4px solid var(--primary-green);
-}
-
-.spotlight-dual-container {
-  display: flex;
-  gap: 20px;
-  flex-wrap: wrap;
-}
-
-.spotlight-section {
-  flex: 1;
-  min-width: 400px;
-}
-
-/* Adjust table to fit with sub-header */
-.spotlight-section .top25-table {
-  border-top: none;
-}
-
-/* Mobile Tweak */
+/* Mobile Tweaks */
 @media (max-width: 1000px) {
   .spotlight-section {
     min-width: 100%;
   }
-}
-
-/* Monthly Summary Accordion Styles */
-.accordion-toggle-row {
-  transition: background-color 0.2s ease;
-}
-
-.accordion-toggle-row:hover {
-  background-color: rgba(0, 0, 0, 0.08) !important; /* Slightly darkens when you mouse over */
-}
-
-.toggle-icon {
-  display: inline-block;
-  width: 16px; /* Keeps spacing consistent between ▶ and ▼ */
-  text-align: center;
-  font-size: 0.8rem;
 }
