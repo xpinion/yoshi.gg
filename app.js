@@ -1355,10 +1355,11 @@ function setupLiveSearch() {
   if (gameSearch && gameDatalist) {
     const uniqueGames = [...new Set(rawData.allEntries.map(e => e.game))].sort((a,b) => a.localeCompare(b));
     gameDatalist.innerHTML = uniqueGames.map(g => `<option value="${escapeHTML(g)}">`).join('');
-    
-    // Set initial value to the most recently played game
+
+    // Find the most recent game and render its history, but leave the input blank
     const mostRecentGame = rawData.allEntries[rawData.allEntries.length - 1].game;
-    gameSearch.value = mostRecentGame;
+    gameSearch.value = ""; // Force the box to be blank
+    gameSearch.placeholder = `Search... (Showing: ${mostRecentGame})`; // Helpful hint
     renderGameHistory(mostRecentGame);
 
     // Listen for typing/selection
@@ -1366,6 +1367,9 @@ function setupLiveSearch() {
       const val = e.target.value;
       if (uniqueGames.includes(val)) {
         renderGameHistory(val);
+      } else if (val === "") {
+        // If they clear the box, revert to the most recent game
+        renderGameHistory(mostRecentGame);
       }
     });
   }
@@ -1374,8 +1378,8 @@ function setupLiveSearch() {
   if (seriesSearch && seriesDatalist) {
     const franchises = [...new Set(metaGames.map(g => g.franchise))].filter(f => f !== 'Unknown' && f !== 'ZZNONE').sort();
     seriesDatalist.innerHTML = franchises.map(f => `<option value="${escapeHTML(f)}">`).join('');
-    
-    // Find the most recently played franchise for the initial render
+
+    // Find the most recently played franchise
     let initialSeries = franchises.length > 0 ? franchises[0] : "";
     for (let i = rawData.allEntries.length - 1; i >= 0; i--) {
         if (rawData.allEntries[i].series && rawData.allEntries[i].series !== "N/A" && rawData.allEntries[i].series.toUpperCase() !== 'ZZNONE') {
@@ -1383,8 +1387,10 @@ function setupLiveSearch() {
             break;
         }
     }
-    
-    seriesSearch.value = initialSeries;
+
+    // Render the history, but leave the input blank
+    seriesSearch.value = ""; // Force the box to be blank
+    seriesSearch.placeholder = `Search... (Showing: ${initialSeries})`; // Helpful hint
     renderSeriesArchive(initialSeries);
 
     // Listen for typing/selection
@@ -1392,6 +1398,9 @@ function setupLiveSearch() {
       const val = e.target.value;
       if (franchises.includes(val)) {
         renderSeriesArchive(val);
+      } else if (val === "") {
+        // If they clear the box, revert to the initial series
+        renderSeriesArchive(initialSeries);
       }
     });
   }
