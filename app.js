@@ -73,16 +73,10 @@ async function initDashboard() {
     ]);
 
     const rawText = await rawResponse.text();
-    rawData = JSON.parse(rawText, (key, value) => {
-      // ONLY Revive Sets (Leave Dates as strings so .startsWith() and .split() work!)
-      if (value && typeof value === 'object' && value._dataType === 'Set') {
-        // Look for the array in value.value, falling back to value.data just in case
-        const arrayItems = value.value || value.data || [];
-        return new Set(arrayItems);
-      }
-      return value;
-    });
     
+    // --- UPDATED: Standard JSON parse. No custom reviver needed! ---
+    rawData = JSON.parse(rawText);
+
     const metaData = await metaResponse.json();
     const top25Data = await top25Response.json();
 
@@ -114,7 +108,7 @@ async function initDashboard() {
     document.querySelectorAll('.card').forEach((card, index) => {
       card.style.animationDelay = `${index * 0.08}s`; // 80ms delay per card
     });
-    
+
   } catch (error) {
     console.error("Error loading dashboard data:", error);
     document.querySelectorAll('.card-content').forEach(el => el.innerHTML = `<div class="loading-text" style="color: red;">Error loading data.</div>`);
@@ -558,14 +552,13 @@ function renderCompletions(year) {
 function renderMostPlayed(year) {
   const container = document.getElementById('most-played-list');
   const statsObj = year === 'All-Time' ? rawData.metrics.allTimeGameStats : rawData.metrics.yearlyGameStats[year];
-  
+
   if (!statsObj) { container.innerHTML = `<div class="loading-text">No playtime logged.</div>`; return; }
 
   const sortedGames = Object.entries(statsObj).map(([name, stats]) => {
-    const sysStr = stats.systems instanceof Set ? Array.from(stats.systems).join(', ') : (Array.isArray(stats.systems) ? stats.systems.join(', ') : (stats.systems && stats.systems.data ? stats.systems.data.join(', ') : ''));
-    const daysSet = stats.days instanceof Set ? Array.from(stats.days) : (Array.isArray(stats.days) ? stats.days : (stats.days && stats.days.data ? stats.days.data : []));
-    const daysArr = daysSet.sort();
-    
+    const sysStr = (stats.systems || []).join(', ');
+    const daysArr = [...(stats.days || [])].sort();
+
     // Check Date Objects (All-Time) or fallback to String parsing (Yearly)
     const minDate = stats.firstPlayedDate ? formatFullDate(stats.firstPlayedDate) : (daysArr.length > 0 ? daysArr[0].replace(/-/g, '/') : "N/A");
     const maxDate = stats.lastPlayedDate ? formatFullDate(stats.lastPlayedDate) : (daysArr.length > 0 ? daysArr[daysArr.length - 1].replace(/-/g, '/') : "N/A");
@@ -593,14 +586,13 @@ function renderMostPlayed(year) {
 function renderMostDays(year) {
   const container = document.getElementById('most-days-list');
   const statsObj = year === 'All-Time' ? rawData.metrics.allTimeGameStats : rawData.metrics.yearlyGameStats[year];
-  
+
   if (!statsObj) { container.innerHTML = `<div class="loading-text">No playtime logged.</div>`; return; }
 
   const sortedDays = Object.entries(statsObj).map(([name, stats]) => {
-    const sysStr = stats.systems instanceof Set ? Array.from(stats.systems).join(', ') : (Array.isArray(stats.systems) ? stats.systems.join(', ') : (stats.systems && stats.systems.data ? stats.systems.data.join(', ') : ''));
-    const daysSet = stats.days instanceof Set ? Array.from(stats.days) : (Array.isArray(stats.days) ? stats.days : (stats.days && stats.days.data ? stats.days.data : []));
-    const daysArr = daysSet.sort();
-    
+    const sysStr = (stats.systems || []).join(', ');
+    const daysArr = [...(stats.days || [])].sort();
+
     const minDate = stats.firstPlayedDate ? formatFullDate(stats.firstPlayedDate) : (daysArr.length > 0 ? daysArr[0].replace(/-/g, '/') : "N/A");
     const maxDate = stats.lastPlayedDate ? formatFullDate(stats.lastPlayedDate) : (daysArr.length > 0 ? daysArr[daysArr.length - 1].replace(/-/g, '/') : "N/A");
 
@@ -661,7 +653,7 @@ function renderLongestSession(year) {
 function renderRankings(filterType, filterValue, containerId, limit) {
   const container = document.getElementById(containerId);
   let filtered = metaGames.filter(g => g.score !== null);
-  
+
   if (filterValue !== 'All-Time') {
     if (filterType === 'year') filtered = filtered.filter(g => g.releaseYear === filterValue);
     if (filterType === 'franchise') filtered = filtered.filter(g => g.franchise === filterValue);
@@ -678,12 +670,12 @@ function renderRankings(filterType, filterValue, containerId, limit) {
     let rankText = game.score !== lastScore ? `#${actualPosition}` : '';
     lastScore = game.score; actualPosition++;
     const displayScore = Number.isInteger(game.score) ? game.score : game.score.toFixed(1);
-    
+
     // Grab the aggregated stats to display playtime next to the score
     const gameStats = rawData.metrics.allTimeGameStats[game.name];
     const timeStr = gameStats ? formatTime(gameStats.totalSeconds) : "0m";
-    const daysCount = gameStats && gameStats.days ? (gameStats.days.size || gameStats.days.length || (gameStats.days.data ? gameStats.days.data.length : 0)) : 0;
-    
+    const daysCount = gameStats && gameStats.days ? gameStats.days.length : 0;
+
     return `
     <div class="list-item" style="align-items: flex-start; flex-direction: column; padding: 10px 12px;">
       <div style="display: flex; justify-content: space-between; width: 100%; align-items: center;">
@@ -848,10 +840,10 @@ function renderHeatmap(mode) {
   const container = document.getElementById('heatmap-content');
   if (!rawData || !rawData.metrics || !rawData.metrics.calendarData) return;
 
-  // --- NEW: Game of the Year (Scores) Summary ---
+  // --- Game of the Year (Scores) Summary ---
   if (mode === 'gotySummary') {
     const ratedGames = metaGames.filter(g => g.score !== null);
-    
+
     // Group games by their release year
     const gamesByYear = {};
     ratedGames.forEach(g => {
@@ -861,12 +853,12 @@ function renderHeatmap(mode) {
         gamesByYear[y].push(g);
       }
     });
-    
+
     const sortedYears = Object.keys(gamesByYear).sort((a,b) => b - a);
-    
+
     let html = `<div style="overflow-x: auto;"><table class="analysis-table"><thead><tr>`;
     html += `<th>Release Year</th><th>🏆 GOTY</th><th>2nd Place</th><th>3rd Place</th><th>4th Place</th><th>5th Place</th></tr></thead><tbody>`;
-    
+
     // 1. Render All-Time Top 5
     const allTimeTop5 = [...ratedGames].sort((a,b) => b.score - a.score || a.name.localeCompare(b.name)).slice(0, 5);
     html += `<tr class="all-time-row">
@@ -896,19 +888,19 @@ function renderHeatmap(mode) {
         }).join('')}
       </tr>`;
     });
-    
+
     html += `</tbody></table></div>`;
     container.innerHTML = html;
     return;
   }
-  
+
   // 1. Render Chart Tables (Game/Genre Summaries)
   if (mode === 'gameSummary' || mode === 'genreSummary') {
     const isGame = mode === 'gameSummary';
-    const map = isGame ? 
+    const map = isGame ?
       { 'All-Time': rawData.metrics.allTimeGameStats, ...rawData.metrics.yearlyGameStats, ...rawData.metrics.monthlyStats } :
       { 'All-Time': rawData.metrics.allTimeGenreStats, ...rawData.metrics.yearlyGenreStats, ...rawData.metrics.monthlyGenreStats };
-    
+
     const gameMapForDays = { 'All-Time': rawData.metrics.allTimeGameStats, ...rawData.metrics.yearlyGameStats, ...rawData.metrics.monthlyStats };
 
     const yearKeys = Object.keys(rawData.metrics.yearlyGameStats).sort().reverse();
@@ -922,21 +914,17 @@ function renderHeatmap(mode) {
       const stats = map[key] || {};
       const top5 = Object.entries(stats).map(([name, data]) => ({ name, ...data })).sort((a,b) => b.totalSeconds - a.totalSeconds).slice(0, 5);
       const totalTime = Object.values(stats).reduce((sum, item) => sum + item.totalSeconds, 0);
-      
+
       const totalDaysSet = new Set();
       const statsForDays = isGame ? stats : gameMapForDays[key];
       if (statsForDays) {
           Object.values(statsForDays).forEach(item => {
               if (item.days) {
-                  // Safely handle Sets, Arrays, or raw data objects
-                  const daysArr = item.days instanceof Set 
-                      ? Array.from(item.days) 
-                      : (Array.isArray(item.days) ? item.days : (item.days.data || []));
-                  daysArr.forEach(d => totalDaysSet.add(d));
+                  item.days.forEach(d => totalDaysSet.add(d));
               }
           });
       }
-      
+
       let displayKey = key;
       if (key !== 'All-Time' && key.includes('-')) {
           const [y, m] = key.split('-');
@@ -951,11 +939,7 @@ function renderHeatmap(mode) {
         ${[0,1,2,3,4].map(i => {
            if (top5[i]) {
                if (isGame) {
-                   // Safely handle Sets, Arrays, or raw data objects for Systems
-                   const sysStr = top5[i].systems instanceof Set 
-                       ? Array.from(top5[i].systems).join(', ') 
-                       : (Array.isArray(top5[i].systems) ? top5[i].systems.join(', ') : (top5[i].systems && top5[i].systems.data ? top5[i].systems.data.join(', ') : ''));
-                       
+                   const sysStr = (top5[i].systems || []).join(', ');
                    return `<td style="font-size: 0.75rem; text-align: left;">[${formatHHMM(top5[i].totalSeconds)}] ${escapeHTML(top5[i].name)} (${escapeHTML(sysStr)})</td>`;
                } else {
                    return `<td style="font-size: 0.75rem; text-align: left;">[${formatHHMM(top5[i].totalSeconds)}] ${escapeHTML(top5[i].name)}</td>`;
@@ -975,7 +959,7 @@ function renderHeatmap(mode) {
   const calData = rawData.metrics.calendarData;
   const possible = rawData.metrics.possibleYears;
   const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-  
+
   let maxTime = 0;
   if (mode === 'time') {
     for (let m=0; m<12; m++) {
@@ -1002,7 +986,7 @@ function renderHeatmap(mode) {
 
       const dayData = calData[m][d];
       const poss = possible[m][d];
-      const playedCount = dayData.yearsPlayed ? (Array.isArray(dayData.yearsPlayed) ? dayData.yearsPlayed.length : (dayData.yearsPlayed.data ? dayData.yearsPlayed.data.length : 0)) : 0;
+      const playedCount = dayData.yearsPlayed ? dayData.yearsPlayed.length : 0;
       const timeSec = dayData.totalSeconds;
 
       let bgColor = '#f7f7f7';
