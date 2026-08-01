@@ -73,7 +73,7 @@ async function initDashboard() {
     ]);
 
     const rawText = await rawResponse.text();
-    rawData = JSON.parse(rawText, (key, value) => {
+    rawData = JSON.parse(rawText);
       // ONLY Revive Sets (Leave Dates as strings so .startsWith() and .split() work!)
       if (value && typeof value === 'object' && value._dataType === 'Set') {
         // Look for the array in value.value, falling back to value.data just in case
@@ -121,60 +121,271 @@ async function initDashboard() {
   }
 }
 
-// --- SPOTLIGHT PARSING (Grouped & Bolded) ---
 function parseTop25Data(top25Data) {
   allTop25Tables = [];
-  const { values, backgrounds, fontWeights } = top25Data;
-  if (!values || !backgrounds) return;
+  const currentYear = new Date().getFullYear();
 
-  const TITLE_BG = "#0000ff";
+  // --- CORE HELPERS ---
+  const getRank = (val, prev, idx) => val === prev ? "" : `#${idx + 1}`;
+  const getSysStr = (sys) => Array.isArray(sys) ? sys.join(', ') : (sys?.data ? sys.data.join(', ') : (sys || ''));
+  const getBold = (dateStr) => dateStr ? new Date(dateStr).getFullYear() === currentYear : false;
 
-  const extractBlock = (r, c, width) => {
-    let headers = [];
-    let rows = [];
-    if (!values[r+1]) return { headers, rows };
+  const buildDualTable = (mainTitle, rightTitle, leftData, rightData, headers, leftFn, rightFn, rightHeaders = null) => {
+    if (!leftData || leftData.length === 0) return;
     
-    // Grab headers from the row immediately below the title
-    for (let i = 0; i < width; i++) headers.push(values[r+1][c+i]);
-    
-    // Grab data rows until we hit another title background
-    let dr = r + 2;
-    while (dr < values.length && backgrounds[dr] && backgrounds[dr][c] !== TITLE_BG) {
-      let rowHasData = false;
-      let rowVals = [];
-      for (let i = 0; i < width; i++) {
-        const val = values[dr][c+i] || "";
-        if (val.trim() !== "") rowHasData = true;
-        // Check for "bold" weight provided by the sheet
-        const isBold = fontWeights && fontWeights[dr] ? fontWeights[dr][c+i] === "bold" : false;
-        rowVals.push({ val, isBold });
-      }
-      if (!rowHasData) break;
-      rows.push(rowVals);
-      dr++;
-    }
-    return { headers, rows };
+    let prevVal = null;
+    const leftRows = leftData.map((item, i) => {
+      const row = leftFn(item, i, prevVal);
+      prevVal = row.rawVal;
+      return [
+        { val: row.c1, isBold: row.isBold }, { val: row.c2, isBold: row.isBold },
+        { val: row.c3, isBold: row.isBold }, { val: row.c4, isBold: row.isBold },
+        { val: row.c5, isBold: row.isBold }
+      ];
+    });
+
+    const rightRows = rightData ? rightData.map(w => {
+      const row = rightFn(w);
+      return [
+        { val: row.c1, isBold: false }, { val: row.c2, isBold: false },
+        { val: row.c3, isBold: false }, { val: row.c4, isBold: false },
+        { val: row.c5, isBold: false }
+      ];
+    }) : [];
+
+    allTop25Tables.push({
+      type: rightData ? 'dual' : 'single',
+      mainTitle: mainTitle,
+      left: { title: mainTitle, headers: headers, rows: leftRows },
+      right: rightData ? { title: rightTitle, headers: rightHeaders || ["Year", ...headers.slice(1)], rows: rightRows } : null
+    });
   };
 
-  // Scan only Column A (Index 0) for titles to initiate a pairing
-  for (let r = 0; r < values.length; r++) {
-    if (backgrounds[r] && backgrounds[r][0] === TITLE_BG && values[r][0]) {
-      const left = extractBlock(r, 0, 5);
-      const hasRight = backgrounds[r][6] === TITLE_BG;
-      
-      allTop25Tables.push({
-        type: hasRight ? 'dual' : 'single',
-        mainTitle: values[r][0], // The left title is our key
-        left: { title: values[r][0], ...left },
-        right: hasRight ? { title: values[r][6], ...extractBlock(r, 6, 5) } : null
-      });
+  // --- STANDARD FORMATTERS ---
+  
+  const fmtStreak = (item, i, prev) => ({
+    rawVal: item.length, c1: getRank(item.length, prev, i), c2: item.length,
+    c3: formatFullDate(item.start || item.startDate), c4: formatFullDate(item.end || item.endDate),
+    c5: item.detailsString || item.brokenBy || `${item.game || item.system} ${item.systems ? `(${getSysStr(item.systems)})` : ''}`,
+    isBold: getBold(item.end || item.endDate)
+  });
+  
+  const fmtStreakYr = (w) => ({
+    c1: w.year, c2: w.data.clippedLength || w.data.length || w.data.value,
+    c3: formatFullDate(w.data.clippedStart || w.data.minDate || w.data.start || w.data.startDate), 
+    c4: formatFullDate(w.data.clippedEnd || w.data.maxDate || w.data.end || w.data.endDate),
+    c5: w.data.detailsString || w.data.brokenBy || `${w.data.game || w.data.system} ${w.data.systems ? `(${getSysStr(w.data.systems)})` : ''}`
+  });
+
+  const fmtEvt = (valKey, sKey, eKey, descFn, isTime=false) => (item, i, prev) => {
+    const v = item[valKey]; const endD = item[eKey] || item[sKey];
+    return { rawVal: v, c1: getRank(v, prev, i), c2: isTime ? formatHHMM(v) : v,
+      c3: formatFullDate(item[sKey]), c4: formatFullDate(endD),
+      c5: descFn(item), isBold: getBold(endD) };
+  };
+  
+  const fmtEvtYr = (valKey, sKey, eKey, descFn, isTime=false) => (w) => {
+    if(!w || !w.data) return { c1: w.year, c2: "-", c3: "-", c4: "-", c5: "-" };
+    const endD = w.data[eKey] || w.data[sKey];
+    return { c1: w.year, c2: isTime ? formatHHMM(w.data[valKey]) : w.data[valKey],
+      c3: formatFullDate(w.data[sKey]), c4: formatFullDate(endD), c5: descFn(w.data) };
+  };
+
+  const fmtStat = (isTime) => (item, i, prev) => {
+    const v = item.totalSeconds ?? item.value ?? item.count ?? item.days?.length ?? item.days?.size ?? 0;
+    const d1 = item.minDate || item.firstPlayed || item.firstSeen || item.firstDate;
+    const d2 = item.maxDate || item.lastPlayed || item.lastSeen || item.lastDate;
+    let desc = item.name || item.game || item.gameName;
+    if (item.systems) desc += ` (${getSysStr(item.systems)})`;
+    if (item.games && (item.games.size > 0 || item.games.length > 0)) desc += ` (${item.games.size || item.games.length} Games)`;
+    return { rawVal: v, c1: getRank(v, prev, i), c2: isTime ? formatHHMM(v) : v,
+      c3: formatFullDate(d1), c4: formatFullDate(d2), c5: desc, isBold: getBold(d2) };
+  };
+  
+  const fmtStatYr = (isTime) => (w) => {
+    const d = w.data; if (!d) return { c1: w.year, c2: "-", c3: "-", c4: "-", c5: "-" };
+    const v = d.totalSeconds ?? d.value ?? d.count ?? d.days?.length ?? d.days?.size ?? 0;
+    const d1 = d.minDate || d.firstPlayed || d.firstSeen || d.firstDate;
+    const d2 = d.maxDate || d.lastPlayed || d.lastSeen || d.lastDate;
+    let desc = d.name || d.game || d.gameName;
+    if (d.systems) desc += ` (${getSysStr(d.systems)})`;
+    if (d.games && (d.games.size > 0 || d.games.length > 0)) desc += ` (${d.games.size || d.games.length} Games)`;
+    return { c1: w.year, c2: isTime ? formatHHMM(v) : v, c3: formatFullDate(d1), c4: formatFullDate(d2), c5: desc };
+  };
+
+  // --- INJECTING THE TABLES ---
+  if (!top25Data) return;
+
+  // 1. Streaks
+  buildDualTable("Top 25 Gaming Streaks", "Longest Gaming Streak by Year", top25Data.topGamingStreaks, top25Data.yearlyGamingStreaks, ["Rank", "Length (Days)", "Start Date", "End Date", "# Games / Top 3 Played"], fmtStreak, fmtStreakYr);
+  buildDualTable("Top 25 Non-Gaming Streaks", "Longest Break by Year", top25Data.topBreakStreaks, top25Data.yearlyBreakStreaks, ["Rank", "Length (Days)", "Start Date", "End Date", ""], fmtStreak, fmtStreakYr);
+  buildDualTable("Top 25 Same-Game Streaks", "Longest Same-Game Streak by Year", top25Data.topSameGameStreaks, top25Data.yearlySameGameStreaks, ["Rank", "Length (Days)", "Start Date", "End Date", "Videogame [Time Spent]"], fmtStreak, fmtStreakYr);
+  buildDualTable("Top 25 Consecutive Entries for One System", "Longest System Streak by Year", top25Data.systemStreaks, top25Data.yearlySystemStreaks, ["Rank", "Entries", "Start", "End", "System"], fmtStreak, fmtStreakYr);
+  buildDualTable("Completion Streaks", "Longest Completion Streak by Year", top25Data.topCompletionStreaks, top25Data.yearlyCompletionStreaks, ["Rank", "Count", "Start", "End", "Start / End / Broken By"], 
+    fmtEvt('length', 'startDate', 'endDate', i => `${i.games[0]} / ${i.games[i.games.length-1]} / ${i.brokenBy||''}`), 
+    fmtEvtYr('clippedLength', 'clippedStart', 'clippedEnd', i => `${i.clippedGames[0]} / ${i.clippedGames[i.clippedGames.length-1]} / ${i.brokenBy||''}`));
+
+  // 2. Completions
+  buildDualTable("Top 25 One-Sitting Completions", "Longest One-Sitting Clear by Year", top25Data.oneSittingCompletions, top25Data.yearlyOneSittingCompletions, ["Rank", "Time", "Date", "System", "Game [Note]"], 
+    fmtEvt('finalPtLifetime', 'lastDate', 'lastDate', i => `${i.gameName} (${i.system}) [${i.finalNote}]`), fmtEvtYr('finalPtLifetime', 'lastDate', 'lastDate', i => `${i.gameName} (${i.system}) [${i.finalNote}]`));
+  buildDualTable("Longest Completions (Time)", "Longest Completion (Time) by Year", top25Data.sortedLongestCompletionsByTime, top25Data.yearlyCompletionsByTime, ["Rank", "Time", "Start", "End", "Game [Note]"],
+    fmtEvt('finalPtLifetime', 'startDate', 'lastDate', i => `${i.gameName} (${i.system}) [${i.finalNote}]`), fmtEvtYr('finalPtLifetime', 'startDate', 'lastDate', i => `${i.gameName} (${i.system}) [${i.finalNote}]`));
+  buildDualTable("Longest Completions (Days)", "Longest Completion (Days) by Year", top25Data.sortedLongestCompletionsByDays, top25Data.yearlyCompletionsByDays, ["Rank", "Days", "Start", "End", "Game [Note]"],
+    fmtEvt('durationDays', 'startDate', 'lastDate', i => `${i.gameName} (${i.system}) [${i.finalNote}]`), fmtEvtYr('durationDays', 'startDate', 'lastDate', i => `${i.gameName} (${i.system}) [${i.finalNote}]`));
+  buildDualTable("Fastest Completions (Time)", "Fastest Completion by Year", top25Data.topFastestCompletions, top25Data.yearlyFastestCompletions, ["Rank", "Time", "Start", "End", "Game [Note]"],
+    fmtEvt('finalPtLifetime', 'startDate', 'lastDate', i => `${i.gameName} (${i.system}) [${i.finalNote}]`), fmtEvtYr('finalPtLifetime', 'startDate', 'lastDate', i => `${i.gameName} (${i.system}) [${i.finalNote}]`));
+  buildDualTable("Top 25 Longest to Abandon", "Longest Abandon by Year", top25Data.topAbandoned, top25Data.yearlyAbandoned, ["Rank", "Time Invested", "Start", "End", "Game"],
+    fmtEvt('totalSeconds', 'startDate', 'lastDate', i => `${i.gameName} (${i.system})`, true), fmtEvtYr('totalSeconds', 'startDate', 'lastDate', i => `${i.gameName} (${i.system})`, true));
+  buildDualTable("Most Completed Games", "Most Completed Game by Year", top25Data.topCompletedGames, top25Data.yearlyCompletedGames, ["Rank", "Count", "First", "Last", "Game [Dates]"],
+    fmtEvt('completions', 'firstStartDate', 'lastUpdateDate', i => `${i.gameName} [${i.completionDates.map(d=>formatFullDate(d)).join(', ')}]`),
+    fmtEvtYr('completions', 'firstStartDate', 'lastUpdateDate', i => `${i.gameName} [${i.completionDates.map(d=>formatFullDate(d)).join(', ')}]`));
+  
+  buildDualTable("Top 25 Busiest Completion Days", "Busiest Completion Day by Year", top25Data.topCompletionDays, top25Data.yearlyCompletionDays, ["Rank", "# Completions", "Date", "", "Games"],
+    fmtEvt('count', 'date', 'date', i => i.games.map(g => `${g.name} (${g.system})`).join(', ')), fmtEvtYr('count', 'date', 'date', i => i.games.map(g => `${g.name} (${g.system})`).join(', ')));
+  buildDualTable("Top 25 Busiest Completion Months", "Busiest Completion Month by Year", top25Data.topCompletionMonths, top25Data.yearlyCompletionMonths, ["Rank", "# Completions", "Start", "End", "Month [Games]"],
+    fmtEvt('count', 'minDate', 'maxDate', i => `${i.monthKey} [${i.games.map(g => g.name).join(', ')}]`), fmtEvtYr('count', 'minDate', 'maxDate', i => `${i.monthKey} [${i.games.map(g => g.name).join(', ')}]`));
+  buildDualTable("Top 25 Busiest Completion Weeks", "Busiest Completion Week by Year", top25Data.topCompletionWeeks, top25Data.yearlyCompletionWeeks, ["Rank", "# Completions", "Start", "End", "Games Completed"],
+    fmtEvt('count', 'startDate', 'endDate', i => i.gamesPlayed), fmtEvtYr('count', 'startDate', 'endDate', i => i.gamesPlayed));
+
+  // 3. Time & Days Played Presence
+  buildDualTable("Games Played Across Most Years", "Active Leader (Most Years) by Year", top25Data.topGamesByYearCount, top25Data.yearlyRunningYearsPlayed, ["Rank", "# Years", "First", "Last", "Game [Years]"],
+    fmtEvt('count', 'firstPlayed', 'lastPlayed', i => `${i.game} [${i.years.join(', ')}]`),
+    (w) => ({ c1: w.year, c2: w.maxCount, c3: "-", c4: "-", c5: w.leaders ? w.leaders.map(l => l.game).join(' / ') : "(Many Tied)" }), ["Year", "# Years", "-", "-", "Active Leader(s)"]);
+  buildDualTable("Games Played Across Most Months", "Game Played Across Most Months by Year", top25Data.topGamesByMonthCount, top25Data.yearlyGamesByMonthCount, ["Rank", "# Months", "First", "Last", "Game [Months]"],
+    fmtEvt('count', 'firstPlayed', 'lastPlayed', i => `${i.game} [${i.months.join(', ')}]`), fmtStatYr(false));
+
+  // 4. Metadata (Series, Dev, Pub, Genre, Year) - Time & Days
+  buildDualTable("Top 25 Most Played Series", "Most Played Series by Year", top25Data.topSeries, top25Data.yearlySeries, ["Rank", "Total Time", "Start", "End", "Series"], fmtStat(true), fmtStatYr(true));
+  buildDualTable("Top 25 Developers", "Top Developer by Year", top25Data.topDevelopers, top25Data.yearlyDevelopers, ["Rank", "Total Time", "Start", "End", "Developer"], fmtStat(true), fmtStatYr(true));
+  buildDualTable("Top 25 Publishers", "Top Publisher by Year", top25Data.topPublishers, top25Data.yearlyPublishers, ["Rank", "Total Time", "Start", "End", "Publisher"], fmtStat(true), fmtStatYr(true));
+  buildDualTable("Top 25 Genres", "Top Genre by Year", top25Data.topGenres, top25Data.yearlyGenres, ["Rank", "Total Time", "Start", "End", "Genre"], fmtStat(true), fmtStatYr(true));
+  buildDualTable("Top 25 Release Years", "Top Release Year by Year", top25Data.topReleaseYears, top25Data.yearlyReleaseYears, ["Rank", "Total Time", "Start", "End", "Release Year"], fmtStat(true), fmtStatYr(true));
+
+  buildDualTable("Most Days Playing a Series", "Most Days Playing Series by Year", top25Data.topSeriesByDays, top25Data.yearlySeriesByDays, ["Rank", "Days Played", "Start", "Last", "Series"], fmtStat(false), fmtStatYr(false));
+  buildDualTable("Most Days Playing a Genre", "Most Days Playing Genre by Year", top25Data.topGenreByDays, top25Data.yearlyGenreByDays, ["Rank", "Days Played", "Start", "Last", "Genre"], fmtStat(false), fmtStatYr(false));
+  buildDualTable("Most Days Playing a Developer", "Most Days Playing Developer by Year", top25Data.topDeveloperByDays, top25Data.yearlyDeveloperByDays, ["Rank", "Days Played", "Start", "Last", "Developer"], fmtStat(false), fmtStatYr(false));
+  buildDualTable("Most Days Playing a Publisher", "Most Days Playing Publisher by Year", top25Data.topPublisherByDays, top25Data.yearlyPublisherByDays, ["Rank", "Days Played", "Start", "Last", "Publisher"], fmtStat(false), fmtStatYr(false));
+  buildDualTable("Most Days Playing a Release Year", "Most Days Playing Release Year by Year", top25Data.topReleaseYearByDays, top25Data.yearlyReleaseYearByDays, ["Rank", "Days Played", "Start", "Last", "Release Year"], fmtStat(false), fmtStatYr(false));
+
+  buildDualTable("Series Presence (Most Years)", "Top Series by Year (by Time)", top25Data.topSeriesByYearCount, top25Data.yearlySeries, ["Rank", "# Years", "First", "Last", "Series [Years]"],
+    fmtEvt('count', 'firstSeen', 'lastSeen', i => `${i.name} [${i.values.join(', ')}]`), fmtStatYr(true));
+  buildDualTable("Series Presence (Most Months)", "Top Series by Year (by Months)", top25Data.topSeriesByMonthCount, top25Data.yearlySeriesByMonthCount, ["Rank", "# Months", "First", "Last", "Series [Months]"],
+    fmtEvt('count', 'firstSeen', 'lastSeen', i => `${i.name} [${i.values.join(', ')}]`), fmtStatYr(false));
+  
+  buildDualTable("Genre Presence (Most Years)", "Top Genre by Year (by Time)", top25Data.topGenreByYearCount, top25Data.yearlyGenres, ["Rank", "# Years", "First", "Last", "Genre [Years]"],
+    fmtEvt('count', 'firstSeen', 'lastSeen', i => `${i.name} [${i.values.join(', ')}]`), fmtStatYr(true));
+  buildDualTable("Genre Presence (Most Months)", "Top Genre by Year (by Months)", top25Data.topGenreByMonthCount, top25Data.yearlyGenreByMonthCount, ["Rank", "# Months", "First", "Last", "Genre [Months]"],
+    fmtEvt('count', 'firstSeen', 'lastSeen', i => `${i.name} [${i.values.join(', ')}]`), fmtStatYr(false));
+
+  buildDualTable("Developer Presence (Most Years)", "Top Developer by Year (by Time)", top25Data.topDeveloperByYearCount, top25Data.yearlyDevelopers, ["Rank", "# Years", "First", "Last", "Developer [Years]"],
+    fmtEvt('count', 'firstSeen', 'lastSeen', i => `${i.name} [${i.values.join(', ')}]`), fmtStatYr(true));
+  buildDualTable("Developer Presence (Most Months)", "Top Developer by Year (by Months)", top25Data.topDeveloperByMonthCount, top25Data.yearlyDeveloperByMonthCount, ["Rank", "# Months", "First", "Last", "Developer [Months]"],
+    fmtEvt('count', 'firstSeen', 'lastSeen', i => `${i.name} [${i.values.join(', ')}]`), fmtStatYr(false));
+
+  buildDualTable("Publisher Presence (Most Years)", "Top Publisher by Year (by Time)", top25Data.topPublisherByYearCount, top25Data.yearlyPublishers, ["Rank", "# Years", "First", "Last", "Publisher [Years]"],
+    fmtEvt('count', 'firstSeen', 'lastSeen', i => `${i.name} [${i.values.join(', ')}]`), fmtStatYr(true));
+  buildDualTable("Publisher Presence (Most Months)", "Top Publisher by Year (by Months)", top25Data.topPublisherByMonthCount, top25Data.yearlyPublisherByMonthCount, ["Rank", "# Months", "First", "Last", "Publisher [Months]"],
+    fmtEvt('count', 'firstSeen', 'lastSeen', i => `${i.name} [${i.values.join(', ')}]`), fmtStatYr(false));
+
+  // 5. Binges, Sessions, Marathons
+  buildDualTable("Top 25 Monthly Binges", "Biggest Monthly Binge by Year", top25Data.topMonthlyBinges, top25Data.yearlyMonthlyBinges, ["Rank", "Time", "Start", "End", "Game [Month]"],
+    fmtEvt('totalSeconds', 'minDate', 'maxDate', i => `${i.game} (${getSysStr(i.systems)}) [${i.monthKey}]`, true), fmtEvtYr('totalSeconds', 'minDate', 'maxDate', i => `${i.game} (${getSysStr(i.systems)}) [${i.monthKey}]`, true));
+  buildDualTable("Top 25 Weekly Binges", "Biggest Weekly Binge by Year", top25Data.topWeeklyBinges, top25Data.yearlyWeeklyBinges, ["Rank", "Time", "Start", "End", "Game"],
+    fmtEvt('totalSeconds', 'startDate', 'endDate', i => `${i.game} (${getSysStr(i.systems)})`, true), fmtEvtYr('totalSeconds', 'startDate', 'endDate', i => `${i.game} (${getSysStr(i.systems)})`, true));
+  
+  buildDualTable("Top 25 Busiest Months", "Busiest Month by Year", top25Data.topBusiestMonths, top25Data.yearlyBusiestMonths, ["Rank", "Total Time", "Start", "End", "Month / Top 3"],
+    fmtEvt('totalSeconds', 'minDate', 'maxDate', i => `${i.monthKey} ${i.top3Games ? `[${i.top3Games.map(g=>g.name).join(', ')}]` : ''}`, true),
+    fmtEvtYr('totalSeconds', 'minDate', 'maxDate', i => `${i.monthKey} ${i.top3Games ? `[${i.top3Games.map(g=>g.name).join(', ')}]` : ''}`, true));
+  buildDualTable("Top 25 Busiest Weeks", "Busiest Week by Year", top25Data.topBusiestWeeks, top25Data.yearlyBusiestWeeks, ["Rank", "Total Time", "Start", "End", "Top 3 Games"],
+    fmtEvt('totalSeconds', 'startDate', 'endDate', i => i.gamesPlayed, true), fmtEvtYr('totalSeconds', 'startDate', 'endDate', i => i.gamesPlayed, true));
+
+  buildDualTable("Top 25 Marathons (>4h)", "Top Marathon Game by Year", top25Data.topMarathons, top25Data.yearlyMarathons, ["Rank", "Count", "First", "Last", "Game"],
+    fmtEvt('count', 'firstPlayed', 'lastPlayed', i => `${i.gameName} (${getSysStr(i.systems)})`), fmtStatYr(false));
+  buildDualTable("Top 25 Short Sessions (<30m)", "Top Short Session Game by Year", top25Data.topShortSessions, top25Data.yearlyShortSessions, ["Rank", "Count", "First", "Last", "Game"],
+    fmtEvt('count', 'firstPlayed', 'lastPlayed', i => `${i.gameName} (${getSysStr(i.systems)})`), fmtStatYr(false));
+
+  // 6. Multiplayer
+  buildDualTable("Top 25 Multiplayer Games", "Top Multiplayer Game by Year", top25Data.topMultiplayerGames, top25Data.yearlyMultiplayerGames, ["Rank", "Total Time", "Start", "End", "Videogame"], fmtStat(true), fmtStatYr(true));
+  buildDualTable("Top 25 Busiest Multiplayer Days", "Busiest Multiplayer Day by Year", top25Data.topBusiestMultiplayerDays, top25Data.yearlyBusiestMultiplayerDays, ["Rank", "Total Time", "Date", "", "Top 3 Games"],
+    fmtEvt('totalSeconds', 'date', 'date', i => i.top3Games.map(g => `${g.name} [${formatHHMM(g.time)}]`).join(', '), true),
+    fmtEvtYr('totalSeconds', 'date', 'date', i => i.top3Games.map(g => `${g.name} [${formatHHMM(g.time)}]`).join(', '), true));
+  buildDualTable("Top 25 Busiest Multiplayer Weeks", "Busiest Multiplayer Week by Year", top25Data.topBusiestMultiplayerWeeks, top25Data.yearlyBusiestMultiplayerWeeks, ["Rank", "Total Time", "Start", "End", "Top Games"],
+    fmtEvt('totalSeconds', 'startDate', 'endDate', i => i.gamesPlayed, true), fmtEvtYr('totalSeconds', 'startDate', 'endDate', i => i.gamesPlayed, true));
+  buildDualTable("Top 25 Busiest Multiplayer Months", "Busiest Multiplayer Month by Year", top25Data.topBusiestMultiplayerMonths, top25Data.yearlyBusiestMultiplayerMonths, ["Rank", "Total Time", "Start", "End", "Month / Top 3"],
+    fmtEvt('totalSeconds', 'minDate', 'maxDate', i => `${i.monthKey} ${i.top3Games ? `[${i.top3Games.map(g => `${g.name} [${formatHHMM(g.time)}]`).join(', ')}]` : ''}`, true),
+    fmtEvtYr('totalSeconds', 'minDate', 'maxDate', i => `${i.monthKey} ${i.top3Games ? `[${i.top3Games.map(g => `${g.name} [${formatHHMM(g.time)}]`).join(', ')}]` : ''}`, true));
+
+  // 7. Variety, Hiatuses, Concentration & Overlaps
+  buildDualTable("Top 25 Diverse Days", "Most Diverse Day by Year", top25Data.topDiverseDays, top25Data.yearlyDiverseDays, ["Rank", "# Games", "Time", "Date", "Games"],
+    (item, i, prev) => ({ rawVal: item.numGames, c1: getRank(item.numGames, prev, i), c2: item.numGames, c3: formatHHMM(item.totalTime), c4: formatFullDate(item.date), c5: item.games, isBold: getBold(item.date) }),
+    (w) => ({ c1: w.year, c2: w.data.numGames, c3: formatHHMM(w.data.totalTime), c4: formatFullDate(w.data.date), c5: w.data.games }));
+
+  buildDualTable("Top 25 Busiest Game Variety (Weekly)", "Busiest Game Variety (Week) by Year", top25Data.topWeeklyGameVariety, top25Data.yearlyWeeklyGameVariety, ["Rank", "# Games", "Start", "End", "Top 3 Games"],
+    fmtEvt('count', 'startDate', 'endDate', i => i.gamesPlayed), fmtEvtYr('count', 'startDate', 'endDate', i => i.gamesPlayed));
+  buildDualTable("Top 25 Busiest Game Variety (Monthly)", "Busiest Game Variety (Month) by Year", top25Data.topMonthlyGameVariety, top25Data.yearlyMonthlyGameVariety, ["Rank", "# Games", "Start", "End", "Month [Top 3 Games]"],
+    fmtEvt('games.size', 'minDate', 'maxDate', i => `${i.monthKey} [${Object.entries(i.gameTimes).sort((a,b)=>b[1]-a[1]).slice(0,3).map(g=>`${g[0]} [${formatHHMM(g[1])}]`).join(', ')}]`),
+    fmtEvtYr('games.size', 'minDate', 'maxDate', i => `${i.monthKey} [${Object.entries(i.gameTimes).sort((a,b)=>b[1]-a[1]).slice(0,3).map(g=>`${g[0]} [${formatHHMM(g[1])}]`).join(', ')}]`));
+
+  buildDualTable("Top 25 Game Hiatuses", "Longest Game Hiatus by Year", top25Data.topGameHiatuses, top25Data.yearlyGameHiatuses, ["Rank", "Gap Days", "Start", "End", "Game"],
+    fmtEvt('gapDays', 'startDate', 'endDate', i => `${i.game} (${i.prevSystem}->${i.currentSystem})`), fmtEvtYr('gapDays', 'startDate', 'endDate', i => `${i.game} (${i.prevSystem}->${i.currentSystem})`));
+
+  buildDualTable("Top 25 Game Overlaps (Same Day)", "Top Game Overlap by Year", top25Data.topGameOverlaps, top25Data.yearlyGameOverlaps, ["Rank", "# Days", "First Date", "Last Date", "Game Pair"],
+    fmtEvt('count', 'firstDate', 'lastDate', i => i.pair), fmtStatYr(false));
+
+  buildDualTable("Highest % of Year Spent on One Game", "Most Dominant Game by Year", top25Data.topYearlyConcentration, top25Data.yearlyYearlyConcentration, ["Rank", "% Share", "Year", "", "Game [Time Spent]"],
+    fmtEvt('percent', 'year', 'year', i => `${i.game} (${getSysStr(i.systems)}) [${formatHHMM(i.gameSeconds)}]`),
+    fmtEvtYr('percent', 'year', 'year', i => `${i.game} (${getSysStr(i.systems)}) [${formatHHMM(i.gameSeconds)}]`));
+  buildDualTable("Highest % of Month Spent on One Game", "Most Dominant Month by Year", top25Data.topMonthlyConcentration, top25Data.yearlyMonthlyConcentration, ["Rank", "% Share", "Month", "", "Game [Time / Total]"],
+    fmtEvt('percent', 'minDate', 'minDate', i => `${i.game} (${getSysStr(i.systems)}) [${formatHHMM(i.gameSeconds)}/${formatHHMM(i.totalSeconds)}]`),
+    fmtEvtYr('percent', 'minDate', 'minDate', i => `${i.game} (${getSysStr(i.systems)}) [${formatHHMM(i.gameSeconds)}/${formatHHMM(i.totalSeconds)}]`));
+
+  // Loop through Meta Hiatuses (Series, Genre, Dev, Pub, System, Release Year)
+  const hiatusLabels = { series: "Series", genre: "Genre", developer: "Developer", publisher: "Publisher", releaseYear: "Rel Year", system: "System" };
+  Object.keys(top25Data.topMetaHiatuses).forEach(key => {
+    buildDualTable(`Top 25 ${hiatusLabels[key]} Hiatuses`, `Longest ${hiatusLabels[key]} Hiatus Ending by Year`, top25Data.topMetaHiatuses[key], top25Data.yearlyMetaHiatuses[key], ["Rank", "Gap Days", "Start", "End", `${hiatusLabels[key]} [From -> To]`],
+      fmtEvt('gapDays', 'startDate', 'endDate', i => i.details || `${i.name} [${i.prevGame} -> ${i.currentGame}]`),
+      fmtEvtYr('gapDays', 'startDate', 'endDate', i => i.details || `${i.name} [${i.prevGame} -> ${i.currentGame}]`));
+  });
+
+  // Loop through Most Unique Games by Meta (Series, Genre, Dev, Pub, Release Year)
+  ['series', 'genre', 'developer', 'publisher', 'releaseYear'].forEach(key => {
+    if (top25Data.metaGameCountData[`top${key}`]) {
+      buildDualTable(`Most Unique ${hiatusLabels[key]} Games in One Year`, `Most Unique ${hiatusLabels[key]} Games by Year`, top25Data.metaGameCountData[`top${key}`], top25Data.metaGameCountData[`yearly${key}`], ["Rank", "Count", "Start", "End", "Details"],
+        fmtEvt('count', 'minDate', 'maxDate', i => `[${i.year}] ${i.name} [${formatHHMM(i.totalSeconds)}]`),
+        fmtEvtYr('count', 'minDate', 'maxDate', i => `[${i.year}] ${i.name} [${formatHHMM(i.totalSeconds)}]`));
     }
+  });
+
+  // 8. DYNAMIC DATA (12 Months, Genres)
+  const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+  for (let m = 0; m < 12; m++) {
+    const dataForMonth = top25Data.bestMonthsByName[m] || [];
+    const top25 = [...dataForMonth].sort((a,b) => b.totalSeconds - a.totalSeconds).slice(0, 25);
+    const yearlyData = [...dataForMonth].sort((a,b) => b.year - a.year).map(item => ({ year: item.year, data: item }));
+    
+    buildDualTable(`Top 25 Best of ${monthNames[m]}`, `${monthNames[m]} Stats by Year`, top25, yearlyData, ["Rank", "Time", "Start", "End", "Year / Top 5 Games"],
+      fmtEvt('totalSeconds', 'startDate', 'endDate', i => `[${i.year}] ${i.details}`, true),
+      fmtEvtYr('totalSeconds', 'startDate', 'endDate', i => i.details, true));
   }
 
+  if (top25Data.topGamesByGenreData) {
+    Object.keys(top25Data.topGamesByGenreData).sort().forEach(genre => {
+      if (genre === 'N/A') return;
+      const data = top25Data.topGamesByGenreData[genre];
+      const top25 = [...data.allTime].sort((a,b) => b.totalSeconds - a.totalSeconds).slice(0, 25);
+      const yearlyData = data.yearly.map(item => ({ year: item.year, data: item })).sort((a,b) => b.year - a.year);
+      
+      buildDualTable(`Top 25 Most Played ${genre}`, `Most Played ${genre} by Year`, top25, yearlyData, ["Rank", "Time", "Start", "Last", "Game"],
+        fmtEvt('totalSeconds', 'startDate', 'lastDate', i => `${i.name} ${i.systems ? `(${getSysStr(i.systems)})` : ""}`, true),
+        fmtEvtYr('totalSeconds', 'startDate', 'endDate', i => `${i.name} ${i.systems ? `(${getSysStr(i.systems)})` : ""}`, true));
+    });
+  }
+
+  // Populate the Dropdown Menu with all generated tables
   const select = document.getElementById('random-top25-select');
   if (select && allTop25Tables.length > 0) {
     select.innerHTML = allTop25Tables.map(t => `<option value="${escapeHTML(t.mainTitle)}">${escapeHTML(t.mainTitle)}</option>`).join('');
-    select.onchange = renderRandomTop25; 
+    select.onchange = renderRandomTop25;
     renderRandomTop25();
   }
 }
@@ -1044,20 +1255,29 @@ function renderHeatmap(mode) {
   container.innerHTML = html;
 }
 
-// --- FULL GAME ARCHIVE ---
+let currentGameHistory = [];
+let historyDisplayLimit = 50;
+
 function renderGameHistory(gameName) {
   const container = document.getElementById('game-history-content');
   if (!rawData || !rawData.allEntries) return;
 
-  // Grab all entries for this game and reverse them so the newest is at the top
-  const entries = rawData.allEntries.filter(e => e.game === gameName).slice().reverse();
-  
-  if (entries.length === 0) {
+  // Store the full array in state and reset the limit
+  currentGameHistory = rawData.allEntries.filter(e => e.game === gameName).slice().reverse();
+  historyDisplayLimit = 50; 
+
+  if (currentGameHistory.length === 0) {
     container.innerHTML = `<div class="loading-text" style="padding: 20px;">No entries found.</div>`;
     return;
   }
 
-  // We reuse the 'monthly-table' CSS class because it already looks perfect!
+  updateGameHistoryDOM();
+}
+
+function updateGameHistoryDOM() {
+  const container = document.getElementById('game-history-content');
+  const entriesToShow = currentGameHistory.slice(0, historyDisplayLimit);
+
   let html = `
     <div class="monthly-table-wrapper" style="padding: 20px;">
       <table class="monthly-table" style="min-width: 1100px;">
@@ -1076,7 +1296,7 @@ function renderGameHistory(gameName) {
         <tbody>
   `;
 
-  entries.forEach(entry => {
+  entriesToShow.forEach(entry => {
     const bgColor = getStatusColor(entry.status);
     html += `
       <tr>
@@ -1093,7 +1313,26 @@ function renderGameHistory(gameName) {
   });
 
   html += `</tbody></table></div>`;
+
+  // Add the Load More button if there are remaining entries
+  if (currentGameHistory.length > historyDisplayLimit) {
+    html += `
+      <div style="text-align: center; padding: 10px;">
+        <button id="load-more-history" class="theme-btn" style="position: static; margin-bottom: 20px;">Load More Entries (${currentGameHistory.length - historyDisplayLimit} remaining)</button>
+      </div>
+    `;
+  }
+
   container.innerHTML = html;
+
+  // Attach listener to the new button
+  const loadMoreBtn = document.getElementById('load-more-history');
+  if (loadMoreBtn) {
+    loadMoreBtn.addEventListener('click', () => {
+      historyDisplayLimit += 50;
+      updateGameHistoryDOM();
+    });
+  }
 }
 
 // --- SERIES ARCHIVE ---
