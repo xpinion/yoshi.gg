@@ -73,9 +73,15 @@ async function initDashboard() {
     ]);
 
     const rawText = await rawResponse.text();
-    
-    // --- UPDATED: Standard JSON parse. No custom reviver needed! ---
-    rawData = JSON.parse(rawText);
+    rawData = JSON.parse(rawText, (key, value) => {
+      // ONLY Revive Sets (Leave Dates as strings so .startsWith() and .split() work!)
+      if (value && typeof value === 'object' && value._dataType === 'Set') {
+        // Look for the array in value.value, falling back to value.data just in case
+        const arrayItems = value.value || value.data || [];
+        return new Set(arrayItems);
+      }
+      return value;
+    });
 
     const metaData = await metaResponse.json();
     const top25Data = await top25Response.json();
@@ -127,10 +133,10 @@ function parseTop25Data(top25Data) {
     let headers = [];
     let rows = [];
     if (!values[r+1]) return { headers, rows };
-    
+
     // Grab headers from the row immediately below the title
     for (let i = 0; i < width; i++) headers.push(values[r+1][c+i]);
-    
+
     // Grab data rows until we hit another title background
     let dr = r + 2;
     while (dr < values.length && backgrounds[dr] && backgrounds[dr][c] !== TITLE_BG) {
@@ -155,7 +161,7 @@ function parseTop25Data(top25Data) {
     if (backgrounds[r] && backgrounds[r][0] === TITLE_BG && values[r][0]) {
       const left = extractBlock(r, 0, 5);
       const hasRight = backgrounds[r][6] === TITLE_BG;
-      
+
       allTop25Tables.push({
         type: hasRight ? 'dual' : 'single',
         mainTitle: values[r][0], // The left title is our key
@@ -168,7 +174,7 @@ function parseTop25Data(top25Data) {
   const select = document.getElementById('random-top25-select');
   if (select && allTop25Tables.length > 0) {
     select.innerHTML = allTop25Tables.map(t => `<option value="${escapeHTML(t.mainTitle)}">${escapeHTML(t.mainTitle)}</option>`).join('');
-    select.onchange = renderRandomTop25; 
+    select.onchange = renderRandomTop25;
     renderRandomTop25();
   }
 }
@@ -192,7 +198,7 @@ function setupDropdowns() {
     [compSelect, playedSelect, daysSelect, sessionSelect, metricSelect1, metricSelect2, metricSelect3].forEach(s => {
       if (s) s.value = val;
     });
-    
+
     // Refresh all cards simultaneously
     renderCompletions(val);
     renderMostPlayed(val);
@@ -283,7 +289,7 @@ function setupDropdowns() {
   // 5. Heatmap Dropdown
   const heatmapSelect = document.getElementById('heatmap-select');
   if (heatmapSelect) {
-    heatmapSelect.value = 'gameSummary'; 
+    heatmapSelect.value = 'gameSummary';
     heatmapSelect.addEventListener('change', (e) => renderHeatmap(e.target.value));
   }
 
@@ -311,7 +317,7 @@ function setupDropdowns() {
 function setupHoverHistory() {
   const tooltip = document.getElementById('game-tooltip');
   let tooltipTimeout; // The grace-period timer
-  
+
   document.addEventListener('mouseover', (e) => {
     // If hovering over the game name OR the tooltip itself, cancel the closing timer
     if (e.target.classList.contains('hover-trigger') || e.target.closest('#game-tooltip')) {
@@ -322,7 +328,7 @@ function setupHoverHistory() {
     if (e.target.classList.contains('hover-trigger')) {
       const gameName = e.target.getAttribute('data-game');
       if (!gameName) return;
-      
+
       // Removed the .slice(0, 15) so you can scroll the FULL history!
       const entries = rawData.allEntries.filter(entry => entry.game === gameName).slice().reverse();
       if (entries.length === 0) return;
@@ -334,7 +340,7 @@ function setupHoverHistory() {
           <div class="tooltip-note">${escapeHTML(entry.note)}</div>
         </div>
       `).join('');
-      
+
       tooltip.innerHTML = html;
       tooltip.classList.add('visible');
 
@@ -342,10 +348,10 @@ function setupHoverHistory() {
       const rect = e.target.getBoundingClientRect();
       let top = rect.bottom + window.scrollY + 10;
       let left = rect.left + window.scrollX;
-      
+
       // Prevent it from flying off the right side of the screen
       if (left + 350 > window.innerWidth) left = window.innerWidth - 370;
-      
+
       tooltip.style.top = top + 'px';
       tooltip.style.left = left + 'px';
     }
@@ -416,13 +422,13 @@ function renderMonthlySummary(monthKey) {
       html += `<tr class="active-row"><td class="text-left"><span class="hover-trigger" data-game="${escapeHTML(game.name)}">${escapeHTML(game.name)}</span></td><td class="text-center">${escapeHTML(sysStr)}</td><td class="text-center">${formatHHMM(ptLocal.timeframeTime)}</td><td class="text-center">${ptLocal.timeframeDays.size}</td><td class="text-center">${ptLocal.lastPtLifetime}</td><td class="text-center">${ptLocal.lastPtLifetimeDays}</td><td class="text-center">${game.latestGameLifetime}</td><td class="text-center">${game.latestGameLifetimeDays}</td><td class="text-center">${formatFullDate(ptHistory.startDate)}</td><td class="text-center">${formatFullDate(ptLocal.lastDate)}</td><td class="text-center status-cell" style="background-color: ${bgColor};">${ptLocal.lastStatus}</td><td class="text-left">${escapeHTML(ptLocal.latestNote)}</td></tr>`;
     });
 const allGamePlaythroughs = Object.keys(rawData.playthroughHistory).filter(tag => rawData.playthroughHistory[tag].gameName === game.name);
-    
+
     // Filter out the ones we already printed as active
     const inactiveTags = allGamePlaythroughs.filter(oldTag => !activeTags.includes(oldTag));
-    
+
     if (inactiveTags.length > 0) {
       const safeGameId = `collapse-${index}`;
-      
+
       // 1. The Toggle Button Row
       html += `
         <tr class="accordion-toggle-row" onclick="toggleAccordion('${safeGameId}', this)" style="cursor: pointer; background-color: rgba(0,0,0,0.03);">
@@ -434,9 +440,9 @@ const allGamePlaythroughs = Object.keys(rawData.playthroughHistory).filter(tag =
 
       // 2. The Hidden Inactive Rows
       inactiveTags.forEach(oldTag => {
-        const oldPt = rawData.playthroughHistory[oldTag]; 
+        const oldPt = rawData.playthroughHistory[oldTag];
         const bgColor = getStatusColor(oldPt.finalStatus);
-        
+
         // Notice the added class: ${safeGameId} and inline style: display: none;
         html += `<tr class="inactive-row ${safeGameId}" style="display: none; opacity: 0.65;">
           <td class="text-left"><span class="hover-trigger" data-game="${escapeHTML(game.name)}">${escapeHTML(game.name)}</span></td>
@@ -463,14 +469,14 @@ const allGamePlaythroughs = Object.keys(rawData.playthroughHistory).filter(tag =
 
 function renderCompletions(year) {
   const container = document.getElementById('completions-list');
-  
+
   const completions = Object.values(rawData.playthroughHistory).filter(pt => {
     const isComp = (pt.completionDates && pt.completionDates.length > 0) || ['Completed', 'M-Completed', 'Postgame'].includes(pt.finalStatus);
     if (!isComp) return false;
-    
+
     const cDate = (pt.completionDates && pt.completionDates.length > 0) ? new Date(pt.completionDates[0]) : new Date(pt.lastDate);
     pt.displayDate = cDate;
-    
+
     if (year === 'All-Time') return true;
     return cDate.getUTCFullYear().toString() === year;
   });
@@ -485,7 +491,7 @@ function renderCompletions(year) {
     if (dateDiff !== 0) return dateDiff;
     return a.entryNum - b.entryNum;
   });
-  
+
   completions.forEach((c, index) => c.yearRank = index + 1);
   completions.reverse();
 
@@ -494,7 +500,7 @@ function renderCompletions(year) {
   container.innerHTML = completions.map(pt => {
     const score = metaScores.get(pt.gameName) || '-';
     const badgeHTML = score !== '-' ? `<div class="item-badge">${score}</div>` : `<div class="item-badge" style="background: var(--heatmap-empty); color: var(--text-muted);">-</div>`;
-    
+
     let pastCompletionsHtml = '';
     if (rawData.metrics && rawData.metrics.completionStats) {
         const allTimeGameData = rawData.metrics.completionStats.find(g => g.gameName === pt.gameName);
@@ -516,13 +522,13 @@ function renderCompletions(year) {
     return `
       <div class="list-item" style="align-items: center; padding: 12px 16px;">
         <div style="display: flex; width: 100%; align-items: center;">
-          
+
           <!-- Left Column: Date & Rank -->
           <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; margin-right: 15px; min-width: 45px;">
             <span style="font-weight: 800; color: var(--text-main); font-size: 0.95rem;">${formatShortDate(pt.displayDate)}</span>
             <span style="color: var(--text-muted); font-size: 0.75rem; font-weight: 700; margin-top: 2px;">(#${pt.yearRank})</span>
           </div>
-          
+
           <!-- Middle Column: Game Info & Stats -->
           <div style="display: flex; flex-direction: column; flex: 1; overflow: hidden; padding-right: 10px;">
             <span class="item-title hover-trigger" data-game="${escapeHTML(pt.gameName)}" style="font-weight: bold; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
@@ -536,12 +542,12 @@ function renderCompletions(year) {
             </div>
             ${pastCompletionsHtml}
           </div>
-          
+
           <!-- Right Column: Score Badge -->
           <div style="margin-left: auto;">
             ${badgeHTML}
           </div>
-          
+
         </div>
       </div>
     `;
@@ -556,8 +562,9 @@ function renderMostPlayed(year) {
   if (!statsObj) { container.innerHTML = `<div class="loading-text">No playtime logged.</div>`; return; }
 
   const sortedGames = Object.entries(statsObj).map(([name, stats]) => {
-    const sysStr = (stats.systems || []).join(', ');
-    const daysArr = [...(stats.days || [])].sort();
+    const sysStr = stats.systems instanceof Set ? Array.from(stats.systems).join(', ') : (Array.isArray(stats.systems) ? stats.systems.join(', ') : (stats.systems && stats.systems.data ? stats.systems.data.join(', ') : ''));
+    const daysSet = stats.days instanceof Set ? Array.from(stats.days) : (Array.isArray(stats.days) ? stats.days : (stats.days && stats.days.data ? stats.days.data : []));
+    const daysArr = daysSet.sort();
 
     // Check Date Objects (All-Time) or fallback to String parsing (Yearly)
     const minDate = stats.firstPlayedDate ? formatFullDate(stats.firstPlayedDate) : (daysArr.length > 0 ? daysArr[0].replace(/-/g, '/') : "N/A");
@@ -590,8 +597,9 @@ function renderMostDays(year) {
   if (!statsObj) { container.innerHTML = `<div class="loading-text">No playtime logged.</div>`; return; }
 
   const sortedDays = Object.entries(statsObj).map(([name, stats]) => {
-    const sysStr = (stats.systems || []).join(', ');
-    const daysArr = [...(stats.days || [])].sort();
+    const sysStr = stats.systems instanceof Set ? Array.from(stats.systems).join(', ') : (Array.isArray(stats.systems) ? stats.systems.join(', ') : (stats.systems && stats.systems.data ? stats.systems.data.join(', ') : ''));
+    const daysSet = stats.days instanceof Set ? Array.from(stats.days) : (Array.isArray(stats.days) ? stats.days : (stats.days && stats.days.data ? stats.days.data : []));
+    const daysArr = daysSet.sort();
 
     const minDate = stats.firstPlayedDate ? formatFullDate(stats.firstPlayedDate) : (daysArr.length > 0 ? daysArr[0].replace(/-/g, '/') : "N/A");
     const maxDate = stats.lastPlayedDate ? formatFullDate(stats.lastPlayedDate) : (daysArr.length > 0 ? daysArr[daysArr.length - 1].replace(/-/g, '/') : "N/A");
@@ -618,22 +626,22 @@ function renderMostDays(year) {
 // Longest Single Session
 function renderLongestSession(year) {
   const container = document.getElementById('longest-session-list');
-  
-  const sessions = year === 'All-Time' 
-    ? rawData.metrics.singleDaySessions 
+
+  const sessions = year === 'All-Time'
+    ? rawData.metrics.singleDaySessions
     : rawData.metrics.singleDaySessions.filter(s => new Date(s.date).getUTCFullYear().toString() === year);
-    
+
   if (sessions.length === 0) { container.innerHTML = `<div class="loading-text">No sessions logged.</div>`; return; }
 
   const sortedSessions = sessions.sort((a, b) => b.time - a.time).slice(0, 100);
-  
+
   container.innerHTML = sortedSessions.map((s, index) => {
     const displayDate = year === 'All-Time' ? formatFullDate(s.date) : formatShortDate(s.date);
-    
+
     // Calculate the percentage of total playtime this single session represents
     const totalGameSecs = rawData.metrics.allTimeGameStats[s.game] ? rawData.metrics.allTimeGameStats[s.game].totalSeconds : s.time;
     const pct = ((s.time / totalGameSecs) * 100).toFixed(1);
-    
+
     return `
     <div class="list-item" style="align-items: flex-start; flex-direction: column; padding: 10px 12px;">
       <div style="display: flex; justify-content: space-between; width: 100%; align-items: center;">
@@ -674,7 +682,7 @@ function renderRankings(filterType, filterValue, containerId, limit) {
     // Grab the aggregated stats to display playtime next to the score
     const gameStats = rawData.metrics.allTimeGameStats[game.name];
     const timeStr = gameStats ? formatTime(gameStats.totalSeconds) : "0m";
-    const daysCount = gameStats && gameStats.days ? gameStats.days.length : 0;
+    const daysCount = gameStats && gameStats.days ? (gameStats.days.size || gameStats.days.length || (gameStats.days.data ? gameStats.days.data.length : 0)) : 0;
 
     return `
     <div class="list-item" style="align-items: flex-start; flex-direction: column; padding: 10px 12px;">
@@ -698,7 +706,7 @@ function renderOnThisDay() {
   const today = new Date();
   const currentMonth = today.getMonth(); // 0-11
   const currentDay = today.getDate(); // 1-31
-  
+
   document.getElementById('today-date').innerText = `${String(currentMonth + 1).padStart(2, '0')}/${String(currentDay).padStart(2, '0')}`;
 
   const historyEntries = rawData.allEntries.filter(e => {
@@ -763,13 +771,13 @@ function renderAnalysis(type) {
   if (!rawData || !rawData.metrics) return;
 
   let html = `<div style="overflow-x: auto;"><table class="analysis-table"><thead><tr>`;
-  
+
   if (type === 'playthrough') {
     const data = rawData.metrics.playthroughAnalysis;
     const timeframes = Object.keys(data).sort((a, b) => a === 'All-Time' ? -1 : b === 'All-Time' ? 1 : b - a);
-    
+
     html += `<th>Timeframe</th><th>Total PTs</th><th># Completed</th><th># Abandoned</th><th># Active</th><th>Comp Rate</th><th># Multiplayer</th><th># Non-Comp</th><th>Avg Time</th><th>Avg Days</th></tr></thead><tbody>`;
-    
+
     timeframes.forEach(key => {
       const s = data[key];
       const completions = s.completed + s.postgame;
@@ -779,13 +787,13 @@ function renderAnalysis(type) {
         <td>${formatHHMM(s.avgCompletionTimeSeconds)}</td><td>${s.avgCompletionDays.toFixed(1)}</td>
       </tr>`;
     });
-  } 
+  }
   else if (type === 'dayOfWeek') {
     const data = rawData.metrics.dayOfWeekStats;
     const timeframes = Object.keys(data).sort((a, b) => a === 'All-Time' ? -1 : b === 'All-Time' ? 1 : b.localeCompare(a));
-    
+
     html += `<th>Timeframe</th><th>Mon</th><th>Tue</th><th>Wed</th><th>Thu</th><th>Fri</th><th>Sat</th><th>Sun</th></tr></thead><tbody>`;
-    
+
     timeframes.forEach(key => {
       const s = data[key];
       html += `<tr class="${key === 'All-Time' ? 'all-time-row' : ''}">
@@ -793,19 +801,19 @@ function renderAnalysis(type) {
         ${[1,2,3,4,5,6,0].map(day => `<td>${formatHHMM(s[day] || 0)}</td>`).join('')}
       </tr>`;
     });
-  } 
+  }
   else {
     const map = { genre: 'genreAnalysis', releaseYear: 'releaseYearAnalysis', developer: 'developerAnalysis', publisher: 'publisherAnalysis' };
     const dataKey = map[type];
     const data = rawData.metrics[dataKey];
     const nameKey = type;
-    
+
     let sortedData = Object.values(data).filter(item => item[nameKey] !== "N/A");
     if (type === 'releaseYear') sortedData.sort((a,b) => b[nameKey] - a[nameKey]);
     else sortedData.sort((a,b) => b.totalPlaythroughs - a.totalPlaythroughs);
 
     html += `<th>${type.charAt(0).toUpperCase() + type.slice(1)}</th><th>Total PTs</th><th># Completed</th><th># Abandoned</th><th># Active</th><th>Comp Rate</th><th># Multiplayer</th><th># Non-Comp</th><th>Avg Time</th><th>Avg Days</th></tr></thead><tbody>`;
-    
+
     sortedData.forEach(s => {
       const completions = s.completed + s.postgame;
       html += `<tr>
@@ -815,7 +823,7 @@ function renderAnalysis(type) {
       </tr>`;
     });
   }
-  
+
   html += `</tbody></table></div>`;
   container.innerHTML = html;
 }
@@ -824,9 +832,9 @@ function renderAnalysis(type) {
 function renderMilestones() {
   const container = document.getElementById('milestones-list');
   if (!rawData || !rawData.metrics || !rawData.metrics.milestones) return;
-  
+
   const milestones = rawData.metrics.milestones.slice().sort((a,b) => new Date(b.date) - new Date(a.date));
-  
+
   container.innerHTML = milestones.map(m => `
     <div class="milestone-item">
       <div class="milestone-date">${formatShortDate(m.date)}/${new Date(m.date).getUTCFullYear()}</div>
@@ -840,7 +848,7 @@ function renderHeatmap(mode) {
   const container = document.getElementById('heatmap-content');
   if (!rawData || !rawData.metrics || !rawData.metrics.calendarData) return;
 
-  // --- Game of the Year (Scores) Summary ---
+  // --- NEW: Game of the Year (Scores) Summary ---
   if (mode === 'gotySummary') {
     const ratedGames = metaGames.filter(g => g.score !== null);
 
@@ -920,7 +928,11 @@ function renderHeatmap(mode) {
       if (statsForDays) {
           Object.values(statsForDays).forEach(item => {
               if (item.days) {
-                  item.days.forEach(d => totalDaysSet.add(d));
+                  // Safely handle Sets, Arrays, or raw data objects
+                  const daysArr = item.days instanceof Set
+                      ? Array.from(item.days)
+                      : (Array.isArray(item.days) ? item.days : (item.days.data || []));
+                  daysArr.forEach(d => totalDaysSet.add(d));
               }
           });
       }
@@ -939,7 +951,11 @@ function renderHeatmap(mode) {
         ${[0,1,2,3,4].map(i => {
            if (top5[i]) {
                if (isGame) {
-                   const sysStr = (top5[i].systems || []).join(', ');
+                   // Safely handle Sets, Arrays, or raw data objects for Systems
+                   const sysStr = top5[i].systems instanceof Set
+                       ? Array.from(top5[i].systems).join(', ')
+                       : (Array.isArray(top5[i].systems) ? top5[i].systems.join(', ') : (top5[i].systems && top5[i].systems.data ? top5[i].systems.data.join(', ') : ''));
+
                    return `<td style="font-size: 0.75rem; text-align: left;">[${formatHHMM(top5[i].totalSeconds)}] ${escapeHTML(top5[i].name)} (${escapeHTML(sysStr)})</td>`;
                } else {
                    return `<td style="font-size: 0.75rem; text-align: left;">[${formatHHMM(top5[i].totalSeconds)}] ${escapeHTML(top5[i].name)}</td>`;
@@ -986,7 +1002,7 @@ function renderHeatmap(mode) {
 
       const dayData = calData[m][d];
       const poss = possible[m][d];
-      const playedCount = dayData.yearsPlayed ? dayData.yearsPlayed.length : 0;
+      const playedCount = dayData.yearsPlayed ? (Array.isArray(dayData.yearsPlayed) ? dayData.yearsPlayed.length : (dayData.yearsPlayed.data ? dayData.yearsPlayed.data.length : 0)) : 0;
       const timeSec = dayData.totalSeconds;
 
       let bgColor = '#f7f7f7';
@@ -1035,7 +1051,7 @@ function renderGameHistory(gameName) {
 
   // Grab all entries for this game and reverse them so the newest is at the top
   const entries = rawData.allEntries.filter(e => e.game === gameName).slice().reverse();
-  
+
   if (entries.length === 0) {
     container.innerHTML = `<div class="loading-text" style="padding: 20px;">No entries found.</div>`;
     return;
@@ -1109,8 +1125,8 @@ function renderSeriesArchive(seriesName) {
   pts.sort((a, b) => {
       // Compare the overall max lastDate for the two games (Newest Game Group on top)
       const gameDateDiff = gameMaxDates[b.gameName] - gameMaxDates[a.gameName];
-      if (gameDateDiff !== 0) return gameDateDiff; 
-      
+      if (gameDateDiff !== 0) return gameDateDiff;
+
       // If it's the exact same game, sort its individual playthroughs by their own lastDate (Newest PT on top)
       return new Date(b.lastDate).getTime() - new Date(a.lastDate).getTime();
   });
@@ -1202,7 +1218,7 @@ function renderSeriesArchive(seriesName) {
 window.toggleAccordion = function(targetClass, toggleRow) {
   const rows = document.querySelectorAll(`.${targetClass}`);
   const icon = toggleRow.querySelector('.toggle-icon');
-  
+
   let isHidden = true;
   rows.forEach(row => {
     if (row.style.display === 'none') {
@@ -1231,18 +1247,18 @@ function renderSideBySideMetrics(year) {
   if (!rawData || !rawData.allEntries) return;
 
   // Filter based on the string date (no .toISOString() needed)
-  const entries = year === 'All-Time' 
-    ? rawData.allEntries 
+  const entries = year === 'All-Time'
+    ? rawData.allEntries
     : rawData.allEntries.filter(e => e.date && e.date.startsWith(year));
 
   const systems = {};
   const franchises = {};
   const genres = {};
 
-  const initMetricObj = (name) => ({ 
-    name: name, 
-    totalSeconds: 0, 
-    uniqueGames: new Set(), 
+  const initMetricObj = (name) => ({
+    name: name,
+    totalSeconds: 0,
+    uniqueGames: new Set(),
     gamePlaytimes: {},
     days: new Set(),
     firstPlayed: null,
@@ -1298,7 +1314,7 @@ function renderSideBySideMetrics(year) {
     return sorted.map((item, index) => {
       const topGameInfo = getTopGameString(item.gamePlaytimes);
       const formatDate = (d) => d ? `${d.getUTCFullYear()}/${String(d.getUTCMonth() + 1).padStart(2, '0')}/${String(d.getUTCDate()).padStart(2, '0')}` : '';
-      
+
       return `
         <div class="list-item" style="align-items: flex-start; flex-direction: column; padding: 10px 0; border-bottom: 1px solid rgba(0,0,0,0.05);">
           <div style="display: flex; justify-content: space-between; width: 100%; align-items: center;">
@@ -1327,7 +1343,7 @@ function renderSideBySideMetrics(year) {
 // --- THEME TOGGLE LOGIC ---
 function setupThemeToggle() {
   const btn = document.getElementById('theme-toggle');
-  
+
   // Check local storage for user preference
   const savedTheme = localStorage.getItem('yoshi-theme');
   if (savedTheme === 'dark') {
@@ -1340,7 +1356,7 @@ function setupThemeToggle() {
     const isDark = document.body.classList.contains('dark-theme');
     localStorage.setItem('yoshi-theme', isDark ? 'dark' : 'light');
     btn.innerText = isDark ? '☀️ Light Mode' : '🌙 Dark Mode';
-    
+
   });
 }
 
@@ -1356,10 +1372,9 @@ function setupLiveSearch() {
     const uniqueGames = [...new Set(rawData.allEntries.map(e => e.game))].sort((a,b) => a.localeCompare(b));
     gameDatalist.innerHTML = uniqueGames.map(g => `<option value="${escapeHTML(g)}">`).join('');
 
-    // Find the most recent game and render its history, but leave the input blank
+    // Set initial value to the most recently played game
     const mostRecentGame = rawData.allEntries[rawData.allEntries.length - 1].game;
-    gameSearch.value = ""; // Force the box to be blank
-    gameSearch.placeholder = `Search... (Showing: ${mostRecentGame})`; // Helpful hint
+    gameSearch.value = mostRecentGame;
     renderGameHistory(mostRecentGame);
 
     // Listen for typing/selection
@@ -1367,9 +1382,6 @@ function setupLiveSearch() {
       const val = e.target.value;
       if (uniqueGames.includes(val)) {
         renderGameHistory(val);
-      } else if (val === "") {
-        // If they clear the box, revert to the most recent game
-        renderGameHistory(mostRecentGame);
       }
     });
   }
@@ -1379,7 +1391,7 @@ function setupLiveSearch() {
     const franchises = [...new Set(metaGames.map(g => g.franchise))].filter(f => f !== 'Unknown' && f !== 'ZZNONE').sort();
     seriesDatalist.innerHTML = franchises.map(f => `<option value="${escapeHTML(f)}">`).join('');
 
-    // Find the most recently played franchise
+    // Find the most recently played franchise for the initial render
     let initialSeries = franchises.length > 0 ? franchises[0] : "";
     for (let i = rawData.allEntries.length - 1; i >= 0; i--) {
         if (rawData.allEntries[i].series && rawData.allEntries[i].series !== "N/A" && rawData.allEntries[i].series.toUpperCase() !== 'ZZNONE') {
@@ -1388,9 +1400,7 @@ function setupLiveSearch() {
         }
     }
 
-    // Render the history, but leave the input blank
-    seriesSearch.value = ""; // Force the box to be blank
-    seriesSearch.placeholder = `Search... (Showing: ${initialSeries})`; // Helpful hint
+    seriesSearch.value = initialSeries;
     renderSeriesArchive(initialSeries);
 
     // Listen for typing/selection
@@ -1398,9 +1408,6 @@ function setupLiveSearch() {
       const val = e.target.value;
       if (franchises.includes(val)) {
         renderSeriesArchive(val);
-      } else if (val === "") {
-        // If they clear the box, revert to the initial series
-        renderSeriesArchive(initialSeries);
       }
     });
   }
