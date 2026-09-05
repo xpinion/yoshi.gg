@@ -63,6 +63,33 @@ function escapeHTML(str) {
   return str.replace(/[&<>'"]/g, tag => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[tag] || tag));
 }
 
+// --- GLOBAL UI RENDERERS ---
+function renderGlobalHeader() {
+  const headerContainer = document.getElementById('global-header');
+  if (!headerContainer) return;
+
+  headerContainer.innerHTML = `
+    <div class="dashboard-header">
+      <h1>yoshi xcx's videogame dashboard</h1>
+      <button id="theme-toggle" class="theme-btn">🌙 Dark Mode</button>
+    </div>
+    <nav class="global-nav">
+      <a href="index.html">Index</a>
+      <a href="monthly.html">Monthly</a>
+      <a href="yearly.html">Yearly</a>
+      <a href="completions.html">Completions</a>
+      <a href="goty.html">GotY</a>
+      <a href="systems.html">Systems</a>
+      <a href="series.html">Series</a>
+      <a href="franchise.html">Franchise</a>
+      <a href="genre.html">Genre</a>
+      <a href="spotlight.html">Spotlight</a>
+      <a href="analysis.html">Data Analysis</a>
+      <a href="metrics.html">Metrics & Heatmaps</a>
+    </nav>
+  `;
+}
+
 // Initialization
 async function initDashboard() {
   try {
