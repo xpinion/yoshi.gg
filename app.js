@@ -234,7 +234,45 @@ function initMonthlyPage() {
   });
 }
 
-function initYearlyPage() {}
+// --- YEARLY PAGE ROUTING ---
+function initYearlyPage() {
+  const mainContainer = document.getElementById('yearly-page-container');
+  if (!mainContainer || !rawData || !rawData.metrics) return;
+
+  // Grab all the years from the data (e.g., "2026", "2025") and sort newest first
+  const yearKeys = Object.keys(rawData.metrics.yearlyGameStats).sort().reverse();
+  let html = '';
+
+  // 1. Build the structural cards for every year
+  yearKeys.forEach(year => {
+    html += `
+      <section class="card-row grid-1">
+        <div class="card">
+          <div class="card-header">
+            <h2>${year} Summary</h2>
+          </div>
+          <div class="card-content" id="yearly-summary-${year}">
+            <div class="loading-text">Loading Data...</div>
+          </div>
+        </div>
+      </section>
+    `;
+  });
+
+  mainContainer.innerHTML = html;
+
+  // 2. Populate each card with its specific table
+  yearKeys.forEach(year => {
+    renderYearlySummary(year, `yearly-summary-${year}`);
+  });
+
+  // 3. Stagger the fade-in animation
+  document.querySelectorAll('.card').forEach((card, index) => {
+    const delay = Math.min(index * 0.08, 1.5);
+    card.style.animationDelay = `${delay}s`; 
+  });
+}
+
 function initCompletionsPage() {}
 function initGotyPage() {}
 function initSystemsPage() {}
@@ -587,6 +625,112 @@ const allGamePlaythroughs = Object.keys(rawData.playthroughHistory).filter(tag =
   });
 
   // 5. Close it out
+  html += `</tbody></table></div>`;
+  container.innerHTML = html;
+}
+
+function renderYearlySummary(yearStr, containerId) {
+  const container = document.getElementById(containerId);
+  if (!container || !rawData || !rawData.allEntries) return;
+
+  // Filter entries that start with the requested year (e.g., "2026")
+  const yearEntries = rawData.allEntries.filter(e => e.date.startsWith(yearStr));
+  if (yearEntries.length === 0) { 
+    container.innerHTML = `<div class="loading-text">No data for ${yearStr}.</div>`; 
+    return; 
+  }
+
+  const yearData = { games: {}, allEntryDays: new Set() };
+  let totalSecondsInYear = 0;
+
+  yearEntries.forEach(entry => {
+    const timeSec = timeStringToSeconds(entry.time);
+    totalSecondsInYear += timeSec;
+    yearData.allEntryDays.add(entry.date.split('T')[0]);
+
+    if (!yearData.games[entry.game]) {
+      yearData.games[entry.game] = { name: entry.game, totalSeconds: 0, latestGameLifetime: entry.gameLifetime, latestGameLifetimeDays: entry.gameLifetimeDays, activePlaythroughs: {} };
+    }
+    const g = yearData.games[entry.game];
+    g.totalSeconds += timeSec; 
+    g.latestGameLifetime = entry.gameLifetime; 
+    g.latestGameLifetimeDays = entry.gameLifetimeDays;
+
+    if (!g.activePlaythroughs[entry.ptTag]) {
+      g.activePlaythroughs[entry.ptTag] = { timeframeTime: 0, timeframeDays: new Set(), timeframeSystems: new Set(), lastDate: entry.date, lastStatus: entry.status, lastPtLifetime: entry.ptLifetime, lastPtLifetimeDays: entry.ptLifetimeDays, latestNote: entry.note };
+    }
+    const pt = g.activePlaythroughs[entry.ptTag];
+    pt.timeframeTime += timeSec; 
+    pt.timeframeDays.add(entry.date.split('T')[0]); 
+    pt.timeframeSystems.add(entry.system);
+    
+    if (entry.date >= pt.lastDate) { 
+      pt.lastDate = entry.date; 
+      pt.lastStatus = entry.status; 
+      pt.lastPtLifetime = entry.ptLifetime; 
+      pt.lastPtLifetimeDays = entry.ptLifetimeDays; 
+      pt.latestNote = entry.note; 
+    }
+  });
+
+  const sortedGames = Object.values(yearData.games).sort((a, b) => b.totalSeconds - a.totalSeconds);
+
+  // Leap year calculation for the denominator
+  const yInt = parseInt(yearStr);
+  const daysInYear = (yInt % 4 === 0 && (yInt % 100 !== 0 || yInt % 400 === 0)) ? 366 : 365;
+
+  let html = `<div class="monthly-table-wrapper"><table class="monthly-table"><thead>
+    <tr><th rowspan="2">Videogame</th><th rowspan="2">System</th><th colspan="2">Active Year</th><th colspan="2">Playthrough Lifetime</th><th colspan="2">Game Lifetime</th><th rowspan="2">Date Started</th><th rowspan="2">Last Updated</th><th rowspan="2">Game Status</th><th rowspan="2">Playthrough Details</th></tr>
+    <tr><th>Time</th><th>Days</th><th>Time</th><th>Days</th><th>Time</th><th>Days</th></tr>
+    </thead><tbody>`;
+
+  html += `<tr class="grand-total-row"><td colspan="2" class="text-left">Grand Total</td><td class="text-center">${formatHHMM(totalSecondsInYear)}</td><td class="text-center">${yearData.allEntryDays.size}/${daysInYear}</td><td colspan="8"></td></tr>`;
+
+  sortedGames.forEach((game, index) => {
+    const activeTags = Object.keys(game.activePlaythroughs);
+    activeTags.forEach(ptTag => {
+      const ptLocal = game.activePlaythroughs[ptTag]; 
+      const ptHistory = rawData.playthroughHistory[ptTag];
+      const sysStr = Array.from(ptLocal.timeframeSystems).join(', '); 
+      const bgColor = getStatusColor(ptHistory.finalStatus);
+      html += `<tr class="active-row"><td class="text-left"><span class="hover-trigger" data-game="${escapeHTML(game.name)}">${escapeHTML(game.name)}</span></td><td class="text-center">${escapeHTML(sysStr)}</td><td class="text-center">${formatHHMM(ptLocal.timeframeTime)}</td><td class="text-center">${ptLocal.timeframeDays.size}</td><td class="text-center">${ptLocal.lastPtLifetime}</td><td class="text-center">${ptLocal.lastPtLifetimeDays}</td><td class="text-center">${game.latestGameLifetime}</td><td class="text-center">${game.latestGameLifetimeDays}</td><td class="text-center">${formatFullDate(ptHistory.startDate)}</td><td class="text-center">${formatFullDate(ptLocal.lastDate)}</td><td class="text-center status-cell" style="background-color: ${bgColor};">${ptLocal.lastStatus}</td><td class="text-left">${escapeHTML(ptLocal.latestNote)}</td></tr>`;
+    });
+    
+    const allGamePlaythroughs = Object.keys(rawData.playthroughHistory).filter(tag => rawData.playthroughHistory[tag].gameName === game.name);
+    const inactiveTags = allGamePlaythroughs.filter(oldTag => !activeTags.includes(oldTag));
+
+    if (inactiveTags.length > 0) {
+      const safeGameId = `collapse-year-${yearStr}-${index}`;
+      
+      html += `
+        <tr class="accordion-toggle-row" onclick="toggleAccordion('${safeGameId}', this)" style="cursor: pointer; background-color: rgba(0,0,0,0.03);">
+          <td colspan="12" class="text-left" style="padding: 6px 12px; font-size: 0.85rem; color: #666;">
+            <span class="toggle-icon">▶</span> Show ${inactiveTags.length} Past Playthrough${inactiveTags.length !== 1 ? 's' : ''}
+          </td>
+        </tr>
+      `;
+      
+      inactiveTags.forEach(oldTag => {
+        const oldPt = rawData.playthroughHistory[oldTag];
+        const bgColor = getStatusColor(oldPt.finalStatus);
+        html += `<tr class="inactive-row ${safeGameId}" style="display: none; opacity: 0.65;">
+          <td class="text-left"><span class="hover-trigger" data-game="${escapeHTML(game.name)}">${escapeHTML(game.name)}</span></td>
+          <td class="text-center">${escapeHTML(oldPt.system)}</td>
+          <td class="text-center">00:00</td>
+          <td class="text-center">0</td>
+          <td class="text-center">${oldPt.finalPtLifetime}</td>
+          <td class="text-center">${oldPt.finalPtLifetimeDays}</td>
+          <td class="text-center">${game.latestGameLifetime}</td>
+          <td class="text-center">${game.latestGameLifetimeDays}</td>
+          <td class="text-center">${formatFullDate(oldPt.startDate)}</td>
+          <td class="text-center">${formatFullDate(oldPt.lastDate)}</td>
+          <td class="text-center status-cell" style="background-color: ${bgColor};">${oldPt.finalStatus}</td>
+          <td class="text-left">${escapeHTML(oldPt.finalNote)}</td>
+        </tr>`;
+      });
+    }
+  });
+  
   html += `</tbody></table></div>`;
   container.innerHTML = html;
 }
