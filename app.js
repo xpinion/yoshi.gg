@@ -330,21 +330,24 @@ function initCompletionsPage() {
     }
 
     return `
-      <div class="completion-card card" style="border-top: 6px solid ${statusColor}; animation-delay: ${Math.min(index * 0.03, 1.2)}s;">
-        <div class="cc-header">
-          <div class="cc-title-group">
-            <span class="cc-rank">Completion #${rank}</span>
-            <span class="cc-title hover-trigger" data-game="${escapeHTML(pt.gameName)}">${escapeHTML(pt.gameName)}</span>
-          </div>
-          ${badgeHTML}
-        </div>
+      <div class="completion-list-item card" style="border-left: 6px solid ${statusColor}; animation-delay: ${Math.min(index * 0.03, 1.2)}s;">
         
-        <div class="cc-meta">
-          <span class="cc-pill" style="background: var(--item-bg); border: 1px solid var(--border-light);">${escapeHTML(pt.system)}</span>
-          <span class="cc-pill" style="background: var(--item-bg); border: 1px solid ${statusColor}; color: var(--text-main); font-weight: 900;">${pt.finalStatus}</span>
+        <!-- Left Column: Core Info -->
+        <div class="cc-primary">
+          <span class="cc-rank">Completion #${rank}</span>
+          <span class="cc-title hover-trigger" data-game="${escapeHTML(pt.gameName)}">${escapeHTML(pt.gameName)}</span>
+          <div class="cc-meta">
+            <span class="cc-pill" style="background: var(--item-bg); border: 1px solid var(--border-light);">${escapeHTML(pt.system)}</span>
+            <span class="cc-pill" style="background: var(--item-bg); border: 1px solid ${statusColor}; color: var(--text-main); font-weight: 900;">${pt.finalStatus}</span>
+            ${badgeHTML}
+          </div>
+          <div class="cc-footer">
+            <span><strong>Start:</strong> ${formatFullDate(pt.startDate)} &nbsp;|&nbsp; <strong>End:</strong> ${formatFullDate(pt.displayDate)}</span>
+          </div>
         </div>
 
-        <div class="cc-stats">
+        <!-- Middle Column: Stats -->
+        <div class="cc-stats-col">
           <div class="cc-stat-block">
             <span class="cc-stat-label">Total Time</span>
             <span class="cc-stat-val">${formattedTime}</span>
@@ -353,18 +356,16 @@ function initCompletionsPage() {
             <span class="cc-stat-label">Days Played</span>
             <span class="cc-stat-val">${pt.finalPtLifetimeDays}</span>
           </div>
+          ${pastCompletionsHtml}
         </div>
 
-        ${pastCompletionsHtml}
-
-        <div class="cc-note">
-          ${escapeHTML(pt.finalNote)}
+        <!-- Right Column: Note -->
+        <div class="cc-note-col">
+          <div class="cc-note">
+            ${escapeHTML(pt.finalNote)}
+          </div>
         </div>
-
-        <div class="cc-footer">
-          <div class="cc-date"><strong>Start:</strong> ${formatFullDate(pt.startDate)}</div>
-          <div class="cc-date"><strong>End:</strong> ${formatFullDate(pt.displayDate)}</div>
-        </div>
+        
       </div>
     `;
   }).join('');
