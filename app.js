@@ -133,30 +133,31 @@ async function initDashboard() {
     setupThemeToggle();
     setupHoverHistory();
 
-    // 3. Page Routing
-    const path = window.location.pathname;
+// 3. Page Routing
+    const path = window.location.pathname.toLowerCase();
 
-    if (path.includes('monthly.html')) {
+    // Check for the word rather than the exact filename
+    if (path.includes('monthly')) {
       initMonthlyPage();
-    } else if (path.includes('yearly.html')) {
+    } else if (path.includes('yearly')) {
       initYearlyPage();
-    } else if (path.includes('completions.html')) {
+    } else if (path.includes('completions')) {
       initCompletionsPage();
-    } else if (path.includes('goty.html')) {
+    } else if (path.includes('goty')) {
       initGotyPage();
-    } else if (path.includes('systems.html')) {
+    } else if (path.includes('systems')) {
       initSystemsPage();
-    } else if (path.includes('series.html')) {
+    } else if (path.includes('series')) {
       initSeriesPage();
-    } else if (path.includes('franchise.html')) {
+    } else if (path.includes('franchise')) {
       initFranchisePage();
-    } else if (path.includes('genre.html')) {
+    } else if (path.includes('genre')) {
       initGenrePage();
-    } else if (path.includes('spotlight.html')) {
+    } else if (path.includes('spotlight')) {
       initSpotlightPage();
-    } else if (path.includes('analysis.html')) {
+    } else if (path.includes('analysis')) {
       initAnalysisPage();
-    } else if (path.includes('metrics.html')) {
+    } else if (path.includes('metrics')) {
       initMetricsPage();
     } else {
       // Default fallback (index.html)
@@ -491,7 +492,7 @@ function setupHoverHistory() {
 
 function renderMonthlySummary(monthKey, containerId = 'monthly-summary-list') {
   const container = document.getElementById(containerId);
-  if (!rawData || !rawData.allEntries) return;
+  if (!container || !rawData || !rawData.allEntries) return;
 
   const monthEntries = rawData.allEntries.filter(e => e.date.startsWith(monthKey));
   if (monthEntries.length === 0) { container.innerHTML = `<div class="loading-text">No data for ${monthKey}.</div>`; return; }
@@ -888,7 +889,7 @@ function renderRandomTop25() {
 // --- ANALYSIS TABLES ---
 function renderAnalysis(type) {
   const container = document.getElementById('analysis-content');
-  if (!rawData || !rawData.metrics) return;
+  if (!container || !rawData || !rawData.metrics) return;
 
   let html = `<div style="overflow-x: auto;"><table class="analysis-table"><thead><tr>`;
 
@@ -966,7 +967,7 @@ function renderMilestones() {
 // --- CALENDAR HEATMAP & TIMEFRAME SUMMARIES ---
 function renderHeatmap(mode) {
   const container = document.getElementById('heatmap-content');
-  if (!rawData || !rawData.metrics || !rawData.metrics.calendarData) return;
+  if (!container || !rawData || !rawData.metrics || !rawData.metrics.calendarData) return;
 
   // --- NEW: Game of the Year (Scores) Summary ---
   if (mode === 'gotySummary') {
