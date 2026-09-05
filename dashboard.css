@@ -135,7 +135,7 @@ body {
 }
 
 /* --- STICKY NAVIGATION --- */
-.sticky-nav {
+.global-nav {
   position: sticky;
   top: 0;
   background-color: var(--nav-bg);
@@ -147,9 +147,9 @@ body {
   justify-content: center;
   gap: 20px;
   flex-wrap: wrap;
-  margin: -30px -20px 30px -20px; /* Pulls nav flush with viewport edges */
+  margin: 0 -20px 30px -20px; /* Adjusted to fit under the new injected header */
 }
-.sticky-nav a {
+.global-nav a {
   text-decoration: none;
   color: var(--text-main);
   font-weight: 800;
@@ -157,7 +157,7 @@ body {
   text-transform: uppercase;
   transition: color 0.2s;
 }
-.sticky-nav a:hover {
+.global-nav a:hover {
   color: var(--primary-green);
 }
 
