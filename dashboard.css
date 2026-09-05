@@ -591,3 +591,113 @@ body {
     min-width: 100%;
   }
 }
+
+/* --- COMPLETIONS PAGE GRID --- */
+.completion-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 25px;
+}
+
+.completion-card {
+  padding: 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  background: var(--card-bg);
+  border-radius: 12px;
+  box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+  opacity: 0;
+  animation: fadeInUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.completion-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 10px 25px rgba(0,0,0,0.15);
+}
+
+.cc-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 15px;
+}
+
+.cc-title-group {
+  display: flex;
+  flex-direction: column;
+}
+
+.cc-rank {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  font-weight: 800;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  margin-bottom: 4px;
+}
+
+.cc-title {
+  font-size: 1.3rem;
+  font-weight: 900;
+  color: var(--text-title);
+  line-height: 1.2;
+}
+
+.cc-score {
+  font-size: 1.2rem;
+  padding: 8px 14px;
+}
+
+.cc-meta {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.cc-pill {
+  font-size: 0.75rem;
+  font-weight: 800;
+  padding: 4px 12px;
+  border-radius: 15px;
+  text-transform: uppercase;
+}
+
+.cc-stats {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  background: var(--item-bg);
+  padding: 15px;
+  border-radius: 8px;
+  border: 1px solid var(--border-light);
+}
+
+.cc-stat-block {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.cc-stat-label {
+  font-size: 0.75rem;
+  color: var(--text-sub);
+  text-transform: uppercase;
+  font-weight: 800;
+}
+
+.cc-stat-val {
+  font-size: 1.2rem;
+  font-weight: 900;
+  color: var(--text-main);
+}
+
+.cc-footer {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.85rem;
+  color: var(--text-sub);
+  border-top: 1px dashed var(--border-light);
+  padding-top: 15px;
+  margin-top: auto;
+}
