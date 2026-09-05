@@ -134,7 +134,7 @@ async function initDashboard() {
     setupHoverHistory();
 
 // 3. Page Routing
-    const path = window.location.pathname.toLowerCase();
+    const path = window.location.href.toLowerCase();
 
     // Check for the word rather than the exact filename
     if (path.includes('monthly')) {
@@ -165,8 +165,11 @@ async function initDashboard() {
     }
 
   } catch (error) {
-    console.error("Error loading dashboard data:", error);
-    document.querySelectorAll('.card-content').forEach(el => el.innerHTML = `<div class="loading-text" style="color: red;">Error loading data.</div>`);
+    console.error("Dashboard Error:", error);
+    const errorHtml = `<div class="loading-text" style="color: red; padding: 20px;">Error: ${error.message}</div>`;
+    
+    // This targets your index cards AND your new monthly container
+    document.querySelectorAll('.card-content, #monthly-page-container').forEach(el => el.innerHTML = errorHtml);
   }
 }
 
@@ -824,11 +827,18 @@ function renderRankings(filterType, filterValue, containerId, limit) {
 
 function renderOnThisDay() {
   const container = document.getElementById('on-this-day-list');
+  const dateSpan = document.getElementById('today-date');
+  
+  // 1. Safety check FIRST. If these elements don't exist, stop immediately.
+  if (!container || !dateSpan || !rawData || !rawData.allEntries) return; 
+
+  // 2. Keep your existing date variables!
   const today = new Date();
   const currentMonth = today.getMonth(); // 0-11
   const currentDay = today.getDate(); // 1-31
 
-  document.getElementById('today-date').innerText = `${String(currentMonth + 1).padStart(2, '0')}/${String(currentDay).padStart(2, '0')}`;
+  // 3. Update the innerText using the safely checked dateSpan variable
+  dateSpan.innerText = `${String(currentMonth + 1).padStart(2, '0')}/${String(currentDay).padStart(2, '0')}`;
 
   const historyEntries = rawData.allEntries.filter(e => {
     const d = new Date(e.date);
@@ -859,6 +869,7 @@ function renderOnThisDay() {
     `;
   }).join('');
 }
+
 function renderRandomTop25() {
   const selected = document.getElementById('random-top25-select').value;
   const pair = allTop25Tables.find(t => t.mainTitle === selected);
