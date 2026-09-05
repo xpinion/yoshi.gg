@@ -76,7 +76,6 @@ async function initDashboard() {
     rawData = JSON.parse(rawText, (key, value) => {
       // ONLY Revive Sets (Leave Dates as strings so .startsWith() and .split() work!)
       if (value && typeof value === 'object' && value._dataType === 'Set') {
-        // Look for the array in value.value, falling back to value.data just in case
         const arrayItems = value.value || value.data || [];
         return new Set(arrayItems);
       }
@@ -100,26 +99,77 @@ async function initDashboard() {
       }
     }
 
-    parseTop25Data(top25Data);
-    setupDropdowns();
-    setupThemeToggle();
-    setupLiveSearch();
-    setupHoverHistory();
-    renderOnThisDay();
-    renderMilestones();
-    renderAnalysis('playthrough');
-    renderHeatmap('gameSummary');
+    // 1. Render the header FIRST so the DOM elements (like the theme toggle) exist
+    renderGlobalHeader();
 
-    // Trigger the staggered fade-in animations for all cards
-    document.querySelectorAll('.card').forEach((card, index) => {
-      card.style.animationDelay = `${index * 0.08}s`; // 80ms delay per card
-    });
+    // 2. Setup global UI elements that exist on every page
+    setupThemeToggle();
+    setupHoverHistory();
+
+    // 3. Page Routing
+    const path = window.location.pathname;
+
+    if (path.includes('monthly.html')) {
+      initMonthlyPage();
+    } else if (path.includes('yearly.html')) {
+      initYearlyPage();
+    } else if (path.includes('completions.html')) {
+      initCompletionsPage();
+    } else if (path.includes('goty.html')) {
+      initGotyPage();
+    } else if (path.includes('systems.html')) {
+      initSystemsPage();
+    } else if (path.includes('series.html')) {
+      initSeriesPage();
+    } else if (path.includes('franchise.html')) {
+      initFranchisePage();
+    } else if (path.includes('genre.html')) {
+      initGenrePage();
+    } else if (path.includes('spotlight.html')) {
+      initSpotlightPage();
+    } else if (path.includes('analysis.html')) {
+      initAnalysisPage();
+    } else if (path.includes('metrics.html')) {
+      initMetricsPage();
+    } else {
+      // Default fallback (index.html)
+      initIndexPage(top25Data);
+    }
 
   } catch (error) {
     console.error("Error loading dashboard data:", error);
     document.querySelectorAll('.card-content').forEach(el => el.innerHTML = `<div class="loading-text" style="color: red;">Error loading data.</div>`);
   }
 }
+
+// Move your existing page rendering logic here so index.html still works
+function initIndexPage(top25Data) {
+  parseTop25Data(top25Data);
+  setupDropdowns();
+  setupLiveSearch();
+  renderOnThisDay();
+  renderMilestones();
+  renderAnalysis('playthrough');
+  renderHeatmap('gameSummary');
+
+  // Trigger the staggered fade-in animations for all cards
+  document.querySelectorAll('.card').forEach((card, index) => {
+    card.style.animationDelay = `${index * 0.08}s`; // 80ms delay per card
+  });
+}
+
+// Placeholders for future pages to prevent reference errors when you navigate
+function initMonthlyPage() {}
+function initYearlyPage() {}
+function initCompletionsPage() {}
+function initGotyPage() {}
+function initSystemsPage() {}
+function initSeriesPage() {}
+function initFranchisePage() {}
+function initGenrePage() {}
+function initSpotlightPage() {}
+function initAnalysisPage() {}
+function initMetricsPage() {}
 
 // --- SPOTLIGHT PARSING (Grouped & Bolded) ---
 function parseTop25Data(top25Data) {
