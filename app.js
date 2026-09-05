@@ -169,7 +169,7 @@ async function initDashboard() {
     const errorHtml = `<div class="loading-text" style="color: red; padding: 20px;">Error: ${error.message}</div>`;
     
     // This targets your index cards AND your new monthly container
-    document.querySelectorAll('.card-content, #monthly-page-container').forEach(el => el.innerHTML = errorHtml);
+    document.querySelectorAll('.card-content, .dashboard-container').forEach(el => el.innerHTML = errorHtml);
   }
 }
 
