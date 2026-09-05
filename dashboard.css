@@ -701,3 +701,21 @@ body {
   padding-top: 15px;
   margin-top: auto;
 }
+
+.cc-past {
+  font-size: 0.8rem;
+  color: var(--text-sub);
+  font-style: italic;
+  margin-top: -5px;
+}
+
+.cc-note {
+  font-size: 0.85rem;
+  line-height: 1.5;
+  color: var(--text-main);
+  background: var(--bg-color);
+  padding: 12px 15px;
+  border-radius: 6px;
+  border-left: 4px solid var(--border-light);
+  margin-top: auto; /* Pushes the footer to the bottom evenly */
+}
