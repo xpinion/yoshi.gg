@@ -1367,23 +1367,43 @@ function setupLiveSearch() {
   const seriesSearch = document.getElementById('series-search');
   const seriesDatalist = document.getElementById('series-datalist');
 
+  // Helper for better Datalist UX (clears on click, restores on blur)
+  const applyDatalistUX = (inputElement, validOptions, renderFn) => {
+    let prevVal = inputElement.value;
+    
+    // Clear the box on click to show all datalist suggestions
+    inputElement.addEventListener('focus', () => {
+      prevVal = inputElement.value;
+      inputElement.value = '';
+    });
+    
+    // Restore the previous valid text if they click away without picking one
+    inputElement.addEventListener('blur', () => {
+      if (!inputElement.value.trim() || !validOptions.includes(inputElement.value)) {
+        inputElement.value = prevVal;
+      }
+    });
+
+    // Re-render immediately when a valid option is selected
+    inputElement.addEventListener('input', (e) => {
+      const val = e.target.value;
+      if (validOptions.includes(val)) {
+        prevVal = val;
+        renderFn(val);
+      }
+    });
+  };
+
   // Populate Game Search
   if (gameSearch && gameDatalist) {
     const uniqueGames = [...new Set(rawData.allEntries.map(e => e.game))].sort((a,b) => a.localeCompare(b));
     gameDatalist.innerHTML = uniqueGames.map(g => `<option value="${escapeHTML(g)}">`).join('');
 
-    // Set initial value to the most recently played game
     const mostRecentGame = rawData.allEntries[rawData.allEntries.length - 1].game;
     gameSearch.value = mostRecentGame;
     renderGameHistory(mostRecentGame);
 
-    // Listen for typing/selection
-    gameSearch.addEventListener('input', (e) => {
-      const val = e.target.value;
-      if (uniqueGames.includes(val)) {
-        renderGameHistory(val);
-      }
-    });
+    applyDatalistUX(gameSearch, uniqueGames, renderGameHistory);
   }
 
   // Populate Series Search
@@ -1391,7 +1411,6 @@ function setupLiveSearch() {
     const franchises = [...new Set(metaGames.map(g => g.franchise))].filter(f => f !== 'Unknown' && f !== 'ZZNONE').sort();
     seriesDatalist.innerHTML = franchises.map(f => `<option value="${escapeHTML(f)}">`).join('');
 
-    // Find the most recently played franchise for the initial render
     let initialSeries = franchises.length > 0 ? franchises[0] : "";
     for (let i = rawData.allEntries.length - 1; i >= 0; i--) {
         if (rawData.allEntries[i].series && rawData.allEntries[i].series !== "N/A" && rawData.allEntries[i].series.toUpperCase() !== 'ZZNONE') {
@@ -1403,13 +1422,7 @@ function setupLiveSearch() {
     seriesSearch.value = initialSeries;
     renderSeriesArchive(initialSeries);
 
-    // Listen for typing/selection
-    seriesSearch.addEventListener('input', (e) => {
-      const val = e.target.value;
-      if (franchises.includes(val)) {
-        renderSeriesArchive(val);
-      }
-    });
+    applyDatalistUX(seriesSearch, franchises, renderSeriesArchive);
   }
 }
 
