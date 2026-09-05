@@ -49,11 +49,10 @@ function formatHHMM(totalSeconds) {
 }
 function getStatusColor(status) {
   switch (status) {
-    case 'Completed': case 'M-Completed': return '#00FF00';
+    case 'Completed': case 'M-Completed': case 'Postgame': return '#00FF00';
     case 'Active': return '#FFFF00';
     case 'Multiplayer': return '#00FFFF';
     case 'Abandoned': return '#FFCCCC';
-    case 'Postgame': return '#FFA500';
     case 'Non-Completable': return '#DDDDDD';
     default: return '#FFFFFF';
   }
@@ -312,8 +311,24 @@ function initCompletionsPage() {
     const badgeHTML = score !== '-' ? `<div class="item-badge cc-score">${score}</div>` : `<div class="item-badge cc-score" style="background: var(--heatmap-empty); color: var(--text-muted);">-</div>`;
     const formattedTime = formatTime(timeStringToSeconds(pt.finalPtLifetime));
     const statusColor = getStatusColor(pt.finalStatus);
-    const rank = totalCompletions - index; // #1 is oldest, highest is newest
+    const rank = totalCompletions - index;
     
+    // Check for prior completions
+    let pastCompletionsHtml = '';
+    if (rawData.metrics && rawData.metrics.completionStats) {
+        const allTimeGameData = rawData.metrics.completionStats.find(g => g.gameName === pt.gameName);
+        if (allTimeGameData && allTimeGameData.completionDates.length > 1) {
+          const currentCompletionStr = formatFullDate(pt.displayDate);
+          const pastDates = allTimeGameData.completionDates
+              .map(d => formatFullDate(d))
+              .filter(d => d !== currentCompletionStr);
+            if (pastDates.length > 0) {
+                const uniquePastDates = [...new Set(pastDates)];
+                pastCompletionsHtml = `<div class="cc-past"><strong>Also completed on:</strong> ${uniquePastDates.join(', ')}</div>`;
+            }
+        }
+    }
+
     return `
       <div class="completion-card card" style="border-top: 6px solid ${statusColor}; animation-delay: ${Math.min(index * 0.03, 1.2)}s;">
         <div class="cc-header">
@@ -338,6 +353,12 @@ function initCompletionsPage() {
             <span class="cc-stat-label">Days Played</span>
             <span class="cc-stat-val">${pt.finalPtLifetimeDays}</span>
           </div>
+        </div>
+
+        ${pastCompletionsHtml}
+
+        <div class="cc-note">
+          ${escapeHTML(pt.finalNote)}
         </div>
 
         <div class="cc-footer">
