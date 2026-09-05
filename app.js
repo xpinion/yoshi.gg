@@ -186,7 +186,50 @@ function initIndexPage(top25Data) {
 }
 
 // Placeholders for future pages to prevent reference errors when you navigate
-function initMonthlyPage() {}
+// --- SPECIFIC PAGE ROUTING ---
+function initMonthlyPage() {
+  const mainContainer = document.getElementById('monthly-page-container');
+  if (!mainContainer || !rawData || !rawData.metrics) return;
+
+  const monthKeys = Object.keys(rawData.metrics.monthlyStats).sort().reverse();
+  let html = '';
+
+  // 1. Build the structural cards for every month
+  monthKeys.forEach(monthKey => {
+    // Convert "YYYY-MM" into a nice title like "September 2026"
+    const [yearStr, monthStr] = monthKey.split('-');
+    const dateObj = new Date(parseInt(yearStr), parseInt(monthStr) - 1, 1);
+    const displayTitle = dateObj.toLocaleString('default', { month: 'long', year: 'numeric' });
+
+    html += `
+      <section class="card-row grid-1">
+        <div class="card">
+          <div class="card-header">
+            <h2>${displayTitle} Summary</h2>
+          </div>
+          <div class="card-content" id="monthly-summary-${monthKey}">
+            <div class="loading-text">Loading Data...</div>
+          </div>
+        </div>
+      </section>
+    `;
+  });
+
+  mainContainer.innerHTML = html;
+
+  // 2. Populate each card with its specific table
+  monthKeys.forEach(monthKey => {
+    renderMonthlySummary(monthKey, `monthly-summary-${monthKey}`);
+  });
+
+  // 3. Stagger the fade-in animation
+  document.querySelectorAll('.card').forEach((card, index) => {
+    // Cap the delay multiplier so the bottom cards don't take 5 seconds to load
+    const delay = Math.min(index * 0.08, 1.5);
+    card.style.animationDelay = `${delay}s`; 
+  });
+}
+
 function initYearlyPage() {}
 function initCompletionsPage() {}
 function initGotyPage() {}
@@ -446,8 +489,8 @@ function setupHoverHistory() {
 
 // --- RENDER FUNCTIONS ---
 
-function renderMonthlySummary(monthKey) {
-  const container = document.getElementById('monthly-summary-list');
+function renderMonthlySummary(monthKey, containerId = 'monthly-summary-list') {
+  const container = document.getElementById(containerId);
   if (!rawData || !rawData.allEntries) return;
 
   const monthEntries = rawData.allEntries.filter(e => e.date.startsWith(monthKey));
@@ -504,7 +547,7 @@ const allGamePlaythroughs = Object.keys(rawData.playthroughHistory).filter(tag =
     const inactiveTags = allGamePlaythroughs.filter(oldTag => !activeTags.includes(oldTag));
 
     if (inactiveTags.length > 0) {
-      const safeGameId = `collapse-${index}`;
+      const safeGameId = `collapse-${monthKey}-${index}`;
 
       // 1. The Toggle Button Row
       html += `
