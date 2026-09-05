@@ -272,8 +272,86 @@ function initYearlyPage() {
     card.style.animationDelay = `${delay}s`; 
   });
 }
+// --- COMPLETIONS PAGE ROUTING ---
+function initCompletionsPage() {
+  const container = document.getElementById('completions-page-container');
+  if (!container || !rawData || !rawData.playthroughHistory) return;
 
-function initCompletionsPage() {}
+  // Filter for completed/postgame states
+  const completions = Object.values(rawData.playthroughHistory).filter(pt => {
+    return (pt.completionDates && pt.completionDates.length > 0) || ['Completed', 'M-Completed', 'Postgame'].includes(pt.finalStatus);
+  });
+
+  // Calculate display dates and rank
+  completions.forEach(pt => {
+    const cDate = (pt.completionDates && pt.completionDates.length > 0) ? new Date(pt.completionDates[0]) : new Date(pt.lastDate);
+    pt.displayDate = cDate;
+    const finalEntry = rawData.allEntries.slice().reverse().find(e => e.ptTag === pt.ptTag && ['Completed', 'M-Completed', 'Postgame'].includes(e.status));
+    pt.entryNum = finalEntry ? Number(finalEntry.entryNum) : 0;
+  });
+
+  completions.sort((a, b) => {
+    const dateDiff = b.displayDate.getTime() - a.displayDate.getTime(); 
+    if (dateDiff !== 0) return dateDiff;
+    return b.entryNum - a.entryNum;
+  });
+
+  const totalCompletions = completions.length;
+
+  let html = `
+    <div class="card-row grid-1">
+      <div style="text-align: center; margin-bottom: 10px;">
+        <h2 style="font-size: 2.5rem; color: var(--text-header); font-weight: 900;">All-Time Completions: <span style="color: var(--primary-green);">${totalCompletions}</span></h2>
+      </div>
+    </div>
+    <div class="completion-grid">
+  `;
+
+  html += completions.map((pt, index) => {
+    const score = metaScores.get(pt.gameName) || '-';
+    const badgeHTML = score !== '-' ? `<div class="item-badge cc-score">${score}</div>` : `<div class="item-badge cc-score" style="background: var(--heatmap-empty); color: var(--text-muted);">-</div>`;
+    const formattedTime = formatTime(timeStringToSeconds(pt.finalPtLifetime));
+    const statusColor = getStatusColor(pt.finalStatus);
+    const rank = totalCompletions - index; // #1 is oldest, highest is newest
+    
+    return `
+      <div class="completion-card card" style="border-top: 6px solid ${statusColor}; animation-delay: ${Math.min(index * 0.03, 1.2)}s;">
+        <div class="cc-header">
+          <div class="cc-title-group">
+            <span class="cc-rank">Completion #${rank}</span>
+            <span class="cc-title hover-trigger" data-game="${escapeHTML(pt.gameName)}">${escapeHTML(pt.gameName)}</span>
+          </div>
+          ${badgeHTML}
+        </div>
+        
+        <div class="cc-meta">
+          <span class="cc-pill" style="background: var(--item-bg); border: 1px solid var(--border-light);">${escapeHTML(pt.system)}</span>
+          <span class="cc-pill" style="background: var(--item-bg); border: 1px solid ${statusColor}; color: var(--text-main); font-weight: 900;">${pt.finalStatus}</span>
+        </div>
+
+        <div class="cc-stats">
+          <div class="cc-stat-block">
+            <span class="cc-stat-label">Total Time</span>
+            <span class="cc-stat-val">${formattedTime}</span>
+          </div>
+          <div class="cc-stat-block">
+            <span class="cc-stat-label">Days Played</span>
+            <span class="cc-stat-val">${pt.finalPtLifetimeDays}</span>
+          </div>
+        </div>
+
+        <div class="cc-footer">
+          <div class="cc-date"><strong>Start:</strong> ${formatFullDate(pt.startDate)}</div>
+          <div class="cc-date"><strong>End:</strong> ${formatFullDate(pt.displayDate)}</div>
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  html += `</div>`;
+  container.innerHTML = html;
+}
+
 function initGotyPage() {}
 function initSystemsPage() {}
 function initSeriesPage() {}
