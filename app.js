@@ -635,7 +635,6 @@ function initSystemsPage() {
   const systemData = {};
   let totalGlobalTime = 0;
   
-  // Initialize with extreme bounds to guarantee they get overwritten
   let globalMinDate = new Date('2099-01-01');
   let globalMaxDate = new Date('2000-01-01');
 
@@ -643,8 +642,6 @@ function initSystemsPage() {
     const sysName = e.system || "Unknown";
     const sec = timeStringToSeconds(e.time);
     const dateKey = e.date.split('T')[0];
-    
-    // Parse the date properly for math and indexing
     const entryDate = new Date(e.date);
     const dow = entryDate.getUTCDay();
     const year = entryDate.getUTCFullYear();
@@ -657,20 +654,10 @@ function initSystemsPage() {
 
     if (!systemData[sysName]) {
       systemData[sysName] = {
-        name: sysName,
-        totalSeconds: 0,
-        days: new Set(),
-        games: new Set(),
-        sessions: [],
-        gamePlaytimes: {},
-        entries: [],
-        yearStats: {},
-        monthlyTime: {},
-        cumulativeTime: {},
-        genreTime: {},
-        devTime: {},
-        dowStats: { 0:0, 1:0, 2:0, 3:0, 4:0, 5:0, 6:0 },
-        completions: 0
+        name: sysName, totalSeconds: 0, days: new Set(), games: new Set(),
+        sessions: [], gamePlaytimes: {}, entries: [], yearStats: {},
+        monthlyTime: {}, cumulativeTime: {}, genreTime: {}, devTime: {},
+        dowStats: { 0:0, 1:0, 2:0, 3:0, 4:0, 5:0, 6:0 }, completions: 0
       };
     }
 
@@ -685,13 +672,10 @@ function initSystemsPage() {
     sys.monthlyTime[monthKey] = (sys.monthlyTime[monthKey] || 0) + sec;
     sys.dowStats[dow] += sec;
 
-    // Metadata Tracking for "Vibe Check"
     if (e.genre && e.genre !== "N/A") sys.genreTime[e.genre] = (sys.genreTime[e.genre] || 0) + sec;
     if (e.developer && e.developer !== "N/A") sys.devTime[e.developer] = (sys.devTime[e.developer] || 0) + sec;
 
-    if (!sys.gamePlaytimes[e.game]) {
-      sys.gamePlaytimes[e.game] = { seconds: 0, days: new Set(), minDate: e.date, maxDate: e.date };
-    }
+    if (!sys.gamePlaytimes[e.game]) sys.gamePlaytimes[e.game] = { seconds: 0, days: new Set(), minDate: e.date, maxDate: e.date };
     sys.gamePlaytimes[e.game].seconds += sec;
     sys.gamePlaytimes[e.game].days.add(dateKey);
     
@@ -699,7 +683,6 @@ function initSystemsPage() {
     if (e.date > sys.gamePlaytimes[e.game].maxDate) sys.gamePlaytimes[e.game].maxDate = e.date;
   });
 
-  // Tally Completions
   if (rawData.playthroughHistory) {
     Object.values(rawData.playthroughHistory).forEach(pt => {
       if (['Completed', 'M-Completed', 'Postgame'].includes(pt.finalStatus)) {
@@ -709,14 +692,12 @@ function initSystemsPage() {
     });
   }
 
-  // Generate All Month Keys for Timelines & Charts safely
   const allMonthKeys = [];
   if (globalMinDate <= globalMaxDate) {
     let currY = globalMinDate.getUTCFullYear();
     let currM = globalMinDate.getUTCMonth() + 1;
     const endY = globalMaxDate.getUTCFullYear();
     const endM = globalMaxDate.getUTCMonth() + 1;
-
     while (currY < endY || (currY === endY && currM <= endM)) {
       allMonthKeys.push(`${currY}-${currM.toString().padStart(2, '0')}`);
       currM++;
@@ -724,7 +705,6 @@ function initSystemsPage() {
     }
   }
 
-  // 2. Prepare Derived Stats & Determine Maximums
   let maxTime = 0, maxDays = 0, maxGames = 0, maxComp = 0, maxLongestSess = 0, maxMpgTime = 0;
   const sortedSystems = Object.values(systemData).sort((a, b) => b.totalSeconds - a.totalSeconds);
   
@@ -742,7 +722,6 @@ function initSystemsPage() {
     sys.sessions.forEach(s => { if (s.time > longestSess.time) longestSess = s; });
     sys.longestSession = longestSess;
 
-    // Calculate Cumulative Timeline
     let runningSec = 0;
     allMonthKeys.forEach(mk => {
       runningSec += (sys.monthlyTime[mk] || 0);
@@ -793,13 +772,11 @@ function initSystemsPage() {
     `;
   }).join('');
 
-  // 3. Generate Inline SVG Line Charts for Top 10 Systems
   const top10Systems = sortedSystems.slice(0, 10);
   const chartColors = ['#ff0054', '#ffbd00', '#00b4d8', '#8ac926', '#9d4edd', '#ff9f1c', '#38b000', '#e56b6f', '#3a0ca3', '#00f5d4'];
   
   const generateLineChart = (isCumulative) => {
     if (allMonthKeys.length === 0) return '';
-    // Increase size for wide display, configure margins to fit axes text
     const width = 1200, height = 400;
     const padL = 70, padR = 20, padT = 20, padB = 40;
     const innerW = width - padL - padR, innerH = height - padT - padB;
@@ -814,33 +791,27 @@ function initSystemsPage() {
     if (chartMaxVal === 0) chartMaxVal = 1;
 
     let gridHtml = '';
-    
-    // Y-Axis: Horizontal Grid Lines & Time Labels
     for(let k=0; k<=4; k++) {
        const y = padT + innerH - (k/4)*innerH;
        const valSec = (k/4) * chartMaxVal;
-       const valLabel = Math.round(valSec / 3600) + 'h'; // Convert to Hours
-       
+       const valLabel = Math.round(valSec / 3600) + 'h';
        gridHtml += `<line x1="${padL}" y1="${y}" x2="${width-padR}" y2="${y}" stroke="var(--border-table)" stroke-width="1" />`;
        gridHtml += `<text x="${padL - 10}" y="${y + 4}" fill="var(--text-muted)" font-family="Inter, sans-serif" font-size="12" font-weight="600" text-anchor="end">${valLabel}</text>`;
     }
 
-    // X-Axis: Vertical Tick Marks & Year Labels
     let currentYearLabel = "";
     allMonthKeys.forEach((mk, j) => {
       const year = mk.split('-')[0];
       if (year !== currentYearLabel) {
          currentYearLabel = year;
          const x = padL + (j / Math.max(1, allMonthKeys.length - 1)) * innerW;
-         
          gridHtml += `<line x1="${x}" y1="${padT + innerH}" x2="${x}" y2="${padT + innerH + 5}" stroke="var(--text-muted)" stroke-width="2" />`;
          gridHtml += `<text x="${x}" y="${padT + innerH + 20}" fill="var(--text-muted)" font-family="Inter, sans-serif" font-size="12" font-weight="600" text-anchor="middle">${year}</text>`;
       }
     });
 
-    // Main Axes Base Lines
-    gridHtml += `<line x1="${padL}" y1="${padT}" x2="${padL}" y2="${padT + innerH}" stroke="var(--text-muted)" stroke-width="2" />`; // Y-axis
-    gridHtml += `<line x1="${padL}" y1="${padT + innerH}" x2="${width-padR}" y2="${padT + innerH}" stroke="var(--text-muted)" stroke-width="2" />`; // X-axis
+    gridHtml += `<line x1="${padL}" y1="${padT}" x2="${padL}" y2="${padT + innerH}" stroke="var(--text-muted)" stroke-width="2" />`;
+    gridHtml += `<line x1="${padL}" y1="${padT + innerH}" x2="${width-padR}" y2="${padT + innerH}" stroke="var(--text-muted)" stroke-width="2" />`;
 
     let linesHtml = '';
     let circlesHtml = '';
@@ -862,13 +833,7 @@ function initSystemsPage() {
       linesHtml += `<polyline points="${points.join(' ')}" fill="none" stroke="${color}" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" />`;
     });
 
-    return `
-      <svg viewBox="0 0 ${width} ${height}" style="width: 100%; height: auto; display: block; overflow: visible;">
-        ${gridHtml}
-        ${linesHtml}
-        ${circlesHtml}
-      </svg>
-    `;
+    return `<svg viewBox="0 0 ${width} ${height}" style="width: 100%; height: auto; display: block; overflow: visible;">${gridHtml}${linesHtml}${circlesHtml}</svg>`;
   };
 
   const legendHtml = `
@@ -882,13 +847,14 @@ function initSystemsPage() {
     </div>
   `;
 
-  // 4. Build the Visual Gantt-Style Eras Timeline Safely
+  // 4. Flex-based Responsive Eras Timeline (No Scrollbars needed!)
   let timelineHtml = '';
   if (allMonthKeys.length > 0) {
     timelineHtml += `
-      <div style="overflow-x: auto; padding-bottom: 10px;">
-        <div style="display: flex; min-width: max-content; border-bottom: 2px solid var(--border-light); padding-bottom: 5px;">
-          <div style="width: 140px; position: sticky; left: 0; background: var(--card-bg); z-index: 2;"></div>
+      <div style="width: 100%; display: flex; flex-direction: column; gap: 6px; padding-bottom: 10px;">
+        <div style="display: flex; align-items: center; padding-bottom: 5px; border-bottom: 2px solid var(--border-light);">
+          <div style="width: 140px; min-width: 140px; font-weight: 800; font-size: 0.85rem; padding-right: 15px; text-align: right; color: var(--text-muted);">SYSTEM</div>
+          <div style="display: flex; flex: 1;">
     `;
     
     let currentYearStr = allMonthKeys[0].substring(0,4);
@@ -896,25 +862,28 @@ function initSystemsPage() {
     allMonthKeys.forEach((mk, i) => {
       if (mk.substring(0,4) !== currentYearStr || i === allMonthKeys.length - 1) {
         if (i === allMonthKeys.length - 1) yearColspan++;
-        timelineHtml += `<div style="width: ${yearColspan * 14}px; font-size: 0.75rem; font-weight: 900; color: var(--text-muted); border-left: 1px solid var(--border-light); padding-left: 4px;">${currentYearStr}</div>`;
+        timelineHtml += `<div style="flex: ${yearColspan}; font-size: 0.75rem; font-weight: 900; color: var(--text-muted); border-left: 1px solid var(--border-light); padding-left: 4px;">${currentYearStr}</div>`;
         currentYearStr = mk.substring(0,4);
         yearColspan = 1;
       } else {
         yearColspan++;
       }
     });
-    timelineHtml += `</div>`;
+    timelineHtml += `</div></div>`;
 
     sortedSystems.forEach(sys => {
-      timelineHtml += `<div style="display: flex; min-width: max-content; margin-top: 6px; align-items: center;">`;
-      timelineHtml += `<div style="width: 140px; position: sticky; left: 0; background: var(--card-bg); z-index: 2; font-weight: 800; font-size: 0.85rem; padding-right: 15px; text-align: right; text-transform: uppercase;">${escapeHTML(sys.name)}</div>`;
-      timelineHtml += `<div style="display: flex; gap: 2px;">`;
+      const sysMaxMonthlySec = Math.max(...allMonthKeys.map(mk => sys.monthlyTime[mk] || 0));
+
+      timelineHtml += `<div style="display: flex; align-items: center;">`;
+      timelineHtml += `<div style="width: 140px; min-width: 140px; font-weight: 800; font-size: 0.85rem; padding-right: 15px; text-align: right; text-transform: uppercase;">${escapeHTML(sys.name)}</div>`;
+      timelineHtml += `<div style="display: flex; flex: 1; gap: 1px; height: 16px;">`;
       
       allMonthKeys.forEach(mk => {
         const time = sys.monthlyTime[mk] || 0;
         const bg = time > 0 ? 'var(--primary-green)' : 'var(--heatmap-empty)';
-        const opacity = time > 0 ? Math.min(1, 0.4 + (time / 36000)) : 1; 
-        timelineHtml += `<div title="${mk}: ${formatTime(time)}" style="width: 12px; height: 12px; background: ${bg}; opacity: ${opacity}; border-radius: 2px;"></div>`;
+        // Dynamic opacity relative to system's specific peak month
+        const opacity = time > 0 ? (sysMaxMonthlySec > 0 ? 0.2 + (0.8 * (time / sysMaxMonthlySec)) : 1) : 1; 
+        timelineHtml += `<div title="${mk}: ${formatTime(time)}" style="flex: 1; background: ${bg}; opacity: ${opacity}; border-radius: 1px;"></div>`;
       });
       timelineHtml += `</div></div>`;
     });
@@ -923,7 +892,6 @@ function initSystemsPage() {
 
   // 5. Build the Static Hub UI
   let html = `
-    <!-- Global Systems Ribbon -->
     <section class="card-row grid-4">
       <div class="card" style="text-align: center; padding: 20px;">
         <div class="sys-widget-title">Total Hardware</div>
@@ -945,7 +913,6 @@ function initSystemsPage() {
       </div>
     </section>
 
-    <!-- Global System Summary Table -->
     <section class="card-row grid-1">
       <div class="card">
         <div class="card-header"><h2>All-Time Systems Summary</h2></div>
@@ -971,7 +938,6 @@ function initSystemsPage() {
       </div>
     </section>
 
-    <!-- Global Trend Line Charts (Stacked) -->
     <section class="card-row grid-1" style="margin-top: 20px;">
       <div class="card">
         <div class="card-header"><h2>Top 10 Systems: Monthly Playtime</h2></div>
@@ -989,7 +955,6 @@ function initSystemsPage() {
       </div>
     </section>
 
-    <!-- Global Eras Timeline -->
     <section class="card-row grid-1" style="margin-top: 20px;">
       <div class="card">
         <div class="card-header"><h2>Global Hardware Eras Timeline (2015 - Present)</h2></div>
@@ -999,7 +964,6 @@ function initSystemsPage() {
       </div>
     </section>
 
-    <!-- System Selector -->
     <section class="card-row grid-1" style="margin-top: 20px;">
       <div class="card">
         <div class="card-header" style="border-bottom: none; margin-bottom: 0; padding-bottom: 0;">
@@ -1013,7 +977,6 @@ function initSystemsPage() {
       </div>
     </section>
 
-    <!-- Dynamic Container for Selected System Deep Dive -->
     <div id="dynamic-system-content"></div>
   `;
 
@@ -1026,7 +989,6 @@ function initSystemsPage() {
 
     const dynamicContainer = document.getElementById('dynamic-system-content');
     
-    // Identity "Vibe Check" Algorithm
     const topGenres = Object.entries(sys.genreTime).sort((a, b) => b[1] - a[1]);
     const topDevs = Object.entries(sys.devTime).sort((a, b) => b[1] - a[1]);
     const bestGenre = topGenres.length > 0 ? topGenres[0][0] : "Gaming";
@@ -2103,11 +2065,8 @@ function renderHeatmap(mode) {
   const container = document.getElementById('heatmap-content');
   if (!container || !rawData || !rawData.metrics || !rawData.metrics.calendarData) return;
 
-  // --- NEW: Game of the Year (Scores) Summary ---
   if (mode === 'gotySummary') {
     const ratedGames = metaGames.filter(g => g.score !== null);
-
-    // Group games by their release year
     const gamesByYear = {};
     ratedGames.forEach(g => {
       const y = g.releaseYear;
@@ -2118,38 +2077,29 @@ function renderHeatmap(mode) {
     });
 
     const sortedYears = Object.keys(gamesByYear).sort((a,b) => b - a);
-
     let html = `<div style="overflow-x: auto;"><table class="analysis-table"><thead><tr>`;
     html += `<th>Release Year</th><th>🏆 GOTY</th><th>2nd Place</th><th>3rd Place</th><th>4th Place</th><th>5th Place</th></tr></thead><tbody>`;
 
-    // 1. Render All-Time Top 5
     const allTimeTop5 = [...ratedGames].sort((a,b) => b.score - a.score || a.name.localeCompare(b.name)).slice(0, 5);
     html += `<tr class="all-time-row">
-      <td class="text-center" style="font-weight: bold;">All-Time</td>
-      ${[0,1,2,3,4].map(i => {
-         if (allTimeTop5[i]) {
-             const displayScore = Number.isInteger(allTimeTop5[i].score) ? allTimeTop5[i].score : allTimeTop5[i].score.toFixed(1);
-             return `<td style="font-size: 0.85rem; text-align: left;">[${displayScore}] <span class="hover-trigger" data-game="${escapeHTML(allTimeTop5[i].name)}">${escapeHTML(allTimeTop5[i].name)}</span></td>`;
-         } else {
-             return `<td></td>`;
-         }
-      }).join('')}
-    </tr>`;
+    <td class="text-center" style="font-weight: bold;">All-Time</td>
+    ${[0,1,2,3,4].map(i => {
+      if (allTimeTop5[i]) {
+        const displayScore = Number.isInteger(allTimeTop5[i].score) ? allTimeTop5[i].score : allTimeTop5[i].score.toFixed(1);
+        return `<td style="font-size: 0.85rem; text-align: left;">[${displayScore}] <span class="hover-trigger" data-game="${escapeHTML(allTimeTop5[i].name)}">${escapeHTML(allTimeTop5[i].name)}</span></td>`;
+      } else return `<td></td>`;
+    }).join('')}</tr>`;
 
-    // 2. Render Top 5 for each individual Release Year
     sortedYears.forEach(year => {
       const yearTop5 = gamesByYear[year].sort((a,b) => b.score - a.score || a.name.localeCompare(b.name)).slice(0, 5);
       html += `<tr>
-        <td class="text-center" style="font-weight: bold; font-size: 1.1rem;">${year}</td>
-        ${[0,1,2,3,4].map(i => {
-           if (yearTop5[i]) {
-               const displayScore = Number.isInteger(yearTop5[i].score) ? yearTop5[i].score : yearTop5[i].score.toFixed(1);
-               return `<td style="font-size: 0.85rem; text-align: left;">[${displayScore}] <span class="hover-trigger" data-game="${escapeHTML(yearTop5[i].name)}">${escapeHTML(yearTop5[i].name)}</span></td>`;
-           } else {
-               return `<td></td>`;
-           }
-        }).join('')}
-      </tr>`;
+      <td class="text-center" style="font-weight: bold; font-size: 1.1rem;">${year}</td>
+      ${[0,1,2,3,4].map(i => {
+        if (yearTop5[i]) {
+          const displayScore = Number.isInteger(yearTop5[i].score) ? yearTop5[i].score : yearTop5[i].score.toFixed(1);
+          return `<td style="font-size: 0.85rem; text-align: left;">[${displayScore}] <span class="hover-trigger" data-game="${escapeHTML(yearTop5[i].name)}">${escapeHTML(yearTop5[i].name)}</span></td>`;
+        } else return `<td></td>`;
+      }).join('')}</tr>`;
     });
 
     html += `</tbody></table></div>`;
@@ -2157,15 +2107,13 @@ function renderHeatmap(mode) {
     return;
   }
 
-  // 1. Render Chart Tables (Game/Genre Summaries)
   if (mode === 'gameSummary' || mode === 'genreSummary') {
     const isGame = mode === 'gameSummary';
     const map = isGame ?
-      { 'All-Time': rawData.metrics.allTimeGameStats, ...rawData.metrics.yearlyGameStats, ...rawData.metrics.monthlyStats } :
-      { 'All-Time': rawData.metrics.allTimeGenreStats, ...rawData.metrics.yearlyGenreStats, ...rawData.metrics.monthlyGenreStats };
+    { 'All-Time': rawData.metrics.allTimeGameStats, ...rawData.metrics.yearlyGameStats, ...rawData.metrics.monthlyStats } :
+    { 'All-Time': rawData.metrics.allTimeGenreStats, ...rawData.metrics.yearlyGenreStats, ...rawData.metrics.monthlyGenreStats };
 
     const gameMapForDays = { 'All-Time': rawData.metrics.allTimeGameStats, ...rawData.metrics.yearlyGameStats, ...rawData.metrics.monthlyStats };
-
     const yearKeys = Object.keys(rawData.metrics.yearlyGameStats).sort().reverse();
     const monthKeys = Object.keys(rawData.metrics.monthlyStats).sort().reverse();
     const timeframes = ['All-Time', ...yearKeys, ...monthKeys];
@@ -2181,44 +2129,35 @@ function renderHeatmap(mode) {
       const totalDaysSet = new Set();
       const statsForDays = isGame ? stats : gameMapForDays[key];
       if (statsForDays) {
-          Object.values(statsForDays).forEach(item => {
-              if (item.days) {
-                  // Safely handle Sets, Arrays, or raw data objects
-                  const daysArr = item.days instanceof Set
-                      ? Array.from(item.days)
-                      : (Array.isArray(item.days) ? item.days : (item.days.data || []));
-                  daysArr.forEach(d => totalDaysSet.add(d));
-              }
-          });
+        Object.values(statsForDays).forEach(item => {
+          if (item.days) {
+            const daysArr = item.days instanceof Set ? Array.from(item.days) : (Array.isArray(item.days) ? item.days : (item.days.data || []));
+            daysArr.forEach(d => totalDaysSet.add(d));
+          }
+        });
       }
 
       let displayKey = key;
       if (key !== 'All-Time' && key.includes('-')) {
-          const [y, m] = key.split('-');
-          const dateObj = new Date(Date.UTC(y, m-1, 1));
-          displayKey = `${y}-${m} ${dateObj.toLocaleString('en-US', {month: 'long', timeZone: 'UTC'})}`;
+        const [y, m] = key.split('-');
+        const dateObj = new Date(Date.UTC(y, m-1, 1));
+        displayKey = `${y}-${m} ${dateObj.toLocaleString('en-US', {month: 'long', timeZone: 'UTC'})}`;
       }
 
       html += `<tr class="${key === 'All-Time' ? 'all-time-row' : ''}">
-        <td class="text-left" style="white-space: nowrap; font-weight: bold;">${displayKey}</td>
-        <td>${formatHHMM(totalTime)}</td>
-        <td>${totalDaysSet.size}</td>
-        ${[0,1,2,3,4].map(i => {
-           if (top5[i]) {
-               if (isGame) {
-                   // Safely handle Sets, Arrays, or raw data objects for Systems
-                   const sysStr = top5[i].systems instanceof Set
-                       ? Array.from(top5[i].systems).join(', ')
-                       : (Array.isArray(top5[i].systems) ? top5[i].systems.join(', ') : (top5[i].systems && top5[i].systems.data ? top5[i].systems.data.join(', ') : ''));
-
-                   return `<td style="font-size: 0.75rem; text-align: left;">[${formatHHMM(top5[i].totalSeconds)}] ${escapeHTML(top5[i].name)} (${escapeHTML(sysStr)})</td>`;
-               } else {
-                   return `<td style="font-size: 0.75rem; text-align: left;">[${formatHHMM(top5[i].totalSeconds)}] ${escapeHTML(top5[i].name)}</td>`;
-               }
-           } else {
-               return `<td></td>`;
-           }
-        }).join('')}
+      <td class="text-left" style="white-space: nowrap; font-weight: bold;">${displayKey}</td>
+      <td>${formatHHMM(totalTime)}</td>
+      <td>${totalDaysSet.size}</td>
+      ${[0,1,2,3,4].map(i => {
+        if (top5[i]) {
+          if (isGame) {
+            const sysStr = top5[i].systems instanceof Set ? Array.from(top5[i].systems).join(', ') : (Array.isArray(top5[i].systems) ? top5[i].systems.join(', ') : (top5[i].systems && top5[i].systems.data ? top5[i].systems.data.join(', ') : ''));
+            return `<td style="font-size: 0.75rem; text-align: left;">[${formatHHMM(top5[i].totalSeconds)}] ${escapeHTML(top5[i].name)} (${escapeHTML(sysStr)})</td>`;
+          } else {
+            return `<td style="font-size: 0.75rem; text-align: left;">[${formatHHMM(top5[i].totalSeconds)}] ${escapeHTML(top5[i].name)}</td>`;
+          }
+        } else return `<td></td>`;
+      }).join('')}
       </tr>`;
     });
     html += `</tbody></table></div>`;
@@ -2226,7 +2165,7 @@ function renderHeatmap(mode) {
     return;
   }
 
-  // 2. Render Calendar Heatmaps (Days/Time)
+  // 2. Render Calendar Heatmaps (Square Root Scaling to fix color washout)
   const calData = rawData.metrics.calendarData;
   const possible = rawData.metrics.possibleYears;
   const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
@@ -2239,7 +2178,6 @@ function renderHeatmap(mode) {
       }
     }
   }
-  const logMax = Math.log(maxTime > 0 ? maxTime : 1);
 
   let html = `<div style="overflow-x: auto; padding: 20px;"><table class="heatmap-table"><thead><tr><th></th>`;
   for (let i = 1; i <= 31; i++) html += `<th>${i}</th>`;
@@ -2266,7 +2204,7 @@ function renderHeatmap(mode) {
 
       if (mode === 'days') {
         if (poss > 0) {
-          if (playedCount > 0 && playedCount === poss) bgColor = '#7CFC00'; // Perfect
+          if (playedCount > 0 && playedCount === poss) bgColor = '#7CFC00';
           else {
             const ratio = playedCount / poss;
             if (ratio >= 0.8) bgColor = '#008837';
@@ -2280,13 +2218,13 @@ function renderHeatmap(mode) {
         }
       } else if (mode === 'time') {
         if (timeSec > 0) {
-          const ratio = Math.log(timeSec) / logMax;
-          if (ratio >= 0.9) bgColor = '#cc4c02';
-          else if (ratio >= 0.75) bgColor = '#ec7014';
-          else if (ratio >= 0.6) bgColor = '#fe9929';
-          else if (ratio >= 0.45) bgColor = '#fec44f';
-          else if (ratio >= 0.3) bgColor = '#fee391';
-          else bgColor = '#fff7bc';
+          // Utilizing Square Root scaling instead of Log scaling to beautifully distribute outlier session lengths
+          const ratio = Math.sqrt(timeSec) / Math.sqrt(maxTime);
+          if (ratio >= 0.85) bgColor = '#990000'; // Deep Red
+          else if (ratio >= 0.65) bgColor = '#d7301f'; // Strong Red
+          else if (ratio >= 0.45) bgColor = '#fc8d59'; // Orange
+          else if (ratio >= 0.25) bgColor = '#fdcc8a'; // Light Orange
+          else bgColor = '#fef0d9'; // Pale Yellow
           titleText += `: ${formatHHMM(timeSec)} Hours`;
         }
       }
@@ -2295,7 +2233,35 @@ function renderHeatmap(mode) {
     }
     html += `</tr>`;
   }
-  html += `</tbody></table></div>`;
+  html += `</tbody></table>`;
+
+  // Attach Legend
+  if (mode === 'time') {
+      html += `
+      <div style="display: flex; justify-content: flex-end; gap: 5px; align-items: center; margin-top: 15px; font-size: 0.75rem; color: var(--text-muted);">
+          <span>Less</span>
+          <div style="width: 15px; height: 15px; background: #fef0d9; border: 1px solid var(--heatmap-border);"></div>
+          <div style="width: 15px; height: 15px; background: #fdcc8a; border: 1px solid var(--heatmap-border);"></div>
+          <div style="width: 15px; height: 15px; background: #fc8d59; border: 1px solid var(--heatmap-border);"></div>
+          <div style="width: 15px; height: 15px; background: #d7301f; border: 1px solid var(--heatmap-border);"></div>
+          <div style="width: 15px; height: 15px; background: #990000; border: 1px solid var(--heatmap-border);"></div>
+          <span>More</span>
+      </div>`;
+  } else if (mode === 'days') {
+      html += `
+      <div style="display: flex; justify-content: flex-end; gap: 5px; align-items: center; margin-top: 15px; font-size: 0.75rem; color: var(--text-muted);">
+          <span>0%</span>
+          <div style="width: 15px; height: 15px; background: #f1a340; border: 1px solid var(--heatmap-border);"></div>
+          <div style="width: 15px; height: 15px; background: #fee08b; border: 1px solid var(--heatmap-border);"></div>
+          <div style="width: 15px; height: 15px; background: #ffffbf; border: 1px solid var(--heatmap-border);"></div>
+          <div style="width: 15px; height: 15px; background: #a6dba0; border: 1px solid var(--heatmap-border);"></div>
+          <div style="width: 15px; height: 15px; background: #008837; border: 1px solid var(--heatmap-border);"></div>
+          <div style="width: 15px; height: 15px; background: #7CFC00; border: 1px solid var(--heatmap-border);"></div>
+          <span>100%</span>
+      </div>`;
+  }
+
+  html += `</div>`;
   container.innerHTML = html;
 }
 
