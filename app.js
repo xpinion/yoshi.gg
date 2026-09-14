@@ -793,7 +793,71 @@ function initSystemsPage() {
     `;
   }).join('');
 
-  // Build the Visual Gantt-Style Eras Timeline Safely
+  // 3. Generate Inline SVG Line Charts for Top 10 Systems
+  const top10Systems = sortedSystems.slice(0, 10);
+  const chartColors = ['#ff0054', '#ffbd00', '#00b4d8', '#8ac926', '#9d4edd', '#ff9f1c', '#38b000', '#e56b6f', '#3a0ca3', '#00f5d4'];
+  
+  const generateLineChart = (isCumulative) => {
+    if (allMonthKeys.length === 0) return '';
+    const width = 1000, height = 300, padding = 15;
+    const innerW = width - padding * 2, innerH = height - padding * 2;
+    
+    let chartMaxVal = 0;
+    top10Systems.forEach(sys => {
+      allMonthKeys.forEach(mk => {
+        const val = isCumulative ? (sys.cumulativeTime[mk] || 0) : (sys.monthlyTime[mk] || 0);
+        if (val > chartMaxVal) chartMaxVal = val;
+      });
+    });
+    if (chartMaxVal === 0) chartMaxVal = 1;
+
+    let gridHtml = '';
+    for(let k=0; k<=4; k++) {
+       const y = padding + innerH - (k/4)*innerH;
+       gridHtml += `<line x1="${padding}" y1="${y}" x2="${width-padding}" y2="${y}" stroke="var(--border-table)" stroke-width="1" />`;
+    }
+
+    let linesHtml = '';
+    let circlesHtml = '';
+    top10Systems.forEach((sys, i) => {
+      const color = chartColors[i];
+      let points = [];
+      allMonthKeys.forEach((mk, j) => {
+        const val = isCumulative ? (sys.cumulativeTime[mk] || 0) : (sys.monthlyTime[mk] || 0);
+        const x = padding + (j / Math.max(1, allMonthKeys.length - 1)) * innerW;
+        const y = padding + innerH - (val / chartMaxVal) * innerH;
+        points.push(`${x},${y}`);
+        
+        if (val > 0) {
+          circlesHtml += `<circle cx="${x}" cy="${y}" r="6" fill="transparent" stroke="transparent">
+                            <title>${escapeHTML(sys.name)} - ${mk}: ${formatTime(val)}</title>
+                          </circle>`;
+        }
+      });
+      linesHtml += `<polyline points="${points.join(' ')}" fill="none" stroke="${color}" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" />`;
+    });
+
+    return `
+      <svg viewBox="0 0 ${width} ${height}" style="width: 100%; height: auto; display: block; overflow: visible;">
+        ${gridHtml}
+        ${linesHtml}
+        ${circlesHtml}
+      </svg>
+    `;
+  };
+
+  const legendHtml = `
+    <div style="display: flex; flex-wrap: wrap; gap: 15px; justify-content: center; margin-top: 15px;">
+      ${top10Systems.map((sys, i) => `
+        <div style="display: flex; align-items: center; gap: 6px; font-size: 0.85rem; font-weight: 800; color: var(--text-title);">
+          <div style="width: 12px; height: 12px; background: ${chartColors[i]}; border-radius: 50%;"></div>
+          ${escapeHTML(sys.name)}
+        </div>
+      `).join('')}
+    </div>
+  `;
+
+  // 4. Build the Visual Gantt-Style Eras Timeline Safely
   let timelineHtml = '';
   if (allMonthKeys.length > 0) {
     timelineHtml += `
@@ -832,8 +896,9 @@ function initSystemsPage() {
     timelineHtml += `</div>`;
   }
 
-  // 3. Build the Static Hub UI
+  // 5. Build the Static Hub UI
   let html = `
+    <!-- Global Systems Ribbon -->
     <section class="card-row grid-4">
       <div class="card" style="text-align: center; padding: 20px;">
         <div class="sys-widget-title">Total Hardware</div>
@@ -855,6 +920,7 @@ function initSystemsPage() {
       </div>
     </section>
 
+    <!-- Global System Summary Table -->
     <section class="card-row grid-1">
       <div class="card">
         <div class="card-header"><h2>All-Time Systems Summary</h2></div>
@@ -880,6 +946,25 @@ function initSystemsPage() {
       </div>
     </section>
 
+    <!-- Global Trend Line Charts -->
+    <section class="card-row grid-2" style="margin-top: 20px;">
+      <div class="card">
+        <div class="card-header"><h2>Top 10 Systems: Monthly Playtime</h2></div>
+        <div class="card-content" style="padding: 10px 20px;">
+          ${generateLineChart(false)}
+          ${legendHtml}
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-header"><h2>Top 10 Systems: Cumulative Playtime</h2></div>
+        <div class="card-content" style="padding: 10px 20px;">
+          ${generateLineChart(true)}
+          ${legendHtml}
+        </div>
+      </div>
+    </section>
+
+    <!-- Global Eras Timeline -->
     <section class="card-row grid-1" style="margin-top: 20px;">
       <div class="card">
         <div class="card-header"><h2>Global Hardware Eras Timeline (2015 - Present)</h2></div>
@@ -889,6 +974,7 @@ function initSystemsPage() {
       </div>
     </section>
 
+    <!-- System Selector -->
     <section class="card-row grid-1" style="margin-top: 20px;">
       <div class="card">
         <div class="card-header" style="border-bottom: none; margin-bottom: 0; padding-bottom: 0;">
@@ -902,12 +988,13 @@ function initSystemsPage() {
       </div>
     </section>
 
+    <!-- Dynamic Container for Selected System Deep Dive -->
     <div id="dynamic-system-content"></div>
   `;
 
   container.innerHTML = html;
 
-  // 4. Dynamic Rendering Logic (Single System Deep Dive)
+  // 6. Dynamic Rendering Logic (Single System Deep Dive)
   const renderSelectedSystem = (sysName) => {
     const sys = systemData[sysName];
     if (!sys) return;
@@ -920,31 +1007,6 @@ function initSystemsPage() {
     const bestGenre = topGenres.length > 0 ? topGenres[0][0] : "Gaming";
     const bestDev = topDevs.length > 0 ? topDevs[0][0] : "";
     const identityTitle = bestDev ? `The ${bestDev} ${bestGenre} Machine` : `The ${bestGenre} Machine`;
-
-    // Timeline Bar Charts Generation
-    let maxMonthlySec = Math.max(...Object.values(sys.monthlyTime));
-    if (maxMonthlySec === 0) maxMonthlySec = 1; 
-    
-    let activityChartHtml = `<div class="sys-chart-wrapper">`;
-    let cumulativeChartHtml = `<div class="sys-chart-wrapper">`;
-    
-    allMonthKeys.forEach(mk => {
-       const mTime = sys.monthlyTime[mk] || 0;
-       const cTime = sys.cumulativeTime[mk] || 0;
-       const mPct = (mTime / maxMonthlySec) * 100;
-       const cPct = sys.totalSeconds > 0 ? (cTime / sys.totalSeconds) * 100 : 0;
-       
-       activityChartHtml += `
-         <div class="sys-chart-col">
-           <div class="sys-chart-bar" style="height: ${mPct}%;" title="${mk}: ${formatTime(mTime)}"></div>
-         </div>`;
-       cumulativeChartHtml += `
-         <div class="sys-chart-col">
-           <div class="sys-chart-bar cumulative-bar" style="height: ${cPct}%;" title="${mk}: ${formatTime(cTime)}"></div>
-         </div>`;
-    });
-    activityChartHtml += `</div>`;
-    cumulativeChartHtml += `</div>`;
 
     const firstEntry = sys.entries[0];
     const lastEntry = sys.entries[sys.entries.length - 1];
@@ -1000,21 +1062,6 @@ function initSystemsPage() {
                 ${topDevs.slice(0,3).map(d => `${d[0]} <span style="color:var(--text-sub)">(${formatTime(d[1])})</span>`).join('<br>')}
               </div>
             </div>
-          </div>
-        </div>
-      </section>
-
-      <section class="card-row grid-2">
-        <div class="card">
-          <div class="card-header"><h2>Monthly Activity (Hours)</h2></div>
-          <div class="card-content" style="overflow-x: auto; padding-bottom: 5px;">
-            ${activityChartHtml}
-          </div>
-        </div>
-        <div class="card">
-          <div class="card-header"><h2>Cumulative Growth Tracker</h2></div>
-          <div class="card-content" style="overflow-x: auto; padding-bottom: 5px;">
-            ${cumulativeChartHtml}
           </div>
         </div>
       </section>
