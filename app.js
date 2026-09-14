@@ -755,8 +755,7 @@ function initSystemsPage() {
     return `
       <tr>
         <td class="text-left" style="font-weight: 900; font-size: 1.05rem;">${escapeHTML(sys.name)}</td>
-        <td class="text-center" style="font-size: 0.85rem;">${formatFullDate(sys.firstEntryDate)}</td>
-        <td class="text-center" style="font-size: 0.85rem;">${formatFullDate(sys.lastEntryDate)}</td>
+        <td class="text-center" style="font-size: 0.85rem;">${formatFullDate(sys.firstEntryDate)}-${formatFullDate(sys.lastEntryDate)}</td>
         <td class="text-center">${timeStr}</td>
         <td class="text-center">${daysStr}</td>
         <td class="text-center">${gamesStr}</td>
@@ -764,7 +763,7 @@ function initSystemsPage() {
         <td class="text-left" style="line-height: 1.5;">
           <span class="hover-trigger" style="font-weight: 800; font-size: 0.95rem; color: var(--text-title);" data-game="${escapeHTML(mpg.name)}">${escapeHTML(mpg.name)}</span><br>
           <span style="font-size: 0.8rem; color: var(--text-sub);">
-            ${mpgTimeStr} &nbsp;|&nbsp; Start: ${mpgMin} &nbsp;|&nbsp; End: ${mpgMax}
+            ${mpgTimeStr} &nbsp;|&nbsp; (${mpgMin}-${mpgMax})
           </span>
         </td>
         <td class="text-left" style="line-height: 1.5;">
@@ -813,8 +812,7 @@ function initSystemsPage() {
               <thead>
                 <tr>
                   <th style="width: 130px; text-align: left;">System</th>
-                  <th style="width: 100px;">First Entry</th>
-                  <th style="width: 100px;">Last Update</th>
+                  <th style="width: 180px;">Active Period</th>
                   <th style="width: 100px;">Total Playtime</th>
                   <th style="width: 90px;">Days Played</th>
                   <th style="width: 90px;">Unique Games</th>
