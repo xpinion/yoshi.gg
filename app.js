@@ -360,6 +360,11 @@ function renderTimeframeSummary(timeframeStr, mode, containerId) {
   container.innerHTML = html;
 }
 
+// Backwards compatibility wrapper for index.html
+function renderMonthlySummary(monthKey, containerId = 'monthly-summary-list') {
+  renderTimeframeSummary(monthKey, 'monthly', containerId);
+}
+
 // --- COMPLETIONS PAGE ROUTING ---
 function initCompletionsPage() {
   const container = document.getElementById('completions-page-container');
