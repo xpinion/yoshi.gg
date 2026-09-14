@@ -62,7 +62,7 @@ function escapeHTML(str) {
   return str.replace(/[&<>'"]/g, tag => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[tag] || tag));
 }
 
-// --- GLOBAL UI RENDERERS ---
+// --- UPDATE: GLOBAL HEADER ---
 function renderGlobalHeader() {
   const headerContainer = document.getElementById('global-header');
   if (!headerContainer) return;
@@ -83,13 +83,15 @@ function renderGlobalHeader() {
     <a href="genre.html">Genre</a>
     <a href="releaseyear.html">Release Year</a>
     <a href="spotlight.html">Spotlight</a>
-    <a href="analysis.html">Data Analysis</a>
-    <a href="metrics.html">Metrics & Heatmaps</a>
+    <a href="analysis.html">Analysis</a>
+    <a href="metrics.html">Metrics</a>
+    <a href="milestones.html">Milestones</a>
+    <a href="history.html">History</a>
   </nav>
   `;
 }
 
-// Initialization
+// --- UPDATE: DASHBOARD INIT (Add routing and global parsing) ---
 async function initDashboard() {
   try {
     const [rawResponse, metaResponse, top25Response] = await Promise.all([
@@ -100,10 +102,8 @@ async function initDashboard() {
 
     const rawText = await rawResponse.text();
     rawData = JSON.parse(rawText, (key, value) => {
-      // ONLY Revive Sets (Leave Dates as strings so .startsWith() and .split() work!)
       if (value && typeof value === 'object' && value._dataType === 'Set') {
-        const arrayItems = value.value || value.data || [];
-        return new Set(arrayItems);
+        return new Set(value.value || value.data || []);
       }
       return value;
     });
@@ -125,66 +125,186 @@ async function initDashboard() {
       }
     }
 
-    // 1. Render the header FIRST so the DOM elements (like the theme toggle) exist
+    parseTop25Data(top25Data); // Move this OUT of initIndexPage so Spotlight is globally available
     renderGlobalHeader();
-
-    // 2. Setup global UI elements that exist on every page
     setupThemeToggle();
     setupHoverHistory();
 
-// 3. Page Routing
     const path = window.location.href.toLowerCase();
 
-    // Check for the word rather than the exact filename
-if (path.includes('monthly')) {
-      initMonthlyPage();
-    } else if (path.includes('yearly')) {
-      initYearlyPage();
-    } else if (path.includes('completions')) {
-      initCompletionsPage();
-    } else if (path.includes('goty')) {
-      initGotyPage();
-    } else if (path.includes('systems')) {
-      initSystemsPage();
-    } else if (path.includes('franchise')) {
-      initFranchisePage();
-    } else if (path.includes('genre')) {
-      initGenrePage();
-    } else if (path.includes('releaseyear')) {
-      initReleaseYearPage();
-    } else if (path.includes('spotlight')) {
-      initSpotlightPage();
-    } else if (path.includes('analysis')) {
-      initAnalysisPage();
-    } else if (path.includes('metrics')) {
-      initMetricsPage();
-    } else {
+    if (path.includes('monthly')) initMonthlyPage();
+    else if (path.includes('yearly')) initYearlyPage();
+    else if (path.includes('completions')) initCompletionsPage();
+    else if (path.includes('goty')) initGotyPage();
+    else if (path.includes('systems')) initSystemsPage();
+    else if (path.includes('franchise')) initFranchisePage();
+    else if (path.includes('genre')) initGenrePage();
+    else if (path.includes('releaseyear')) initReleaseYearPage();
+    else if (path.includes('spotlight')) initSpotlightPage();
+    else if (path.includes('analysis')) initAnalysisPage();
+    else if (path.includes('metrics')) initMetricsPage();
+    else if (path.includes('milestones')) {
+      const msContainer = document.getElementById('milestones-page-container');
+      if (msContainer) renderMilestones('milestones-page-container');
+    }
+    else if (path.includes('history')) initHistoryPage();
+    else {
       initIndexPage(top25Data);
     }
-
   } catch (error) {
     console.error("Dashboard Error:", error);
-    const errorHtml = `<div class="loading-text" style="color: red; padding: 20px;">Error: ${error.message}</div>`;
-    
-    // This targets your index cards AND your new monthly container
-    document.querySelectorAll('.card-content, .dashboard-container').forEach(el => el.innerHTML = errorHtml);
+    document.querySelectorAll('.card-content, .dashboard-container').forEach(el => el.innerHTML = `<div class="loading-text" style="color: red;">Error: ${error.message}</div>`);
   }
 }
 
-// Move your existing page rendering logic here so index.html still works
+// --- UPDATE: INIT INDEX PAGE (Remove redundant parseTop25Data) ---
 function initIndexPage(top25Data) {
-  parseTop25Data(top25Data);
   setupDropdowns();
   setupLiveSearch();
-  renderOnThisDay();
-  renderMilestones();
-  renderAnalysis('playthrough');
-  renderHeatmap('gameSummary');
+  renderOnThisDay(); // Calls the generalized render function
+  renderMilestones('milestones-list'); // Passes explicit ID
+  renderAnalysis('playthrough', 'analysis-content');
+  renderHeatmap('gameSummary', 'heatmap-content');
 
-  // Trigger the staggered fade-in animations for all cards
   document.querySelectorAll('.card').forEach((card, index) => {
-    card.style.animationDelay = `${index * 0.08}s`; // 80ms delay per card
+    card.style.animationDelay = `${index * 0.08}s`;
   });
+}
+
+// --- NEW: SPOTLIGHT PAGE ROUTING ---
+function initSpotlightPage() {
+  const container = document.getElementById('spotlight-page-container');
+  if (!container || allTop25Tables.length === 0) return;
+
+  const renderTable = (data, title) => `
+  <div class="spotlight-section">
+    <h3 class="spotlight-subtitle">${escapeHTML(title)}</h3>
+    <table class="top25-table">
+      <thead><tr>${data.headers.map(h => `<th>${escapeHTML(h)}</th>`).join('')}</tr></thead>
+      <tbody>
+      ${data.rows.map(row => `<tr>${row.map(cell => {
+        const boldStyle = cell.isBold ? 'style="font-weight: 800; color: #000; background-color: #f0fff4;"' : '';
+        return `<td ${boldStyle}><span class="hover-trigger" data-game="${escapeHTML(cell.val)}">${escapeHTML(cell.val)}</span></td>`;
+      }).join('')}</tr>`).join('')}
+      </tbody>
+    </table>
+  </div>`;
+
+  let html = '';
+  allTop25Tables.forEach(pair => {
+    html += `
+      <section class="card-row grid-1" style="margin-bottom: 30px;">
+        <div class="card" style="max-height: none;">
+          <div class="card-header"><h2>${escapeHTML(pair.mainTitle)}</h2></div>
+          <div class="card-content" style="padding: 0;">
+            <div class="spotlight-dual-container" style="padding: 20px;">
+              ${renderTable(pair.left, pair.left.title)}
+              ${pair.right ? renderTable(pair.right, pair.right.title) : ''}
+            </div>
+          </div>
+        </div>
+      </section>
+    `;
+  });
+
+  container.innerHTML = html;
+}
+
+// --- NEW: ANALYSIS PAGE ROUTING ---
+function initAnalysisPage() {
+  const container = document.getElementById('analysis-page-container');
+  if (!container || !rawData || !rawData.metrics) return;
+
+  const sections = [
+    { id: 'playthrough', title: 'Playthrough Stats' },
+    { id: 'dayOfWeek', title: 'Day of Week Stats' },
+    { id: 'genre', title: 'Genre Stats' },
+    { id: 'releaseYear', title: 'Release Year Stats' },
+    { id: 'developer', title: 'Developer Stats' },
+    { id: 'publisher', title: 'Publisher Stats' }
+  ];
+
+  let html = '';
+  sections.forEach(sec => {
+    html += `
+      <section class="card-row grid-1" style="margin-bottom: 30px;">
+        <div class="card" style="max-height: none;">
+          <div class="card-header"><h2>${sec.title}</h2></div>
+          <div class="card-content" id="analysis-page-${sec.id}" style="padding: 0;"></div>
+        </div>
+      </section>
+    `;
+  });
+
+  container.innerHTML = html;
+
+  sections.forEach(sec => {
+    renderAnalysis(sec.id, `analysis-page-${sec.id}`);
+  });
+}
+
+// --- NEW: METRICS PAGE ROUTING ---
+function initMetricsPage() {
+  const container = document.getElementById('metrics-page-container');
+  if (!container || !rawData || !rawData.metrics) return;
+
+  const sections = [
+    { id: 'gameSummary', title: 'Table: Game Timeframe Summary' },
+    { id: 'genreSummary', title: 'Table: Genre Timeframe Summary' },
+    { id: 'gotySummary', title: 'Table: Game of the Year (Scores)' },
+    { id: 'days', title: 'Heatmap: Days Played' },
+    { id: 'time', title: 'Heatmap: Total Time Spent' }
+  ];
+
+  let html = '';
+  sections.forEach(sec => {
+    html += `
+      <section class="card-row grid-1" style="margin-bottom: 30px;">
+        <div class="card" style="max-height: none;">
+          <div class="card-header"><h2>${sec.title}</h2></div>
+          <div class="card-content" id="metrics-page-${sec.id}" style="overflow-x: auto; padding: 0;"></div>
+        </div>
+      </section>
+    `;
+  });
+
+  container.innerHTML = html;
+
+  sections.forEach(sec => {
+    renderHeatmap(sec.id, `metrics-page-${sec.id}`);
+  });
+}
+
+// --- NEW: HISTORY PAGE ROUTING ---
+function initHistoryPage() {
+  const select = document.getElementById('history-day-select');
+  if (!select) return;
+
+  const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  const daysInMonth = [31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]; // Allow Feb 29
+
+  let optionsHtml = '';
+  for (let m = 0; m < 12; m++) {
+    for (let d = 1; d <= daysInMonth[m]; d++) {
+      const val = `${m}-${d}`;
+      const text = `${monthNames[m]} ${d.toString().padStart(2, '0')}`;
+      optionsHtml += `<option value="${val}">${text}</option>`;
+    }
+  }
+  select.innerHTML = optionsHtml;
+
+  const today = new Date();
+  const currentMonth = today.getMonth();
+  const currentDay = today.getDate();
+  const todayVal = `${currentMonth}-${currentDay}`;
+  
+  select.value = todayVal;
+  select.addEventListener('change', (e) => {
+    const [m, d] = e.target.value.split('-').map(Number);
+    renderOnThisDay(m, d, 'history-page-container');
+  });
+
+  renderOnThisDay(currentMonth, currentDay, 'history-page-container');
 }
 
 // --- TIMEFRAME PAGE ROUTING ---
@@ -1509,10 +1629,6 @@ function buildAnalyticsHub(containerId, dataKey, titleLabel) {
   renderSelectedItem(sortedItems[0].name);
 }
 
-function initSpotlightPage() {}
-function initAnalysisPage() {}
-function initMetricsPage() {}
-
 // --- SPOTLIGHT PARSING (Grouped & Bolded) ---
 function parseTop25Data(top25Data) {
   allTop25Tables = [];
@@ -1993,24 +2109,20 @@ function renderRankings(filterType, filterValue, containerId, limit) {
   }).join('');
 }
 
-function renderOnThisDay() {
-  const container = document.getElementById('on-this-day-list');
-  const dateSpan = document.getElementById('today-date');
+// --- UPDATE: RENDER ON THIS DAY (Generalize to accept month, day, container) ---
+function renderOnThisDay(monthIndex = new Date().getMonth(), dayIndex = new Date().getDate(), targetContainerId = 'on-this-day-list') {
+  const container = document.getElementById(targetContainerId);
+  const dateSpan = document.getElementById('today-date'); // Optional, exists on Index but not History page
   
-  // 1. Safety check FIRST. If these elements don't exist, stop immediately.
-  if (!container || !dateSpan || !rawData || !rawData.allEntries) return; 
+  if (!container || !rawData || !rawData.allEntries) return;
 
-  // 2. Keep your existing date variables!
-  const today = new Date();
-  const currentMonth = today.getMonth(); // 0-11
-  const currentDay = today.getDate(); // 1-31
-
-  // 3. Update the innerText using the safely checked dateSpan variable
-  dateSpan.innerText = `${String(currentMonth + 1).padStart(2, '0')}/${String(currentDay).padStart(2, '0')}`;
+  if (dateSpan) {
+    dateSpan.innerText = `${String(monthIndex + 1).padStart(2, '0')}/${String(dayIndex).padStart(2, '0')}`;
+  }
 
   const historyEntries = rawData.allEntries.filter(e => {
     const d = new Date(e.date);
-    return d.getUTCMonth() === currentMonth && d.getUTCDate() === currentDay;
+    return d.getUTCMonth() === monthIndex && d.getUTCDate() === dayIndex;
   });
 
   if (historyEntries.length === 0) {
@@ -2024,16 +2136,16 @@ function renderOnThisDay() {
     const year = new Date(e.date).getUTCFullYear();
     const bgColor = getStatusColor(e.status);
     return `
-      <div class="list-item" style="border-left-color: ${bgColor};">
-        <div class="item-info">
-          <span class="item-rank" style="color: #444;">${year}</span>
-          <div class="item-text">
-            <span class="item-title hover-trigger" data-game="${escapeHTML(e.game)}">${escapeHTML(e.game)} (${escapeHTML(e.system)})</span>
-            <span class="item-sub" style="color: #666;">${escapeHTML(e.note)}</span>
-          </div>
+    <div class="list-item" style="border-left-color: ${bgColor};">
+      <div class="item-info">
+        <span class="item-rank" style="color: #444;">${year}</span>
+        <div class="item-text">
+          <span class="item-title hover-trigger" data-game="${escapeHTML(e.game)}">${escapeHTML(e.game)} (${escapeHTML(e.system)})</span>
+          <span class="item-sub" style="color: #666;">${escapeHTML(e.note)}</span>
         </div>
-        <div class="item-badge" style="background-color: ${bgColor}; color: #000; text-shadow: 0 0 2px rgba(255,255,255,0.5);">${formatTime(timeStringToSeconds(e.time))}</div>
       </div>
+      <div class="item-badge" style="background-color: ${bgColor}; color: #000; text-shadow: 0 0 2px rgba(255,255,255,0.5);">${formatTime(timeStringToSeconds(e.time))}</div>
+    </div>
     `;
   }).join('');
 }
@@ -2065,9 +2177,9 @@ function renderRandomTop25() {
     </div>`;
 }
 
-// --- ANALYSIS TABLES ---
-function renderAnalysis(type) {
-  const container = document.getElementById('analysis-content');
+// --- UPDATE: RENDER ANALYSIS (Add Container ID parameter) ---
+function renderAnalysis(type, targetContainerId = 'analysis-content') {
+  const container = document.getElementById(targetContainerId);
   if (!container || !rawData || !rawData.metrics) return;
 
   let html = `<div style="overflow-x: auto;"><table class="analysis-table"><thead><tr>`;
@@ -2075,52 +2187,32 @@ function renderAnalysis(type) {
   if (type === 'playthrough') {
     const data = rawData.metrics.playthroughAnalysis;
     const timeframes = Object.keys(data).sort((a, b) => a === 'All-Time' ? -1 : b === 'All-Time' ? 1 : b - a);
-
     html += `<th>Timeframe</th><th>Total PTs</th><th># Completed</th><th># Abandoned</th><th># Active</th><th>Comp Rate</th><th># Multiplayer</th><th># Non-Comp</th><th>Avg Time</th><th>Avg Days</th></tr></thead><tbody>`;
-
     timeframes.forEach(key => {
       const s = data[key];
       const completions = s.completed + s.postgame;
-      html += `<tr class="${key === 'All-Time' ? 'all-time-row' : ''}">
-        <td class="text-left">${key}</td><td>${s.totalPlaythroughs}</td><td>${completions}</td><td>${s.abandoned}</td><td>${s.active}</td>
-        <td>${(s.completionRate * 100).toFixed(1)}%</td><td>${s.multiplayer}</td><td>${s.nonCompletable}</td>
-        <td>${formatHHMM(s.avgCompletionTimeSeconds)}</td><td>${s.avgCompletionDays.toFixed(1)}</td>
-      </tr>`;
+      html += `<tr class="${key === 'All-Time' ? 'all-time-row' : ''}"><td class="text-left">${key}</td><td>${s.totalPlaythroughs}</td><td>${completions}</td><td>${s.abandoned}</td><td>${s.active}</td><td>${(s.completionRate * 100).toFixed(1)}%</td><td>${s.multiplayer}</td><td>${s.nonCompletable}</td><td>${formatHHMM(s.avgCompletionTimeSeconds)}</td><td>${s.avgCompletionDays.toFixed(1)}</td></tr>`;
     });
-  }
-  else if (type === 'dayOfWeek') {
+  } else if (type === 'dayOfWeek') {
     const data = rawData.metrics.dayOfWeekStats;
     const timeframes = Object.keys(data).sort((a, b) => a === 'All-Time' ? -1 : b === 'All-Time' ? 1 : b.localeCompare(a));
-
     html += `<th>Timeframe</th><th>Mon</th><th>Tue</th><th>Wed</th><th>Thu</th><th>Fri</th><th>Sat</th><th>Sun</th></tr></thead><tbody>`;
-
     timeframes.forEach(key => {
       const s = data[key];
-      html += `<tr class="${key === 'All-Time' ? 'all-time-row' : ''}">
-        <td class="text-left">${key}</td>
-        ${[1,2,3,4,5,6,0].map(day => `<td>${formatHHMM(s[day] || 0)}</td>`).join('')}
-      </tr>`;
+      html += `<tr class="${key === 'All-Time' ? 'all-time-row' : ''}"><td class="text-left">${key}</td>${[1,2,3,4,5,6,0].map(day => `<td>${formatHHMM(s[day] || 0)}</td>`).join('')}</tr>`;
     });
-  }
-  else {
+  } else {
     const map = { genre: 'genreAnalysis', releaseYear: 'releaseYearAnalysis', developer: 'developerAnalysis', publisher: 'publisherAnalysis' };
     const dataKey = map[type];
     const data = rawData.metrics[dataKey];
-    const nameKey = type;
-
-    let sortedData = Object.values(data).filter(item => item[nameKey] !== "N/A");
-    if (type === 'releaseYear') sortedData.sort((a,b) => b[nameKey] - a[nameKey]);
+    let sortedData = Object.values(data).filter(item => item[type] !== "N/A");
+    if (type === 'releaseYear') sortedData.sort((a,b) => b[type] - a[type]);
     else sortedData.sort((a,b) => b.totalPlaythroughs - a.totalPlaythroughs);
 
     html += `<th>${type.charAt(0).toUpperCase() + type.slice(1)}</th><th>Total PTs</th><th># Completed</th><th># Abandoned</th><th># Active</th><th>Comp Rate</th><th># Multiplayer</th><th># Non-Comp</th><th>Avg Time</th><th>Avg Days</th></tr></thead><tbody>`;
-
     sortedData.forEach(s => {
       const completions = s.completed + s.postgame;
-      html += `<tr>
-        <td class="text-left">${escapeHTML(s[nameKey])}</td><td>${s.totalPlaythroughs}</td><td>${completions}</td><td>${s.abandoned}</td><td>${s.active}</td>
-        <td>${(s.completionRate * 100).toFixed(1)}%</td><td>${s.multiplayer}</td><td>${s.nonCompletable}</td>
-        <td>${formatHHMM(s.avgCompletionTimeSeconds)}</td><td>${s.avgCompletionDays.toFixed(1)}</td>
-      </tr>`;
+      html += `<tr><td class="text-left">${escapeHTML(s[type])}</td><td>${s.totalPlaythroughs}</td><td>${completions}</td><td>${s.abandoned}</td><td>${s.active}</td><td>${(s.completionRate * 100).toFixed(1)}%</td><td>${s.multiplayer}</td><td>${s.nonCompletable}</td><td>${formatHHMM(s.avgCompletionTimeSeconds)}</td><td>${s.avgCompletionDays.toFixed(1)}</td></tr>`;
     });
   }
 
@@ -2128,24 +2220,24 @@ function renderAnalysis(type) {
   container.innerHTML = html;
 }
 
-// --- MILESTONES ---
-function renderMilestones() {
-  const container = document.getElementById('milestones-list');
-  if (!rawData || !rawData.metrics || !rawData.metrics.milestones) return;
+// --- UPDATE: RENDER MILESTONES (Add Container ID parameter) ---
+function renderMilestones(targetContainerId = 'milestones-list') {
+  const container = document.getElementById(targetContainerId);
+  if (!container || !rawData || !rawData.metrics || !rawData.metrics.milestones) return;
 
   const milestones = rawData.metrics.milestones.slice().sort((a,b) => new Date(b.date) - new Date(a.date));
 
   container.innerHTML = milestones.map(m => `
-    <div class="milestone-item">
-      <div class="milestone-date">${formatShortDate(m.date)}/${new Date(m.date).getUTCFullYear()}</div>
-      <div class="milestone-detail">${escapeHTML(m.details)}</div>
-    </div>
+  <div class="milestone-item">
+    <div class="milestone-date">${formatShortDate(m.date)}/${new Date(m.date).getUTCFullYear()}</div>
+    <div class="milestone-detail">${escapeHTML(m.details)}</div>
+  </div>
   `).join('');
 }
 
-// --- CALENDAR HEATMAP & TIMEFRAME SUMMARIES ---
-function renderHeatmap(mode) {
-  const container = document.getElementById('heatmap-content');
+// --- UPDATE: RENDER HEATMAP (Add Container ID parameter) ---
+function renderHeatmap(mode, targetContainerId = 'heatmap-content') {
+  const container = document.getElementById(targetContainerId);
   if (!container || !rawData || !rawData.metrics || !rawData.metrics.calendarData) return;
 
   if (mode === 'gotySummary') {
@@ -2164,9 +2256,7 @@ function renderHeatmap(mode) {
     html += `<th>Release Year</th><th>🏆 GOTY</th><th>2nd Place</th><th>3rd Place</th><th>4th Place</th><th>5th Place</th></tr></thead><tbody>`;
 
     const allTimeTop5 = [...ratedGames].sort((a,b) => b.score - a.score || a.name.localeCompare(b.name)).slice(0, 5);
-    html += `<tr class="all-time-row">
-    <td class="text-center" style="font-weight: bold;">All-Time</td>
-    ${[0,1,2,3,4].map(i => {
+    html += `<tr class="all-time-row"><td class="text-center" style="font-weight: bold;">All-Time</td>${[0,1,2,3,4].map(i => {
       if (allTimeTop5[i]) {
         const displayScore = Number.isInteger(allTimeTop5[i].score) ? allTimeTop5[i].score : allTimeTop5[i].score.toFixed(1);
         return `<td style="font-size: 0.85rem; text-align: left;">[${displayScore}] <span class="hover-trigger" data-game="${escapeHTML(allTimeTop5[i].name)}">${escapeHTML(allTimeTop5[i].name)}</span></td>`;
@@ -2175,9 +2265,7 @@ function renderHeatmap(mode) {
 
     sortedYears.forEach(year => {
       const yearTop5 = gamesByYear[year].sort((a,b) => b.score - a.score || a.name.localeCompare(b.name)).slice(0, 5);
-      html += `<tr>
-      <td class="text-center" style="font-weight: bold; font-size: 1.1rem;">${year}</td>
-      ${[0,1,2,3,4].map(i => {
+      html += `<tr><td class="text-center" style="font-weight: bold; font-size: 1.1rem;">${year}</td>${[0,1,2,3,4].map(i => {
         if (yearTop5[i]) {
           const displayScore = Number.isInteger(yearTop5[i].score) ? yearTop5[i].score : yearTop5[i].score.toFixed(1);
           return `<td style="font-size: 0.85rem; text-align: left;">[${displayScore}] <span class="hover-trigger" data-game="${escapeHTML(yearTop5[i].name)}">${escapeHTML(yearTop5[i].name)}</span></td>`;
@@ -2192,10 +2280,7 @@ function renderHeatmap(mode) {
 
   if (mode === 'gameSummary' || mode === 'genreSummary') {
     const isGame = mode === 'gameSummary';
-    const map = isGame ?
-    { 'All-Time': rawData.metrics.allTimeGameStats, ...rawData.metrics.yearlyGameStats, ...rawData.metrics.monthlyStats } :
-    { 'All-Time': rawData.metrics.allTimeGenreStats, ...rawData.metrics.yearlyGenreStats, ...rawData.metrics.monthlyGenreStats };
-
+    const map = isGame ? { 'All-Time': rawData.metrics.allTimeGameStats, ...rawData.metrics.yearlyGameStats, ...rawData.metrics.monthlyStats } : { 'All-Time': rawData.metrics.allTimeGenreStats, ...rawData.metrics.yearlyGenreStats, ...rawData.metrics.monthlyGenreStats };
     const gameMapForDays = { 'All-Time': rawData.metrics.allTimeGameStats, ...rawData.metrics.yearlyGameStats, ...rawData.metrics.monthlyStats };
     const yearKeys = Object.keys(rawData.metrics.yearlyGameStats).sort().reverse();
     const monthKeys = Object.keys(rawData.metrics.monthlyStats).sort().reverse();
@@ -2223,15 +2308,10 @@ function renderHeatmap(mode) {
       let displayKey = key;
       if (key !== 'All-Time' && key.includes('-')) {
         const [y, m] = key.split('-');
-        const dateObj = new Date(Date.UTC(y, m-1, 1));
-        displayKey = `${y}-${m} ${dateObj.toLocaleString('en-US', {month: 'long', timeZone: 'UTC'})}`;
+        displayKey = `${y}-${m} ${new Date(Date.UTC(y, m-1, 1)).toLocaleString('en-US', {month: 'long', timeZone: 'UTC'})}`;
       }
 
-      html += `<tr class="${key === 'All-Time' ? 'all-time-row' : ''}">
-      <td class="text-left" style="white-space: nowrap; font-weight: bold;">${displayKey}</td>
-      <td>${formatHHMM(totalTime)}</td>
-      <td>${totalDaysSet.size}</td>
-      ${[0,1,2,3,4].map(i => {
+      html += `<tr class="${key === 'All-Time' ? 'all-time-row' : ''}"><td class="text-left" style="white-space: nowrap; font-weight: bold;">${displayKey}</td><td>${formatHHMM(totalTime)}</td><td>${totalDaysSet.size}</td>${[0,1,2,3,4].map(i => {
         if (top5[i]) {
           if (isGame) {
             const sysStr = top5[i].systems instanceof Set ? Array.from(top5[i].systems).join(', ') : (Array.isArray(top5[i].systems) ? top5[i].systems.join(', ') : (top5[i].systems && top5[i].systems.data ? top5[i].systems.data.join(', ') : ''));
@@ -2240,15 +2320,13 @@ function renderHeatmap(mode) {
             return `<td style="font-size: 0.75rem; text-align: left;">[${formatHHMM(top5[i].totalSeconds)}] ${escapeHTML(top5[i].name)}</td>`;
           }
         } else return `<td></td>`;
-      }).join('')}
-      </tr>`;
+      }).join('')}</tr>`;
     });
     html += `</tbody></table></div>`;
     container.innerHTML = html;
     return;
   }
 
-  // 2. Render Calendar Heatmaps (Square Root Scaling to fix color washout)
   const calData = rawData.metrics.calendarData;
   const possible = rawData.metrics.possibleYears;
   const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
@@ -2275,15 +2353,12 @@ function renderHeatmap(mode) {
         html += `<td class="heatmap-empty"></td>`;
         continue;
       }
-
       const dayData = calData[m][d];
       const poss = possible[m][d];
       const playedCount = dayData.yearsPlayed ? (Array.isArray(dayData.yearsPlayed) ? dayData.yearsPlayed.length : (dayData.yearsPlayed.data ? dayData.yearsPlayed.data.length : 0)) : 0;
       const timeSec = dayData.totalSeconds;
 
-      let bgColor = '#f7f7f7';
-      let titleText = `${monthNames[m]} ${d}`;
-      let innerText = '';
+      let bgColor = '#f7f7f7', titleText = `${monthNames[m]} ${d}`, innerText = '';
 
       if (mode === 'days') {
         if (poss > 0) {
@@ -2301,49 +2376,26 @@ function renderHeatmap(mode) {
         }
       } else if (mode === 'time') {
         if (timeSec > 0) {
-          // Utilizing Square Root scaling instead of Log scaling to beautifully distribute outlier session lengths
           const ratio = Math.sqrt(timeSec) / Math.sqrt(maxTime);
-          if (ratio >= 0.85) bgColor = '#990000'; // Deep Red
-          else if (ratio >= 0.65) bgColor = '#d7301f'; // Strong Red
-          else if (ratio >= 0.45) bgColor = '#fc8d59'; // Orange
-          else if (ratio >= 0.25) bgColor = '#fdcc8a'; // Light Orange
-          else bgColor = '#fef0d9'; // Pale Yellow
+          if (ratio >= 0.85) bgColor = '#990000';
+          else if (ratio >= 0.65) bgColor = '#d7301f';
+          else if (ratio >= 0.45) bgColor = '#fc8d59';
+          else if (ratio >= 0.25) bgColor = '#fdcc8a';
+          else bgColor = '#fef0d9';
           titleText += `: ${formatHHMM(timeSec)} Hours`;
         }
       }
-
       html += `<td style="background-color: ${bgColor};" title="${titleText}">${innerText}</td>`;
     }
     html += `</tr>`;
   }
   html += `</tbody></table>`;
 
-  // Attach Legend
   if (mode === 'time') {
-      html += `
-      <div style="display: flex; justify-content: flex-end; gap: 5px; align-items: center; margin-top: 15px; font-size: 0.75rem; color: var(--text-muted);">
-          <span>Less</span>
-          <div style="width: 15px; height: 15px; background: #fef0d9; border: 1px solid var(--heatmap-border);"></div>
-          <div style="width: 15px; height: 15px; background: #fdcc8a; border: 1px solid var(--heatmap-border);"></div>
-          <div style="width: 15px; height: 15px; background: #fc8d59; border: 1px solid var(--heatmap-border);"></div>
-          <div style="width: 15px; height: 15px; background: #d7301f; border: 1px solid var(--heatmap-border);"></div>
-          <div style="width: 15px; height: 15px; background: #990000; border: 1px solid var(--heatmap-border);"></div>
-          <span>More</span>
-      </div>`;
+      html += `<div style="display: flex; justify-content: flex-end; gap: 5px; align-items: center; margin-top: 15px; font-size: 0.75rem; color: var(--text-muted);"><span>Less</span><div style="width: 15px; height: 15px; background: #fef0d9; border: 1px solid var(--heatmap-border);"></div><div style="width: 15px; height: 15px; background: #fdcc8a; border: 1px solid var(--heatmap-border);"></div><div style="width: 15px; height: 15px; background: #fc8d59; border: 1px solid var(--heatmap-border);"></div><div style="width: 15px; height: 15px; background: #d7301f; border: 1px solid var(--heatmap-border);"></div><div style="width: 15px; height: 15px; background: #990000; border: 1px solid var(--heatmap-border);"></div><span>More</span></div>`;
   } else if (mode === 'days') {
-      html += `
-      <div style="display: flex; justify-content: flex-end; gap: 5px; align-items: center; margin-top: 15px; font-size: 0.75rem; color: var(--text-muted);">
-          <span>0%</span>
-          <div style="width: 15px; height: 15px; background: #f1a340; border: 1px solid var(--heatmap-border);"></div>
-          <div style="width: 15px; height: 15px; background: #fee08b; border: 1px solid var(--heatmap-border);"></div>
-          <div style="width: 15px; height: 15px; background: #ffffbf; border: 1px solid var(--heatmap-border);"></div>
-          <div style="width: 15px; height: 15px; background: #a6dba0; border: 1px solid var(--heatmap-border);"></div>
-          <div style="width: 15px; height: 15px; background: #008837; border: 1px solid var(--heatmap-border);"></div>
-          <div style="width: 15px; height: 15px; background: #7CFC00; border: 1px solid var(--heatmap-border);"></div>
-          <span>100%</span>
-      </div>`;
+      html += `<div style="display: flex; justify-content: flex-end; gap: 5px; align-items: center; margin-top: 15px; font-size: 0.75rem; color: var(--text-muted);"><span>0%</span><div style="width: 15px; height: 15px; background: #f1a340; border: 1px solid var(--heatmap-border);"></div><div style="width: 15px; height: 15px; background: #fee08b; border: 1px solid var(--heatmap-border);"></div><div style="width: 15px; height: 15px; background: #ffffbf; border: 1px solid var(--heatmap-border);"></div><div style="width: 15px; height: 15px; background: #a6dba0; border: 1px solid var(--heatmap-border);"></div><div style="width: 15px; height: 15px; background: #008837; border: 1px solid var(--heatmap-border);"></div><div style="width: 15px; height: 15px; background: #7CFC00; border: 1px solid var(--heatmap-border);"></div><span>100%</span></div>`;
   }
-
   html += `</div>`;
   container.innerHTML = html;
 }
@@ -2662,32 +2714,6 @@ function setupThemeToggle() {
     btn.innerText = isDark ? '☀️ Light Mode' : '🌙 Dark Mode';
 
   });
-}
-
-function renderGlobalHeader() {
-  const headerContainer = document.getElementById('global-header');
-  if (!headerContainer) return;
-
-  headerContainer.innerHTML = `
-  <div class="dashboard-header">
-    <h1>yoshi xcx's videogame dashboard</h1>
-    <button id="theme-toggle" class="theme-btn">🌙 Dark Mode</button>
-  </div>
-  <nav class="global-nav">
-    <a href="index.html">Index</a>
-    <a href="monthly.html">Monthly</a>
-    <a href="yearly.html">Yearly</a>
-    <a href="completions.html">Completions</a>
-    <a href="goty.html">GotY</a>
-    <a href="systems.html">Systems</a>
-    <a href="franchise.html">Franchise</a>
-    <a href="genre.html">Genre</a>
-    <a href="releaseyear.html">Release Year</a>
-    <a href="spotlight.html">Spotlight</a>
-    <a href="analysis.html">Data Analysis</a>
-    <a href="metrics.html">Metrics & Heatmaps</a>
-  </nav>
-  `;
 }
 
 // --- LIVE SEARCH (ARCHIVES) ---
