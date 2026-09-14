@@ -443,7 +443,6 @@ function initGotyPage() {
   const buildRankCard = (title, gamesArray, limit, anchorId = null) => {
     if (!gamesArray || gamesArray.length === 0) return '';
     
-    // Sort descending by score, tie-break by name
     gamesArray.sort((a, b) => b.score - a.score || a.name.localeCompare(b.name));
 
     const idAttr = anchorId ? `id="${anchorId}"` : '';
@@ -466,7 +465,6 @@ function initGotyPage() {
 
       const displayScore = Number.isInteger(game.score) ? game.score : game.score.toFixed(1);
       
-      // Pull historical play data
       const gameStats = rawData && rawData.metrics && rawData.metrics.allTimeGameStats[game.name] ? rawData.metrics.allTimeGameStats[game.name] : null;
       const timeStr = gameStats ? formatTime(gameStats.totalSeconds) : "0m";
       const daysCount = gameStats && gameStats.days ? (gameStats.days.size || gameStats.days.length || (gameStats.days.data ? gameStats.days.data.length : 0)) : 0;
@@ -512,57 +510,70 @@ function initGotyPage() {
     return html;
   };
 
-  // 3. Assemble the Page Layout
+  // 3. Assemble Layout
   let html = '';
 
-  // SECTION: GOTY Highlight Table (1985+)
+  // SECTION 1: GOTY Highlight Table (3 Equal Columns, 1985 - Present)
   const yearsSince1985 = sortedYears.filter(y => parseInt(y) >= 1985);
-  
+  const totalYears = yearsSince1985.length;
+  const col1Count = Math.ceil(totalYears / 3);
+  const col2Count = Math.ceil((totalYears - col1Count) / 2);
+
+  const col1Years = yearsSince1985.slice(0, col1Count);
+  const col2Years = yearsSince1985.slice(col1Count, col1Count + col2Count);
+  const col3Years = yearsSince1985.slice(col1Count + col2Count);
+
+  const renderGotyColumnTable = (yearList) => {
+    let tHtml = `
+      <table class="analysis-table goty-highlight-table">
+        <thead>
+          <tr>
+            <th style="width: 65px;">Year</th>
+            <th>Game of the Year</th>
+            <th style="width: 65px;">Score</th>
+          </tr>
+        </thead>
+        <tbody>
+    `;
+    yearList.forEach(year => {
+      const games = [...byYear[year]];
+      games.sort((a, b) => b.score - a.score || a.name.localeCompare(b.name));
+      if (games.length > 0) {
+        const goty = games[0];
+        const displayScore = Number.isInteger(goty.score) ? goty.score : goty.score.toFixed(1);
+        tHtml += `
+          <tr>
+            <td style="font-weight: 800; font-size: 1rem;">${year}</td>
+            <td class="text-left" style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 170px;">
+              <span class="hover-trigger" style="font-weight: 800; color: var(--text-title);" data-game="${escapeHTML(goty.name)}">${escapeHTML(goty.name)}</span>
+            </td>
+            <td><div class="item-badge" style="display: inline-block; padding: 3px 8px; font-size: 0.85rem;">${displayScore}</div></td>
+          </tr>
+        `;
+      }
+    });
+    tHtml += `</tbody></table>`;
+    return tHtml;
+  };
+
   html += `
   <section class="card-row grid-1">
     <div class="card">
       <div class="card-header">
-        <h2>Game of the Year (1985 - Present)</h2>
+        <h2>Game of the Year Highlights (1985 - Present)</h2>
       </div>
       <div class="card-content">
-        <div style="overflow-x: auto;">
-          <table class="analysis-table">
-            <thead>
-              <tr>
-                <th style="width: 100px;">Release Year</th>
-                <th>Game of the Year</th>
-                <th style="width: 100px;">Score</th>
-              </tr>
-            </thead>
-            <tbody>
-  `;
-
-  yearsSince1985.forEach(year => {
-    const games = [...byYear[year]];
-    games.sort((a, b) => b.score - a.score || a.name.localeCompare(b.name));
-    if (games.length > 0) {
-      const goty = games[0];
-      const displayScore = Number.isInteger(goty.score) ? goty.score : goty.score.toFixed(1);
-      html += `
-        <tr>
-          <td style="font-weight: bold; font-size: 1.1rem;">${year}</td>
-          <td class="text-left"><span class="hover-trigger" style="font-weight: bold; font-size: 1.1rem; color: var(--text-title);" data-game="${escapeHTML(goty.name)}">${escapeHTML(goty.name)}</span></td>
-          <td><div class="item-badge" style="display: inline-block;">${displayScore}</div></td>
-        </tr>
-      `;
-    }
-  });
-
-  html += `
-            </tbody>
-          </table>
+        <div class="goty-highlight-grid">
+          <div>${renderGotyColumnTable(col1Years)}</div>
+          <div>${renderGotyColumnTable(col2Years)}</div>
+          <div>${renderGotyColumnTable(col3Years)}</div>
         </div>
       </div>
     </div>
   </section>
   `;
 
-  // SECTION: Table of Contents
+  // SECTION 2: Table of Contents
   html += `
   <section class="card-row grid-1">
     <div class="card">
@@ -582,26 +593,25 @@ function initGotyPage() {
   </section>
   `;
 
-  // ROW 1: All-Time, 2020s, 2010s (Top 25)
-  html += `<section class="card-row grid-3">`;
+  // SECTION 3: All-Time and Decades (Top 25)
+  html += `<section class="card-row grid-strict-3">`;
   html += buildRankCard("Top 25 All-Time", allTime, 25);
   html += buildRankCard("Top 25: 2020s", decades['2020s'], 25);
   html += buildRankCard("Top 25: 2010s", decades['2010s'], 25);
   html += `</section>`;
 
-  // ROW 2: 2000s, 1990s, 1980s (Top 25)
-  html += `<section class="card-row grid-3">`;
+  html += `<section class="card-row grid-strict-3">`;
   html += buildRankCard("Top 25: 2000s", decades['2000s'], 25);
   html += buildRankCard("Top 25: 1990s", decades['1990s'], 25);
   html += buildRankCard("Top 25: 1980s", decades['1980s'], 25);
   html += `</section>`;
 
-  // ROW 3+: Yearly Rankings (Grid 4)
+  // SECTION 4: Yearly Rankings (Strict 3-Column Grid)
   html += `
     <div class="card-row grid-1" style="margin-top: 20px;">
       <h2 style="font-size: 2rem; color: var(--text-header); font-weight: 900; text-align: center; border-bottom: 2px solid var(--border-light); padding-bottom: 10px;">Top 25 Games by Release Year</h2>
     </div>
-    <section class="card-row grid-4">
+    <section class="card-row grid-strict-3">
   `;
   
   sortedYears.forEach(year => {
@@ -611,9 +621,7 @@ function initGotyPage() {
   html += `</section>`;
   container.innerHTML = html;
 
-  // Stagger Animations
   document.querySelectorAll('.goty-card').forEach((card, index) => {
-    // Only stagger the first few so the whole page doesn't take forever to load
     card.style.animationDelay = `${Math.min(index * 0.05, 1.5)}s`;
   });
 }
