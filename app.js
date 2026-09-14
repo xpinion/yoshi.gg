@@ -2900,4 +2900,13 @@ function renderSpotlightSingle(listKey, targetContainerId = 'top25-table-contain
   container.innerHTML = html;
 }
 
+function initSpotlightPage() {
+  const container = document.getElementById('spotlight-page-container');
+  if (!container || !rawData || !rawData.metrics) return;
+  
+  if (!rawData.metrics.spotlight) {
+    container.innerHTML = `<div class="loading-text" style="color: #ff9f1c;">Spotlight data not found in JSON. Please re-run DataAggregator.gs!</div>`;
+    return;
+  }
+
 initDashboard();
