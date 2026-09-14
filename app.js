@@ -406,7 +406,147 @@ function initCompletionsPage() {
   container.innerHTML = html;
 }
 
-function initGotyPage() {}
+// --- GOTY / RANKINGS PAGE ROUTING ---
+function initGotyPage() {
+  const container = document.getElementById('goty-page-container');
+  if (!container || !metaGames) return;
+
+  const ratedGames = metaGames.filter(g => g.score !== null);
+
+  // 1. Grouping Data
+  const allTime = [...ratedGames];
+  const decades = { '2020s': [], '2010s': [], '2000s': [], '1990s': [], '1980s': [] };
+  const byYear = {};
+
+  ratedGames.forEach(g => {
+    const yStr = g.releaseYear;
+    if (yStr && yStr !== 'Unknown') {
+      const y = parseInt(yStr, 10);
+      if (!isNaN(y)) {
+        // Decades
+        if (y >= 2020 && y <= 2029) decades['2020s'].push(g);
+        else if (y >= 2010 && y <= 2019) decades['2010s'].push(g);
+        else if (y >= 2000 && y <= 2009) decades['2000s'].push(g);
+        else if (y >= 1990 && y <= 1999) decades['1990s'].push(g);
+        else if (y >= 1980 && y <= 1989) decades['1980s'].push(g);
+
+        // Years
+        if (!byYear[y]) byYear[y] = [];
+        byYear[y].push(g);
+      }
+    }
+  });
+
+  // 2. Render Helper
+  const buildRankCard = (title, gamesArray, limit) => {
+    if (!gamesArray || gamesArray.length === 0) return '';
+    
+    // Sort descending by score, tie-break by name
+    gamesArray.sort((a, b) => b.score - a.score || a.name.localeCompare(b.name));
+
+    let html = `
+    <div class="card goty-card">
+      <div class="card-header">
+        <h2>${escapeHTML(title)}</h2>
+      </div>
+      <div class="card-content goty-list-container">
+    `;
+
+    let actualPosition = 1;
+    let lastScore = -1;
+
+    gamesArray.forEach((game, index) => {
+      let rankText = game.score !== lastScore ? `#${actualPosition}` : '';
+      lastScore = game.score; 
+      actualPosition++;
+
+      const displayScore = Number.isInteger(game.score) ? game.score : game.score.toFixed(1);
+      
+      // Pull historical play data
+      const gameStats = rawData && rawData.metrics && rawData.metrics.allTimeGameStats[game.name] ? rawData.metrics.allTimeGameStats[game.name] : null;
+      const timeStr = gameStats ? formatTime(gameStats.totalSeconds) : "0m";
+      const daysCount = gameStats && gameStats.days ? (gameStats.days.size || gameStats.days.length || (gameStats.days.data ? gameStats.days.data.length : 0)) : 0;
+      const firstStr = (gameStats && gameStats.firstPlayedDate) ? formatFullDate(gameStats.firstPlayedDate) : "-";
+      const lastStr = (gameStats && gameStats.lastPlayedDate) ? formatFullDate(gameStats.lastPlayedDate) : "-";
+      
+      const hiddenClass = index >= limit ? 'goty-hidden-item' : '';
+
+      html += `
+        <div class="list-item ${hiddenClass}" style="align-items: flex-start; flex-direction: column; padding: 12px; border-left-color: var(--primary-green);">
+          
+          <div style="display: flex; justify-content: space-between; width: 100%; align-items: center;">
+            <span class="item-title" style="font-weight: 900; font-size: 1.05rem;">
+              <span style="color: var(--text-muted); margin-right: 8px; min-width: 25px; display: inline-block;">${rankText}</span>
+              <span class="hover-trigger" data-game="${escapeHTML(game.name)}">${escapeHTML(game.name)}</span>
+            </span>
+            <div class="item-badge" style="font-size: 1rem; padding: 6px 12px;">${displayScore}</div>
+          </div>
+          
+          <div class="item-sub" style="display: flex; justify-content: space-between; width: 100%; margin-top: 8px;">
+            <span>Dev: <strong>${escapeHTML(game.developer)}</strong></span>
+            <span><strong>${timeStr}</strong> | ${daysCount} Days</span>
+          </div>
+          
+          <div class="item-sub" style="display: flex; justify-content: space-between; width: 100%; margin-top: 4px; color: var(--text-muted); font-size: 0.7rem;">
+            <span>First Played: ${firstStr}</span>
+            <span>Last Update: ${lastStr}</span>
+          </div>
+
+        </div>
+      `;
+    });
+
+    if (gamesArray.length > limit) {
+      html += `
+        <div class="goty-toggle-btn" onclick="this.parentElement.classList.toggle('expanded'); this.innerText = this.parentElement.classList.contains('expanded') ? 'Hide Extra Rankings' : 'Show All ${gamesArray.length} Rankings';">
+          Show All ${gamesArray.length} Rankings
+        </div>
+      `;
+    }
+
+    html += `</div></div>`;
+    return html;
+  };
+
+  // 3. Assemble the Page Layout
+  let html = '';
+
+  // ROW 1: All-Time, 2020s, 2010s
+  html += `<section class="card-row grid-3">`;
+  html += buildRankCard("Top 50 All-Time", allTime, 50);
+  html += buildRankCard("Top 50: 2020s", decades['2020s'], 50);
+  html += buildRankCard("Top 50: 2010s", decades['2010s'], 50);
+  html += `</section>`;
+
+  // ROW 2: 2000s, 1990s, 1980s
+  html += `<section class="card-row grid-3">`;
+  html += buildRankCard("Top 50: 2000s", decades['2000s'], 50);
+  html += buildRankCard("Top 50: 1990s", decades['1990s'], 50);
+  html += buildRankCard("Top 50: 1980s", decades['1980s'], 50);
+  html += `</section>`;
+
+  // ROW 3+: Yearly Rankings
+  html += `
+    <div class="card-row grid-1" style="margin-top: 20px;">
+      <h2 style="font-size: 2rem; color: var(--text-header); font-weight: 900; text-align: center; border-bottom: 2px solid var(--border-light); padding-bottom: 10px;">Top 25 Games by Release Year</h2>
+    </div>
+    <section class="card-row grid-3">
+  `;
+  
+  const sortedYears = Object.keys(byYear).sort((a, b) => b - a);
+  sortedYears.forEach(year => {
+    html += buildRankCard(`${year} Rankings`, byYear[year], 25);
+  });
+
+  html += `</section>`;
+  container.innerHTML = html;
+
+  // Stagger Animations
+  document.querySelectorAll('.goty-card').forEach((card, index) => {
+    card.style.animationDelay = `${Math.min(index * 0.05, 1.5)}s`;
+  });
+}
+
 function initSystemsPage() {}
 function initSeriesPage() {}
 function initFranchisePage() {}
