@@ -281,7 +281,7 @@ function initCompletionsPage() {
     return (pt.completionDates && pt.completionDates.length > 0) || ['Completed', 'M-Completed', 'Postgame'].includes(pt.finalStatus);
   });
 
-  // Calculate display dates and rank
+  // Calculate display dates and entry numbers
   completions.forEach(pt => {
     const cDate = (pt.completionDates && pt.completionDates.length > 0) ? new Date(pt.completionDates[0]) : new Date(pt.lastDate);
     pt.displayDate = cDate;
@@ -289,21 +289,46 @@ function initCompletionsPage() {
     pt.entryNum = finalEntry ? Number(finalEntry.entryNum) : 0;
   });
 
+  // Sort OLDEST first to calculate running metadata totals accurately
   completions.sort((a, b) => {
-    const dateDiff = b.displayDate.getTime() - a.displayDate.getTime(); 
+    const dateDiff = a.displayDate.getTime() - b.displayDate.getTime();
     if (dateDiff !== 0) return dateDiff;
-    return b.entryNum - a.entryNum;
+    return a.entryNum - b.entryNum;
   });
 
+  const genreCounts = {};
+  const seriesCounts = {};
+  const devCounts = {};
+
+  // Assign overall rank and metadata ranks
+  completions.forEach((pt, index) => {
+    pt.overallRank = index + 1;
+
+    if (pt.genre && pt.genre !== "N/A") {
+      genreCounts[pt.genre] = (genreCounts[pt.genre] || 0) + 1;
+      pt.genreRank = genreCounts[pt.genre];
+    }
+    if (pt.series && pt.series !== "N/A" && pt.series.toUpperCase() !== "ZZNONE") {
+      seriesCounts[pt.series] = (seriesCounts[pt.series] || 0) + 1;
+      pt.seriesRank = seriesCounts[pt.series];
+    }
+    if (pt.developer && pt.developer !== "N/A") {
+      devCounts[pt.developer] = (devCounts[pt.developer] || 0) + 1;
+      pt.devRank = devCounts[pt.developer];
+    }
+  });
+
+  // Reverse back to NEWEST first for dashboard display
+  completions.reverse();
   const totalCompletions = completions.length;
 
   let html = `
-    <div class="card-row grid-1">
-      <div style="text-align: center; margin-bottom: 10px;">
-        <h2 style="font-size: 2.5rem; color: var(--text-header); font-weight: 900;">All-Time Completions: <span style="color: var(--primary-green);">${totalCompletions}</span></h2>
-      </div>
+  <div class="card-row grid-1">
+    <div style="text-align: center; margin-bottom: 10px;">
+      <h2 style="font-size: 2.5rem; color: var(--text-header); font-weight: 900;">All-Time Completions: <span style="color: var(--primary-green);">${totalCompletions}</span></h2>
     </div>
-    <div class="completion-grid">
+  </div>
+  <div class="completion-grid">
   `;
 
   html += completions.map((pt, index) => {
@@ -311,62 +336,69 @@ function initCompletionsPage() {
     const badgeHTML = score !== '-' ? `<div class="item-badge cc-score">${score}</div>` : `<div class="item-badge cc-score" style="background: var(--heatmap-empty); color: var(--text-muted);">-</div>`;
     const formattedTime = formatTime(timeStringToSeconds(pt.finalPtLifetime));
     const statusColor = getStatusColor(pt.finalStatus);
-    const rank = totalCompletions - index;
     
-    // Check for prior completions
     let pastCompletionsHtml = '';
     if (rawData.metrics && rawData.metrics.completionStats) {
-        const allTimeGameData = rawData.metrics.completionStats.find(g => g.gameName === pt.gameName);
-        if (allTimeGameData && allTimeGameData.completionDates.length > 1) {
-          const currentCompletionStr = formatFullDate(pt.displayDate);
-          const pastDates = allTimeGameData.completionDates
-              .map(d => formatFullDate(d))
-              .filter(d => d !== currentCompletionStr);
-            if (pastDates.length > 0) {
-                const uniquePastDates = [...new Set(pastDates)];
-                pastCompletionsHtml = `<div class="cc-past"><strong>Also completed on:</strong> ${uniquePastDates.join(', ')}</div>`;
-            }
+      const allTimeGameData = rawData.metrics.completionStats.find(g => g.gameName === pt.gameName);
+      if (allTimeGameData && allTimeGameData.completionDates.length > 1) {
+        const currentCompletionStr = formatFullDate(pt.displayDate);
+        const pastDates = allTimeGameData.completionDates
+          .map(d => formatFullDate(d))
+          .filter(d => d !== currentCompletionStr);
+        if (pastDates.length > 0) {
+          const uniquePastDates = [...new Set(pastDates)];
+          pastCompletionsHtml = `<div class="cc-past"><strong>Also completed on:</strong> ${uniquePastDates.join(', ')}</div>`;
         }
+      }
     }
 
+    // Build the metadata rank pills
+    let metaRanksHtml = '';
+    if (pt.genreRank) metaRanksHtml += `<span class="meta-rank-pill">${escapeHTML(pt.genre)} #${pt.genreRank}</span>`;
+    if (pt.seriesRank) metaRanksHtml += `<span class="meta-rank-pill">${escapeHTML(pt.series)} #${pt.seriesRank}</span>`;
+    if (pt.devRank) metaRanksHtml += `<span class="meta-rank-pill">${escapeHTML(pt.developer)} #${pt.devRank}</span>`;
+
     return `
-      <div class="completion-list-item card" style="border-left: 6px solid ${statusColor}; animation-delay: ${Math.min(index * 0.03, 1.2)}s;">
-        
-        <!-- Left Column: Core Info -->
-        <div class="cc-primary">
-          <span class="cc-rank">Completion #${rank}</span>
+    <div class="completion-card card" style="border-top: 6px solid ${statusColor}; animation-delay: ${Math.min(index * 0.03, 1.2)}s;">
+      
+      <div class="cc-header">
+        <span class="cc-rank">Completion #${pt.overallRank}</span>
+        <div style="display: flex; justify-content: space-between; align-items: flex-start; width: 100%;">
           <span class="cc-title hover-trigger" data-game="${escapeHTML(pt.gameName)}">${escapeHTML(pt.gameName)}</span>
-          <div class="cc-meta">
-            <span class="cc-pill" style="background: var(--item-bg); border: 1px solid var(--border-light);">${escapeHTML(pt.system)}</span>
-            <span class="cc-pill" style="background: var(--item-bg); border: 1px solid ${statusColor}; color: var(--text-main); font-weight: 900;">${pt.finalStatus}</span>
-            ${badgeHTML}
-          </div>
-          <div class="cc-footer">
-            <span><strong>Start:</strong> ${formatFullDate(pt.startDate)} &nbsp;|&nbsp; <strong>End:</strong> ${formatFullDate(pt.displayDate)}</span>
-          </div>
+          ${badgeHTML}
         </div>
-
-        <!-- Middle Column: Stats -->
-        <div class="cc-stats-col">
-          <div class="cc-stat-block">
-            <span class="cc-stat-label">Total Time</span>
-            <span class="cc-stat-val">${formattedTime}</span>
-          </div>
-          <div class="cc-stat-block">
-            <span class="cc-stat-label">Days Played</span>
-            <span class="cc-stat-val">${pt.finalPtLifetimeDays}</span>
-          </div>
-          ${pastCompletionsHtml}
+        <div class="cc-meta">
+          <span class="cc-pill" style="background: var(--item-bg); border: 1px solid var(--border-light);">${escapeHTML(pt.system)}</span>
+          <span class="cc-pill" style="background: var(--item-bg); border: 1px solid ${statusColor}; color: var(--text-main); font-weight: 900;">${pt.finalStatus}</span>
         </div>
-
-        <!-- Right Column: Note -->
-        <div class="cc-note-col">
-          <div class="cc-note">
-            ${escapeHTML(pt.finalNote)}
-          </div>
-        </div>
-        
       </div>
+
+      <div class="cc-stats-grid">
+        <div class="cc-stat-block">
+          <span class="cc-stat-label">Total Time</span>
+          <span class="cc-stat-val">${formattedTime}</span>
+        </div>
+        <div class="cc-stat-block">
+          <span class="cc-stat-label">Days Played</span>
+          <span class="cc-stat-val">${pt.finalPtLifetimeDays}</span>
+        </div>
+      </div>
+
+      <div class="cc-footer-dates">
+        <span><strong>Start:</strong> ${formatFullDate(pt.startDate)} &nbsp;|&nbsp; <strong>End:</strong> ${formatFullDate(pt.displayDate)}</span>
+        ${pastCompletionsHtml}
+      </div>
+
+      ${metaRanksHtml ? `<div class="cc-meta-ranks">${metaRanksHtml}</div>` : ''}
+
+      <div class="cc-note-toggle" onclick="this.nextElementSibling.classList.toggle('visible')">
+        📖 Toggle Playthrough Details
+      </div>
+      <div class="cc-note-content">
+        ${escapeHTML(pt.finalNote)}
+      </div>
+
+    </div>
     `;
   }).join('');
 
