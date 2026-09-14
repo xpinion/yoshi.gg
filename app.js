@@ -670,10 +670,13 @@ function initSystemsPage() {
     sys.dowStats[dow] += sec;
 
     if (!sys.gamePlaytimes[e.game]) {
-      sys.gamePlaytimes[e.game] = { seconds: 0, days: new Set() };
+      sys.gamePlaytimes[e.game] = { seconds: 0, days: new Set(), minDate: e.date, maxDate: e.date };
     }
     sys.gamePlaytimes[e.game].seconds += sec;
     sys.gamePlaytimes[e.game].days.add(dateKey);
+    
+    if (e.date < sys.gamePlaytimes[e.game].minDate) sys.gamePlaytimes[e.game].minDate = e.date;
+    if (e.date > sys.gamePlaytimes[e.game].maxDate) sys.gamePlaytimes[e.game].maxDate = e.date;
   });
 
   // Tally Completions per system
@@ -691,17 +694,19 @@ function initSystemsPage() {
   }
 
   // 2. Prepare Derived Stats & Determine Maximums
-  let maxTime = 0, maxDays = 0, maxGames = 0, maxAvg = 0, maxComp = 0, maxLongestSess = 0;
+  let maxTime = 0, maxDays = 0, maxGames = 0, maxComp = 0, maxLongestSess = 0, maxMpgTime = 0;
   
   const sortedSystems = Object.values(systemData).sort((a, b) => b.totalSeconds - a.totalSeconds);
   
   sortedSystems.forEach(sys => {
-    sys.avgSessionSec = sys.sessions.length > 0 ? sys.totalSeconds / sys.sessions.length : 0;
+    sys.firstEntryDate = sys.entries[0].date;
+    sys.lastEntryDate = sys.entries[sys.entries.length - 1].date;
     
-    let mostPlayedGame = "N/A";
-    let maxGameSec = 0;
+    let mostPlayedGame = { name: "N/A", seconds: 0, minDate: null, maxDate: null };
     Object.entries(sys.gamePlaytimes).forEach(([g, data]) => {
-      if (data.seconds > maxGameSec) { maxGameSec = data.seconds; mostPlayedGame = g; }
+      if (data.seconds > mostPlayedGame.seconds) { 
+        mostPlayedGame = { name: g, seconds: data.seconds, minDate: data.minDate, maxDate: data.maxDate }; 
+      }
     });
     sys.mostPlayedGame = mostPlayedGame;
     
@@ -715,9 +720,9 @@ function initSystemsPage() {
     if (sys.totalSeconds > maxTime) maxTime = sys.totalSeconds;
     if (sys.days.size > maxDays) maxDays = sys.days.size;
     if (sys.games.size > maxGames) maxGames = sys.games.size;
-    if (sys.avgSessionSec > maxAvg) maxAvg = sys.avgSessionSec;
     if (sys.completions > maxComp) maxComp = sys.completions;
     if (sys.longestSession.time > maxLongestSess) maxLongestSess = sys.longestSession.time;
+    if (sys.mostPlayedGame.seconds > maxMpgTime) maxMpgTime = sys.mostPlayedGame.seconds;
   });
 
   const mostPlayedSys = sortedSystems[0] || { name: "N/A", totalSeconds: 0 };
@@ -727,7 +732,7 @@ function initSystemsPage() {
   const getHighlightStr = (val, max, formatFn) => {
     const displayStr = formatFn ? formatFn(val) : val;
     if (val === max && val > 0) {
-      return `<span style="color: var(--primary-green); font-weight: 900; background: var(--highlight-green-bg); padding: 4px 10px; border-radius: 6px;">${displayStr}</span>`;
+      return `<span style="color: var(--primary-green); font-weight: 900; background: var(--highlight-green-bg); padding: 4px 8px; border-radius: 6px;">${displayStr}</span>`;
     }
     return displayStr;
   };
@@ -736,25 +741,37 @@ function initSystemsPage() {
     const timeStr = getHighlightStr(sys.totalSeconds, maxTime, formatTime);
     const daysStr = getHighlightStr(sys.days.size, maxDays);
     const gamesStr = getHighlightStr(sys.games.size, maxGames);
-    const avgStr = getHighlightStr(sys.avgSessionSec, maxAvg, formatTime);
     const compStr = getHighlightStr(sys.completions, maxComp);
+    
+    const mpg = sys.mostPlayedGame;
+    const mpgTimeStr = getHighlightStr(mpg.seconds, maxMpgTime, formatTime);
+    const mpgMin = mpg.minDate ? formatFullDate(mpg.minDate) : "-";
+    const mpgMax = mpg.maxDate ? formatFullDate(mpg.maxDate) : "-";
     
     const ls = sys.longestSession;
     const lsTimeStr = getHighlightStr(ls.time, maxLongestSess, formatTime);
-    const lsDate = ls.date ? `${formatShortDate(ls.date)}/${new Date(ls.date).getUTCFullYear()}` : "N/A";
+    const lsDate = ls.date ? formatFullDate(ls.date) : "-";
     
     return `
       <tr>
         <td class="text-left" style="font-weight: 900; font-size: 1.05rem;">${escapeHTML(sys.name)}</td>
+        <td class="text-center" style="font-size: 0.85rem;">${formatFullDate(sys.firstEntryDate)}</td>
+        <td class="text-center" style="font-size: 0.85rem;">${formatFullDate(sys.lastEntryDate)}</td>
         <td class="text-center">${timeStr}</td>
         <td class="text-center">${daysStr}</td>
         <td class="text-center">${gamesStr}</td>
-        <td class="text-center">${avgStr}</td>
         <td class="text-center">${compStr}</td>
-        <td class="text-left"><span class="hover-trigger" data-game="${escapeHTML(sys.mostPlayedGame)}">${escapeHTML(sys.mostPlayedGame)}</span></td>
-        <td class="text-left" style="font-size: 0.85rem; line-height: 1.4;">
-          <strong>${lsTimeStr}</strong> - <span class="hover-trigger" data-game="${escapeHTML(ls.game)}">${escapeHTML(ls.game)}</span><br>
-          <span style="color: var(--text-sub);">${lsDate}</span>
+        <td class="text-left" style="line-height: 1.5;">
+          <span class="hover-trigger" style="font-weight: 800; font-size: 0.95rem; color: var(--text-title);" data-game="${escapeHTML(mpg.name)}">${escapeHTML(mpg.name)}</span><br>
+          <span style="font-size: 0.8rem; color: var(--text-sub);">
+            ${mpgTimeStr} &nbsp;|&nbsp; Start: ${mpgMin} &nbsp;|&nbsp; End: ${mpgMax}
+          </span>
+        </td>
+        <td class="text-left" style="line-height: 1.5;">
+          <span class="hover-trigger" style="font-weight: 800; font-size: 0.95rem; color: var(--text-title);" data-game="${escapeHTML(ls.game)}">${escapeHTML(ls.game)}</span><br>
+          <span style="font-size: 0.8rem; color: var(--text-sub);">
+            ${lsTimeStr} &nbsp;|&nbsp; Date: ${lsDate}
+          </span>
         </td>
       </tr>
     `;
@@ -792,16 +809,17 @@ function initSystemsPage() {
         </div>
         <div class="card-content" style="padding: 0;">
           <div class="monthly-table-wrapper" style="padding: 20px;">
-            <table class="analysis-table" style="min-width: 1000px; text-align: left;">
+            <table class="analysis-table" style="min-width: 1200px; text-align: left;">
               <thead>
                 <tr>
-                  <th style="width: 150px; text-align: left;">System</th>
-                  <th style="width: 120px;">Total Playtime</th>
-                  <th style="width: 100px;">Days Played</th>
-                  <th style="width: 110px;">Unique Games</th>
-                  <th style="width: 120px;">Avg Session</th>
-                  <th style="width: 110px;">Completions</th>
-                  <th style="width: 200px; text-align: left;">Most Played Game</th>
+                  <th style="width: 130px; text-align: left;">System</th>
+                  <th style="width: 100px;">First Entry</th>
+                  <th style="width: 100px;">Last Update</th>
+                  <th style="width: 100px;">Total Playtime</th>
+                  <th style="width: 90px;">Days Played</th>
+                  <th style="width: 90px;">Unique Games</th>
+                  <th style="width: 90px;">Completions</th>
+                  <th style="width: 320px; text-align: left;">Most Played Game</th>
                   <th style="text-align: left;">Longest Single Session</th>
                 </tr>
               </thead>
@@ -1053,8 +1071,9 @@ function initSystemsPage() {
     });
   };
 
-  // 5. Attach Listener and Execute Initial Render
+  // 5. Attach Listeners and Execute Initial Render
   document.getElementById('hub-system-select').addEventListener('change', (e) => renderSelectedSystem(e.target.value));
+  
   renderSelectedSystem(sortedSystems[0].name);
 }
 
