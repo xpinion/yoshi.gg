@@ -437,15 +437,19 @@ function initGotyPage() {
     }
   });
 
-  // 2. Render Helper
-  const buildRankCard = (title, gamesArray, limit) => {
+  const sortedYears = Object.keys(byYear).sort((a, b) => b - a);
+
+  // 2. Render Helper for Cards
+  const buildRankCard = (title, gamesArray, limit, anchorId = null) => {
     if (!gamesArray || gamesArray.length === 0) return '';
     
     // Sort descending by score, tie-break by name
     gamesArray.sort((a, b) => b.score - a.score || a.name.localeCompare(b.name));
 
+    const idAttr = anchorId ? `id="${anchorId}"` : '';
+
     let html = `
-    <div class="card goty-card">
+    <div class="card goty-card" ${idAttr} style="scroll-margin-top: 100px;">
       <div class="card-header">
         <h2>${escapeHTML(title)}</h2>
       </div>
@@ -511,31 +515,97 @@ function initGotyPage() {
   // 3. Assemble the Page Layout
   let html = '';
 
-  // ROW 1: All-Time, 2020s, 2010s
+  // SECTION: GOTY Highlight Table (1985+)
+  const yearsSince1985 = sortedYears.filter(y => parseInt(y) >= 1985);
+  
+  html += `
+  <section class="card-row grid-1">
+    <div class="card">
+      <div class="card-header">
+        <h2>Game of the Year (1985 - Present)</h2>
+      </div>
+      <div class="card-content">
+        <div style="overflow-x: auto;">
+          <table class="analysis-table">
+            <thead>
+              <tr>
+                <th style="width: 100px;">Release Year</th>
+                <th>Game of the Year</th>
+                <th style="width: 100px;">Score</th>
+              </tr>
+            </thead>
+            <tbody>
+  `;
+
+  yearsSince1985.forEach(year => {
+    const games = [...byYear[year]];
+    games.sort((a, b) => b.score - a.score || a.name.localeCompare(b.name));
+    if (games.length > 0) {
+      const goty = games[0];
+      const displayScore = Number.isInteger(goty.score) ? goty.score : goty.score.toFixed(1);
+      html += `
+        <tr>
+          <td style="font-weight: bold; font-size: 1.1rem;">${year}</td>
+          <td class="text-left"><span class="hover-trigger" style="font-weight: bold; font-size: 1.1rem; color: var(--text-title);" data-game="${escapeHTML(goty.name)}">${escapeHTML(goty.name)}</span></td>
+          <td><div class="item-badge" style="display: inline-block;">${displayScore}</div></td>
+        </tr>
+      `;
+    }
+  });
+
+  html += `
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </section>
+  `;
+
+  // SECTION: Table of Contents
+  html += `
+  <section class="card-row grid-1">
+    <div class="card">
+      <div class="card-header" style="border-bottom: none; padding-bottom: 0; margin-bottom: 10px;">
+        <h2>Jump to Year</h2>
+      </div>
+      <div class="card-content">
+        <div class="goty-toc">
+  `;
+  sortedYears.forEach(year => {
+    html += `<a href="#year-${year}" class="goty-toc-link">${year}</a>`;
+  });
+  html += `
+        </div>
+      </div>
+    </div>
+  </section>
+  `;
+
+  // ROW 1: All-Time, 2020s, 2010s (Top 25)
   html += `<section class="card-row grid-3">`;
-  html += buildRankCard("Top 50 All-Time", allTime, 50);
-  html += buildRankCard("Top 50: 2020s", decades['2020s'], 50);
-  html += buildRankCard("Top 50: 2010s", decades['2010s'], 50);
+  html += buildRankCard("Top 25 All-Time", allTime, 25);
+  html += buildRankCard("Top 25: 2020s", decades['2020s'], 25);
+  html += buildRankCard("Top 25: 2010s", decades['2010s'], 25);
   html += `</section>`;
 
-  // ROW 2: 2000s, 1990s, 1980s
+  // ROW 2: 2000s, 1990s, 1980s (Top 25)
   html += `<section class="card-row grid-3">`;
-  html += buildRankCard("Top 50: 2000s", decades['2000s'], 50);
-  html += buildRankCard("Top 50: 1990s", decades['1990s'], 50);
-  html += buildRankCard("Top 50: 1980s", decades['1980s'], 50);
+  html += buildRankCard("Top 25: 2000s", decades['2000s'], 25);
+  html += buildRankCard("Top 25: 1990s", decades['1990s'], 25);
+  html += buildRankCard("Top 25: 1980s", decades['1980s'], 25);
   html += `</section>`;
 
-  // ROW 3+: Yearly Rankings
+  // ROW 3+: Yearly Rankings (Grid 4)
   html += `
     <div class="card-row grid-1" style="margin-top: 20px;">
       <h2 style="font-size: 2rem; color: var(--text-header); font-weight: 900; text-align: center; border-bottom: 2px solid var(--border-light); padding-bottom: 10px;">Top 25 Games by Release Year</h2>
     </div>
-    <section class="card-row grid-3">
+    <section class="card-row grid-4">
   `;
   
-  const sortedYears = Object.keys(byYear).sort((a, b) => b - a);
   sortedYears.forEach(year => {
-    html += buildRankCard(`${year} Rankings`, byYear[year], 25);
+    html += buildRankCard(`${year} Rankings`, byYear[year], 25, `year-${year}`);
   });
 
   html += `</section>`;
@@ -543,6 +613,7 @@ function initGotyPage() {
 
   // Stagger Animations
   document.querySelectorAll('.goty-card').forEach((card, index) => {
+    // Only stagger the first few so the whole page doesn't take forever to load
     card.style.animationDelay = `${Math.min(index * 0.05, 1.5)}s`;
   });
 }
