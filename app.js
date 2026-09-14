@@ -642,6 +642,7 @@ function initSystemsPage() {
     const sysName = e.system || "Unknown";
     const sec = timeStringToSeconds(e.time);
     const dateKey = e.date.split('T')[0];
+    
     const entryDate = new Date(e.date);
     const dow = entryDate.getUTCDay();
     const year = entryDate.getUTCFullYear();
@@ -654,10 +655,22 @@ function initSystemsPage() {
 
     if (!systemData[sysName]) {
       systemData[sysName] = {
-        name: sysName, totalSeconds: 0, days: new Set(), games: new Set(),
-        sessions: [], gamePlaytimes: {}, entries: [], yearStats: {},
-        monthlyTime: {}, cumulativeTime: {}, genreTime: {}, devTime: {},
-        dowStats: { 0:0, 1:0, 2:0, 3:0, 4:0, 5:0, 6:0 }, completions: 0
+        name: sysName,
+        totalSeconds: 0,
+        days: new Set(),
+        games: new Set(),
+        sessions: [],
+        gamePlaytimes: {},
+        entries: [],
+        yearStats: {},
+        monthlyTime: {},
+        cumulativeTime: {},
+        genreTime: {},
+        devTime: {},
+        dowStats: { 0:0, 1:0, 2:0, 3:0, 4:0, 5:0, 6:0 },
+        completions: 0,
+        multiplayerSeconds: 0,
+        sessionBuckets: { micro: 0, standard: 0, deep: 0, marathon: 0, epic: 0 }
       };
     }
 
@@ -672,10 +685,24 @@ function initSystemsPage() {
     sys.monthlyTime[monthKey] = (sys.monthlyTime[monthKey] || 0) + sec;
     sys.dowStats[dow] += sec;
 
+    // Multiplayer Tracking
+    if (['Multiplayer', 'M-Completed'].includes(e.status)) {
+      sys.multiplayerSeconds += sec;
+    }
+
+    // Session Buckets
+    if (sec < 1800) sys.sessionBuckets.micro += sec;
+    else if (sec < 7200) sys.sessionBuckets.standard += sec;
+    else if (sec < 14400) sys.sessionBuckets.deep += sec;
+    else if (sec < 28800) sys.sessionBuckets.marathon += sec;
+    else sys.sessionBuckets.epic += sec;
+
     if (e.genre && e.genre !== "N/A") sys.genreTime[e.genre] = (sys.genreTime[e.genre] || 0) + sec;
     if (e.developer && e.developer !== "N/A") sys.devTime[e.developer] = (sys.devTime[e.developer] || 0) + sec;
 
-    if (!sys.gamePlaytimes[e.game]) sys.gamePlaytimes[e.game] = { seconds: 0, days: new Set(), minDate: e.date, maxDate: e.date };
+    if (!sys.gamePlaytimes[e.game]) {
+      sys.gamePlaytimes[e.game] = { seconds: 0, days: new Set(), minDate: e.date, maxDate: e.date };
+    }
     sys.gamePlaytimes[e.game].seconds += sec;
     sys.gamePlaytimes[e.game].days.add(dateKey);
     
@@ -772,6 +799,7 @@ function initSystemsPage() {
     `;
   }).join('');
 
+  // SVG Line Charts
   const top10Systems = sortedSystems.slice(0, 10);
   const chartColors = ['#ff0054', '#ffbd00', '#00b4d8', '#8ac926', '#9d4edd', '#ff9f1c', '#38b000', '#e56b6f', '#3a0ca3', '#00f5d4'];
   
@@ -847,7 +875,7 @@ function initSystemsPage() {
     </div>
   `;
 
-  // 4. Flex-based Responsive Eras Timeline (No Scrollbars needed!)
+  // Gantt-Style Eras Timeline
   let timelineHtml = '';
   if (allMonthKeys.length > 0) {
     timelineHtml += `
@@ -881,7 +909,6 @@ function initSystemsPage() {
       allMonthKeys.forEach(mk => {
         const time = sys.monthlyTime[mk] || 0;
         const bg = time > 0 ? 'var(--primary-green)' : 'var(--heatmap-empty)';
-        // Dynamic opacity relative to system's specific peak month
         const opacity = time > 0 ? (sysMaxMonthlySec > 0 ? 0.2 + (0.8 * (time / sysMaxMonthlySec)) : 1) : 1; 
         timelineHtml += `<div title="${mk}: ${formatTime(time)}" style="flex: 1; background: ${bg}; opacity: ${opacity}; border-radius: 1px;"></div>`;
       });
@@ -890,8 +917,107 @@ function initSystemsPage() {
     timelineHtml += `</div>`;
   }
 
+  // Session Buckets "Sprint vs Marathon" Global Visualizer
+  const generateSessionBucketsHtml = () => {
+    let bHtml = `<div style="display: flex; flex-direction: column; gap: 15px; padding: 10px;">`;
+    bHtml += `
+      <div style="display: flex; flex-wrap: wrap; gap: 15px; justify-content: center; margin-bottom: 10px; font-size: 0.85rem; font-weight: 800;">
+        <div style="display:flex; align-items:center; gap:5px;"><div style="width:12px;height:12px;background:#4cc9f0; border-radius: 2px;"></div>Micro (&lt;30m)</div>
+        <div style="display:flex; align-items:center; gap:5px;"><div style="width:12px;height:12px;background:#4361ee; border-radius: 2px;"></div>Standard (30m-2h)</div>
+        <div style="display:flex; align-items:center; gap:5px;"><div style="width:12px;height:12px;background:#7209b7; border-radius: 2px;"></div>Deep (2h-4h)</div>
+        <div style="display:flex; align-items:center; gap:5px;"><div style="width:12px;height:12px;background:#f72585; border-radius: 2px;"></div>Marathon (4h-8h)</div>
+        <div style="display:flex; align-items:center; gap:5px;"><div style="width:12px;height:12px;background:#ff9f1c; border-radius: 2px;"></div>Epic (8h+)</div>
+      </div>
+    `;
+
+    sortedSystems.forEach(sys => {
+      const t = sys.totalSeconds || 1;
+      const b = sys.sessionBuckets;
+      const p1 = (b.micro/t)*100;
+      const p2 = (b.standard/t)*100;
+      const p3 = (b.deep/t)*100;
+      const p4 = (b.marathon/t)*100;
+      const p5 = (b.epic/t)*100;
+      
+      bHtml += `
+        <div style="display: flex; align-items: center; gap: 10px;">
+          <div style="width: 130px; text-align: right; font-weight: 800; font-size: 0.9rem;">${escapeHTML(sys.name)}</div>
+          <div style="flex: 1; display: flex; height: 24px; border-radius: 4px; overflow: hidden; background: var(--item-bg);">
+            <div style="width: ${p1}%; background: #4cc9f0;" title="Micro (<30m): ${formatTime(b.micro)}"></div>
+            <div style="width: ${p2}%; background: #4361ee;" title="Standard (30m-2h): ${formatTime(b.standard)}"></div>
+            <div style="width: ${p3}%; background: #7209b7;" title="Deep (2h-4h): ${formatTime(b.deep)}"></div>
+            <div style="width: ${p4}%; background: #f72585;" title="Marathon (4h-8h): ${formatTime(b.marathon)}"></div>
+            <div style="width: ${p5}%; background: #ff9f1c;" title="Epic (8h+): ${formatTime(b.epic)}"></div>
+          </div>
+        </div>
+      `;
+    });
+    bHtml += `</div>`;
+    return bHtml;
+  };
+
+  // 2D Scatter Plot: Deep Dive vs Tasting Menu Matrix
+  const generateScatterPlot = () => {
+    const width = 1000, height = 450;
+    const padL = 80, padR = 40, padT = 40, padB = 60;
+    const innerW = width - padL - padR, innerH = height - padT - padB;
+    
+    let mxX = Math.max(...sortedSystems.map(s => s.games.size));
+    let mxY = Math.max(...sortedSystems.map(s => s.totalSeconds));
+    if (mxX === 0) mxX = 1; if (mxY === 0) mxY = 1;
+    mxX *= 1.1; mxY *= 1.1;
+
+    let svg = `<svg viewBox="0 0 ${width} ${height}" style="width: 100%; height: auto; display: block; overflow: visible;">`;
+    
+    // Quadrant Backgrounds
+    const midX = padL + innerW / 2;
+    const midY = padT + innerH / 2;
+    svg += `<rect x="${padL}" y="${padT}" width="${innerW/2}" height="${innerH/2}" fill="var(--item-bg)" opacity="0.6" />`;
+    svg += `<rect x="${midX}" y="${padT}" width="${innerW/2}" height="${innerH/2}" fill="var(--highlight-green-bg)" opacity="0.4" />`;
+    svg += `<rect x="${padL}" y="${midY}" width="${innerW/2}" height="${innerH/2}" fill="transparent" />`;
+    svg += `<rect x="${midX}" y="${midY}" width="${innerW/2}" height="${innerH/2}" fill="var(--item-bg)" opacity="0.6" />`;
+
+    // Quadrant Labels
+    svg += `<text x="${padL + 15}" y="${padT + 25}" fill="var(--text-sub)" font-family="Inter, sans-serif" font-weight="800" font-size="12">DEEP DIVES (High Time, Few Games)</text>`;
+    svg += `<text x="${width - padR - 15}" y="${padT + 25}" fill="var(--primary-green)" font-family="Inter, sans-serif" font-weight="800" font-size="12" text-anchor="end">JUGGERNAUTS (High Time, Many Games)</text>`;
+    svg += `<text x="${padL + 15}" y="${height - padB - 15}" fill="var(--text-sub)" font-family="Inter, sans-serif" font-weight="800" font-size="12">DALLIANCES (Low Time, Few Games)</text>`;
+    svg += `<text x="${width - padR - 15}" y="${height - padB - 15}" fill="var(--text-sub)" font-family="Inter, sans-serif" font-weight="800" font-size="12" text-anchor="end">TASTING MENUS (Low Time, Many Games)</text>`;
+
+    // Axes Lines
+    svg += `<line x1="${padL}" y1="${height-padB}" x2="${width-padR}" y2="${height-padB}" stroke="var(--text-muted)" stroke-width="2" />`;
+    svg += `<line x1="${padL}" y1="${padT}" x2="${padL}" y2="${height-padB}" stroke="var(--text-muted)" stroke-width="2" />`;
+
+    // Axis Labels
+    for(let k=0; k<=4; k++) {
+       const y = padT + innerH - (k/4)*innerH;
+       const valLabel = Math.round(((k/4) * mxY) / 3600) + 'h';
+       svg += `<text x="${padL - 10}" y="${y + 4}" fill="var(--text-muted)" font-family="Inter, sans-serif" font-size="12" font-weight="600" text-anchor="end">${valLabel}</text>`;
+    }
+    for(let k=0; k<=4; k++) {
+       const x = padL + (k/4)*innerW;
+       const valLabel = Math.round((k/4) * mxX);
+       svg += `<text x="${x}" y="${height - padB + 20}" fill="var(--text-muted)" font-family="Inter, sans-serif" font-size="12" font-weight="600" text-anchor="middle">${valLabel}</text>`;
+    }
+    
+    // Plot Points
+    sortedSystems.forEach((sys, i) => {
+       const cx = padL + (sys.games.size / mxX) * innerW;
+       const cy = padT + innerH - (sys.totalSeconds / mxY) * innerH;
+       const color = chartColors[i % chartColors.length];
+       
+       svg += `<circle cx="${cx}" cy="${cy}" r="7" fill="${color}" stroke="var(--card-bg)" stroke-width="2" style="cursor: pointer;">
+                 <title>${escapeHTML(sys.name)}: ${sys.games.size} Games, ${formatTime(sys.totalSeconds)}</title>
+               </circle>`;
+       svg += `<text x="${cx}" y="${cy - 12}" fill="var(--text-title)" font-family="Inter, sans-serif" font-size="11" font-weight="800" text-anchor="middle">${escapeHTML(sys.name)}</text>`;
+    });
+
+    svg += `</svg>`;
+    return svg;
+  };
+
   // 5. Build the Static Hub UI
   let html = `
+    <!-- Global Systems Ribbon -->
     <section class="card-row grid-4">
       <div class="card" style="text-align: center; padding: 20px;">
         <div class="sys-widget-title">Total Hardware</div>
@@ -913,6 +1039,7 @@ function initSystemsPage() {
       </div>
     </section>
 
+    <!-- Global System Summary Table -->
     <section class="card-row grid-1">
       <div class="card">
         <div class="card-header"><h2>All-Time Systems Summary</h2></div>
@@ -938,6 +1065,27 @@ function initSystemsPage() {
       </div>
     </section>
 
+    <!-- Deep Dive vs Tasting Menu Matrix -->
+    <section class="card-row grid-1" style="margin-top: 20px;">
+      <div class="card">
+        <div class="card-header"><h2>The Deep Dive vs. Tasting Menu Matrix</h2></div>
+        <div class="card-content" style="padding: 10px 20px;">
+          ${generateScatterPlot()}
+        </div>
+      </div>
+    </section>
+
+    <!-- Sprint vs Marathon Buckets -->
+    <section class="card-row grid-1" style="margin-top: 20px;">
+      <div class="card">
+        <div class="card-header"><h2>Sprint vs. Marathon: Session Length Breakdown</h2></div>
+        <div class="card-content" style="padding: 10px 20px;">
+          ${generateSessionBucketsHtml()}
+        </div>
+      </div>
+    </section>
+
+    <!-- Global Trend Line Charts (Stacked) -->
     <section class="card-row grid-1" style="margin-top: 20px;">
       <div class="card">
         <div class="card-header"><h2>Top 10 Systems: Monthly Playtime</h2></div>
@@ -955,6 +1103,7 @@ function initSystemsPage() {
       </div>
     </section>
 
+    <!-- Global Eras Timeline -->
     <section class="card-row grid-1" style="margin-top: 20px;">
       <div class="card">
         <div class="card-header"><h2>Global Hardware Eras Timeline (2015 - Present)</h2></div>
@@ -964,6 +1113,7 @@ function initSystemsPage() {
       </div>
     </section>
 
+    <!-- System Selector -->
     <section class="card-row grid-1" style="margin-top: 20px;">
       <div class="card">
         <div class="card-header" style="border-bottom: none; margin-bottom: 0; padding-bottom: 0;">
@@ -977,6 +1127,7 @@ function initSystemsPage() {
       </div>
     </section>
 
+    <!-- Dynamic Container for Selected System Deep Dive -->
     <div id="dynamic-system-content"></div>
   `;
 
@@ -989,6 +1140,7 @@ function initSystemsPage() {
 
     const dynamicContainer = document.getElementById('dynamic-system-content');
     
+    // Identity "Vibe Check" Algorithm
     const topGenres = Object.entries(sys.genreTime).sort((a, b) => b[1] - a[1]);
     const topDevs = Object.entries(sys.devTime).sort((a, b) => b[1] - a[1]);
     const bestGenre = topGenres.length > 0 ? topGenres[0][0] : "Gaming";
@@ -1031,6 +1183,20 @@ function initSystemsPage() {
     const topGamesDays = Object.entries(sys.gamePlaytimes).map(([name, data]) => ({ name, ...data })).sort((a, b) => b.days.size - a.days.size).slice(0, 10);
     const topSessions = [...sys.sessions].sort((a, b) => b.time - a.time).slice(0, 10);
 
+    // Social Hub Index Calculation
+    const multiSec = sys.multiplayerSeconds || 0;
+    const singleSec = sys.totalSeconds - multiSec;
+    const multiPct = sys.totalSeconds > 0 ? Math.round((multiSec / sys.totalSeconds) * 100) : 0;
+    const circleRadius = 40;
+    const circleCircumference = 2 * Math.PI * circleRadius;
+    const multiDash = (multiPct / 100) * circleCircumference;
+    const donutHtml = `
+      <svg viewBox="0 0 100 100" style="width: 100px; height: 100px; transform: rotate(-90deg);">
+        <circle cx="50" cy="50" r="${circleRadius}" fill="transparent" stroke="var(--item-bg)" stroke-width="15" />
+        <circle cx="50" cy="50" r="${circleRadius}" fill="transparent" stroke="var(--primary-green)" stroke-width="15" stroke-dasharray="${multiDash} ${circleCircumference}" />
+      </svg>
+    `;
+
     let sysHtml = `
       <section class="card-row grid-1" style="margin-top: -10px;">
         <div class="card" style="text-align: center; padding: 25px; background: linear-gradient(135deg, var(--card-bg) 0%, var(--item-bg) 100%);">
@@ -1053,21 +1219,21 @@ function initSystemsPage() {
         </div>
       </section>
 
-      <section class="card-row grid-2">
-        <div class="card" style="display: flex; flex-direction: row; align-items: center; justify-content: space-between; padding: 20px;">
-          <div style="flex: 1; text-align: center; border-right: 1px dashed var(--border-light);">
+      <section class="card-row grid-strict-3">
+        <div class="card" style="display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 20px;">
+          <div style="width: 100%; text-align: center; border-bottom: 1px dashed var(--border-light); padding-bottom: 15px; margin-bottom: 15px;">
             <div class="sys-widget-title">Inaugural Session</div>
             <div class="sys-widget-value" style="font-size: 1.1rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding: 0 10px;">${escapeHTML(firstEntry.game)}</div>
             <div class="sys-widget-sub">${formatFullDate(firstEntry.date)}</div>
           </div>
-          <div style="flex: 1; text-align: center;">
+          <div style="width: 100%; text-align: center;">
             <div class="sys-widget-title">Most Recent Session</div>
             <div class="sys-widget-value" style="font-size: 1.1rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding: 0 10px;">${escapeHTML(lastEntry.game)}</div>
             <div class="sys-widget-sub">${formatFullDate(lastEntry.date)}</div>
           </div>
         </div>
         
-        <div class="card" style="padding: 20px; text-align: center;">
+        <div class="card" style="padding: 20px; text-align: center; display: flex; flex-direction: column; justify-content: center;">
           <div class="sys-widget-title" style="margin-bottom: 12px;">Platform Completion Rate (${compRate}%)</div>
           <div style="display: flex; height: 16px; border-radius: 8px; overflow: hidden; background: var(--item-bg); margin-bottom: 8px;">
             <div style="width: ${compRatePct}%; background: #00FF00;" title="Completed: ${compCount}"></div>
@@ -1075,10 +1241,25 @@ function initSystemsPage() {
             <div style="width: ${abanRatePct}%; background: #FFCCCC;" title="Abandoned: ${abanCount}"></div>
             <div style="flex: 1; background: #00FFFF;" title="Other: ${multiCount}"></div>
           </div>
-          <div style="display: flex; justify-content: space-around; font-size: 0.75rem; font-weight: 800; color: var(--text-main);">
-            <span><span style="color: #00FF00;">■</span> Comp (${compCount})</span>
-            <span><span style="color: #FFFF00;">■</span> Act (${actCount})</span>
-            <span><span style="color: #FFCCCC;">■</span> Aban (${abanCount})</span>
+          <div style="display: flex; flex-direction: column; gap: 4px; font-size: 0.8rem; font-weight: 800; color: var(--text-main); align-items: flex-start; margin-top: 10px; margin-left: 10%;">
+            <span><span style="color: #00FF00;">■</span> Completed: ${compCount}</span>
+            <span><span style="color: #FFFF00;">■</span> Active: ${actCount}</span>
+            <span><span style="color: #FFCCCC;">■</span> Abandoned: ${abanCount}</span>
+          </div>
+        </div>
+
+        <div class="card" style="padding: 20px; text-align: center; display: flex; flex-direction: column; align-items: center; justify-content: center;">
+          <div class="sys-widget-title" style="margin-bottom: 10px;">The Social Hub Index</div>
+          <div style="position: relative; width: 100px; height: 100px;">
+            ${donutHtml}
+            <div style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; flex-direction: column;">
+              <span style="font-size: 1.2rem; font-weight: 900; color: var(--text-title);">${multiPct}%</span>
+              <span style="font-size: 0.6rem; font-weight: 800; color: var(--text-muted); text-transform: uppercase;">Multi</span>
+            </div>
+          </div>
+          <div style="display: flex; justify-content: space-around; width: 100%; margin-top: 15px; font-size: 0.75rem; font-weight: 800;">
+            <span><span style="color: var(--primary-green);">■</span> Multi (${formatTime(multiSec)})</span>
+            <span><span style="color: var(--item-bg);">■</span> Single (${formatTime(singleSec)})</span>
           </div>
         </div>
       </section>
