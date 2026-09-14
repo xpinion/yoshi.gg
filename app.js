@@ -639,6 +639,8 @@ function initSystemsPage() {
     const sysName = e.system || "Unknown";
     const sec = timeStringToSeconds(e.time);
     const dateKey = e.date.split('T')[0];
+    const dow = new Date(e.date).getUTCDay();
+    const year = new Date(e.date).getUTCFullYear();
     
     totalGlobalTime += sec;
 
@@ -649,7 +651,10 @@ function initSystemsPage() {
         days: new Set(),
         games: new Set(),
         sessions: [],
-        gamePlaytimes: {} // Tracks time & days per game on this specific system
+        gamePlaytimes: {},
+        entries: [],
+        yearStats: {},
+        dowStats: { 0:0, 1:0, 2:0, 3:0, 4:0, 5:0, 6:0 }
       };
     }
 
@@ -658,6 +663,10 @@ function initSystemsPage() {
     sys.days.add(dateKey);
     sys.games.add(e.game);
     sys.sessions.push({ game: e.game, time: sec, date: e.date });
+    sys.entries.push(e);
+    
+    sys.yearStats[year] = (sys.yearStats[year] || 0) + sec;
+    sys.dowStats[dow] += sec;
 
     if (!sys.gamePlaytimes[e.game]) {
       sys.gamePlaytimes[e.game] = { seconds: 0, days: new Set() };
@@ -670,27 +679,27 @@ function initSystemsPage() {
   const mostPlayedSys = sortedSystems[0];
   const mostDiverseSys = [...sortedSystems].sort((a, b) => b.games.size - a.games.size)[0];
 
-  // 2. Build the Static Hub UI (Ribbon & Selector)
+  // 2. Build the Static Hub UI (Ribbon, Selector, and H2H Showdown)
   let html = `
     <!-- Global Systems Ribbon -->
     <section class="card-row grid-4">
       <div class="card" style="text-align: center; padding: 20px;">
-        <div style="font-size: 0.85rem; color: var(--text-muted); font-weight: 800; text-transform: uppercase;">Total Systems</div>
-        <div style="font-size: 2rem; font-weight: 900; color: var(--primary-green);">${sortedSystems.length}</div>
+        <div class="sys-widget-title">Total Hardware</div>
+        <div class="sys-widget-value" style="color: var(--primary-green);">${sortedSystems.length}</div>
       </div>
       <div class="card" style="text-align: center; padding: 20px;">
-        <div style="font-size: 0.85rem; color: var(--text-muted); font-weight: 800; text-transform: uppercase;">Most Played</div>
-        <div style="font-size: 1.4rem; font-weight: 900; color: var(--text-title);">${escapeHTML(mostPlayedSys.name)}</div>
-        <div style="font-size: 0.8rem; color: var(--text-sub);">${formatTime(mostPlayedSys.totalSeconds)}</div>
+        <div class="sys-widget-title">Most Played</div>
+        <div class="sys-widget-value" style="font-size: 1.4rem;">${escapeHTML(mostPlayedSys.name)}</div>
+        <div class="sys-widget-sub">${formatTime(mostPlayedSys.totalSeconds)}</div>
       </div>
       <div class="card" style="text-align: center; padding: 20px;">
-        <div style="font-size: 0.85rem; color: var(--text-muted); font-weight: 800; text-transform: uppercase;">Largest Library</div>
-        <div style="font-size: 1.4rem; font-weight: 900; color: var(--text-title);">${escapeHTML(mostDiverseSys.name)}</div>
-        <div style="font-size: 0.8rem; color: var(--text-sub);">${mostDiverseSys.games.size} Unique Games</div>
+        <div class="sys-widget-title">Largest Library</div>
+        <div class="sys-widget-value" style="font-size: 1.4rem;">${escapeHTML(mostDiverseSys.name)}</div>
+        <div class="sys-widget-sub">${mostDiverseSys.games.size} Unique Games</div>
       </div>
       <div class="card" style="text-align: center; padding: 20px;">
-        <div style="font-size: 0.85rem; color: var(--text-muted); font-weight: 800; text-transform: uppercase;">Total Logged Time</div>
-        <div style="font-size: 1.8rem; font-weight: 900; color: var(--text-title);">${formatTime(totalGlobalTime)}</div>
+        <div class="sys-widget-title">Total Logged Time</div>
+        <div class="sys-widget-value" style="font-size: 1.8rem;">${formatTime(totalGlobalTime)}</div>
       </div>
     </section>
 
@@ -708,55 +717,135 @@ function initSystemsPage() {
       </div>
     </section>
 
-    <!-- Dynamic Container for Selected System -->
+    <!-- Dynamic Container for Selected System Deep Dive -->
     <div id="dynamic-system-content"></div>
+
+    <!-- Head-to-Head System Showdown -->
+    <section class="card-row grid-1" style="margin-top: 40px;">
+      <div class="card">
+        <div class="card-header" style="display: flex; justify-content: space-around; align-items: center; border-bottom: none; padding-bottom: 15px;">
+          <select id="h2h-sys1" class="h2h-select">
+            ${sortedSystems.map(s => `<option value="${escapeHTML(s.name)}">${escapeHTML(s.name)}</option>`).join('')}
+          </select>
+          <span style="font-size: 1.5rem; font-weight: 900; color: var(--text-muted); margin: 0 20px;">VS</span>
+          <select id="h2h-sys2" class="h2h-select">
+            ${sortedSystems.map((s, i) => `<option value="${escapeHTML(s.name)}" ${i === 1 ? 'selected' : ''}>${escapeHTML(s.name)}</option>`).join('')}
+          </select>
+        </div>
+        <div class="card-content" id="h2h-content"></div>
+      </div>
+    </section>
   `;
 
   container.innerHTML = html;
 
-  // 3. Dynamic Rendering Logic
+  // 3. Dynamic Rendering Logic (Single System Deep Dive)
   const renderSelectedSystem = (sysName) => {
     const sys = systemData[sysName];
     if (!sys) return;
 
     const dynamicContainer = document.getElementById('dynamic-system-content');
     
-    // Sort Data for Leaderboards
-    const topGamesTime = Object.entries(sys.gamePlaytimes)
-      .map(([name, data]) => ({ name, ...data }))
-      .sort((a, b) => b.seconds - a.seconds).slice(0, 10);
-      
-    const topGamesDays = Object.entries(sys.gamePlaytimes)
-      .map(([name, data]) => ({ name, ...data }))
-      .sort((a, b) => b.days.size - a.days.size).slice(0, 10);
+    // Derived Analytics
+    const firstEntry = sys.entries[0];
+    const lastEntry = sys.entries[sys.entries.length - 1];
 
-    const topSessions = [...sys.sessions].sort((a, b) => b.time - a.time).slice(0, 10);
+    let exclusiveCount = 0;
+    sys.games.forEach(game => {
+      const allTimeStats = rawData.metrics?.allTimeGameStats?.[game];
+      if (allTimeStats && allTimeStats.systems.size === 1) exclusiveCount++;
+    });
+    const exclusivityPct = sys.games.size > 0 ? Math.round((exclusiveCount / sys.games.size) * 100) : 0;
+
+    let peakYear = "-", peakTime = 0;
+    Object.entries(sys.yearStats).forEach(([year, time]) => {
+      if (time > peakTime) { peakTime = time; peakYear = year; }
+    });
+    const peakPct = sys.totalSeconds > 0 ? Math.round((peakTime / sys.totalSeconds) * 100) : 0;
+
+    const weekdaySec = sys.dowStats[1] + sys.dowStats[2] + sys.dowStats[3] + sys.dowStats[4] + sys.dowStats[5];
+    const weekendSec = sys.dowStats[0] + sys.dowStats[6];
+    const weekdayPct = sys.totalSeconds > 0 ? Math.round((weekdaySec / sys.totalSeconds) * 100) : 0;
+    const weekendPct = sys.totalSeconds > 0 ? Math.round((weekendSec / sys.totalSeconds) * 100) : 0;
 
     // Filter Playthroughs spanning this system
     const sysPlaythroughs = Object.values(rawData.playthroughHistory).filter(pt => 
       pt.systems && (pt.systems.has ? pt.systems.has(sysName) : Array.from(pt.systems).includes(sysName))
     );
     sysPlaythroughs.sort((a, b) => new Date(b.lastDate) - new Date(a.lastDate));
+    
+    let compCount = 0, abanCount = 0, actCount = 0, multiCount = 0;
+    sysPlaythroughs.forEach(pt => {
+      if (['Completed', 'M-Completed', 'Postgame'].includes(pt.finalStatus)) compCount++;
+      else if (pt.finalStatus === 'Abandoned') abanCount++;
+      else if (pt.finalStatus === 'Active') actCount++;
+      else multiCount++;
+    });
+    
+    const totalDecided = compCount + abanCount;
+    const compRate = totalDecided > 0 ? Math.round((compCount / totalDecided) * 100) : 0;
+    const totalPts = sysPlaythroughs.length;
+    const compRatePct = totalPts > 0 ? ((compCount / totalPts) * 100) : 0;
+    const actRatePct = totalPts > 0 ? ((actCount / totalPts) * 100) : 0;
+    const abanRatePct = totalPts > 0 ? ((abanCount / totalPts) * 100) : 0;
+    
+    // Sort Data for Leaderboards
+    const topGamesTime = Object.entries(sys.gamePlaytimes).map(([name, data]) => ({ name, ...data })).sort((a, b) => b.seconds - a.seconds).slice(0, 10);
+    const topGamesDays = Object.entries(sys.gamePlaytimes).map(([name, data]) => ({ name, ...data })).sort((a, b) => b.days.size - a.days.size).slice(0, 10);
+    const topSessions = [...sys.sessions].sort((a, b) => b.time - a.time).slice(0, 10);
 
     let sysHtml = `
-      <!-- System Stats Summary -->
-      <section class="card-row grid-3" style="margin-top: -10px;">
-        <div class="card" style="background: var(--primary-green); color: white; text-align: center; border: none;">
-          <div style="font-size: 2.5rem; font-weight: 900;">${formatTime(sys.totalSeconds)}</div>
-          <div style="font-size: 0.9rem; font-weight: 700; text-transform: uppercase; opacity: 0.9;">Total Time</div>
+      <!-- Deep Dive Analytics -->
+      <section class="card-row grid-2" style="margin-top: -10px;">
+        <div class="card" style="display: flex; flex-direction: row; align-items: center; justify-content: space-between; padding: 20px;">
+          <div style="flex: 1; text-align: center; border-right: 1px dashed var(--border-light);">
+            <div class="sys-widget-title">Inaugural Session</div>
+            <div class="sys-widget-value" style="font-size: 1.1rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding: 0 10px;">${escapeHTML(firstEntry.game)}</div>
+            <div class="sys-widget-sub">${formatFullDate(firstEntry.date)}</div>
+          </div>
+          <div style="flex: 1; text-align: center;">
+            <div class="sys-widget-title">Most Recent Session</div>
+            <div class="sys-widget-value" style="font-size: 1.1rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding: 0 10px;">${escapeHTML(lastEntry.game)}</div>
+            <div class="sys-widget-sub">${formatFullDate(lastEntry.date)}</div>
+          </div>
         </div>
-        <div class="card" style="background: var(--text-header); color: white; text-align: center; border: none;">
-          <div style="font-size: 2.5rem; font-weight: 900;">${sys.days.size}</div>
-          <div style="font-size: 0.9rem; font-weight: 700; text-transform: uppercase; opacity: 0.9;">Days Played</div>
+        
+        <div class="card" style="padding: 20px; text-align: center;">
+          <div class="sys-widget-title" style="margin-bottom: 12px;">Platform Completion Rate (${compRate}%)</div>
+          <div style="display: flex; height: 16px; border-radius: 8px; overflow: hidden; background: var(--item-bg); margin-bottom: 8px;">
+            <div style="width: ${compRatePct}%; background: #00FF00;" title="Completed: ${compCount}"></div>
+            <div style="width: ${actRatePct}%; background: #FFFF00;" title="Active: ${actCount}"></div>
+            <div style="width: ${abanRatePct}%; background: #FFCCCC;" title="Abandoned: ${abanCount}"></div>
+            <div style="flex: 1; background: #00FFFF;" title="Other: ${multiCount}"></div>
+          </div>
+          <div style="display: flex; justify-content: space-around; font-size: 0.75rem; font-weight: 800; color: var(--text-main);">
+            <span><span style="color: #00FF00;">■</span> Comp (${compCount})</span>
+            <span><span style="color: #FFFF00;">■</span> Act (${actCount})</span>
+            <span><span style="color: #FFCCCC;">■</span> Aban (${abanCount})</span>
+          </div>
         </div>
-        <div class="card" style="background: var(--text-header); color: white; text-align: center; border: none;">
-          <div style="font-size: 2.5rem; font-weight: 900;">${sys.games.size}</div>
-          <div style="font-size: 0.9rem; font-weight: 700; text-transform: uppercase; opacity: 0.9;">Unique Games</div>
+      </section>
+
+      <section class="card-row grid-strict-3">
+        <div class="card" style="text-align: center; padding: 20px;">
+          <div class="sys-widget-title">Platform Exclusivity</div>
+          <div class="sys-widget-value">${exclusivityPct}%</div>
+          <div class="sys-widget-sub">${exclusiveCount} of ${sys.games.size} games played ONLY on this hardware</div>
+        </div>
+        <div class="card" style="text-align: center; padding: 20px;">
+          <div class="sys-widget-title">Golden Era</div>
+          <div class="sys-widget-value">${peakYear}</div>
+          <div class="sys-widget-sub">${formatTime(peakTime)} (${peakPct}% of total platform runtime)</div>
+        </div>
+        <div class="card" style="text-align: center; padding: 20px;">
+          <div class="sys-widget-title">Habit Breakdown</div>
+          <div class="sys-widget-value" style="font-size: 1.4rem;">${weekdayPct}% <span style="font-weight: 600; color: var(--text-muted); font-size: 0.9rem;">WK</span> | ${weekendPct}% <span style="font-weight: 600; color: var(--text-muted); font-size: 0.9rem;">WKND</span></div>
+          <div class="sys-widget-sub">${formatTime(weekdaySec)} vs ${formatTime(weekendSec)}</div>
         </div>
       </section>
 
       <!-- Top 10 Leaderboards -->
-      <section class="card-row grid-3">
+      <section class="card-row grid-strict-3">
         <div class="card">
           <div class="card-header"><h2>Most Played Games (Time)</h2></div>
           <div class="card-content">
@@ -864,16 +953,57 @@ function initSystemsPage() {
     
     dynamicContainer.innerHTML = sysHtml;
 
-    // Trigger staggered animations for the newly rendered cards
     dynamicContainer.querySelectorAll('.card').forEach((card, index) => {
       card.style.animationDelay = `${Math.min(index * 0.05, 0.5)}s`;
     });
   };
 
-  // 4. Attach Event Listener and Render Initial Data
-  const selectEl = document.getElementById('hub-system-select');
-  selectEl.addEventListener('change', (e) => renderSelectedSystem(e.target.value));
+  // 4. Head-to-Head Comparison Rendering
+  const renderH2H = () => {
+    const s1Name = document.getElementById('h2h-sys1').value;
+    const s2Name = document.getElementById('h2h-sys2').value;
+    const s1 = systemData[s1Name];
+    const s2 = systemData[s2Name];
+    if (!s1 || !s2) return;
+    
+    const compStr = (val1, val2, formatFn) => {
+      const v1 = formatFn ? formatFn(val1) : val1;
+      const v2 = formatFn ? formatFn(val2) : val2;
+      const w1 = val1 > val2 ? 'color: var(--primary-green); font-weight: 900; background: var(--highlight-green-bg); padding: 4px 10px; border-radius: 6px;' : '';
+      const w2 = val2 > val1 ? 'color: var(--primary-green); font-weight: 900; background: var(--highlight-green-bg); padding: 4px 10px; border-radius: 6px;' : '';
+      return { str1: `<span style="${w1}">${v1}</span>`, str2: `<span style="${w2}">${v2}</span>` };
+    };
+
+    const exc1 = Math.round(([...s1.games].filter(g => rawData.metrics?.allTimeGameStats?.[g]?.systems.size === 1).length / s1.games.size) * 100) || 0;
+    const exc2 = Math.round(([...s2.games].filter(g => rawData.metrics?.allTimeGameStats?.[g]?.systems.size === 1).length / s2.games.size) * 100) || 0;
+
+    const tTime = compStr(s1.totalSeconds, s2.totalSeconds, formatTime);
+    const dPlayed = compStr(s1.days.size, s2.days.size);
+    const uGames = compStr(s1.games.size, s2.games.size);
+    const aSess = compStr(s1.totalSeconds / (s1.sessions.length || 1), s2.totalSeconds / (s2.sessions.length || 1), formatTime);
+    const ex = compStr(exc1, exc2, v => v + "%");
+
+    const html = `
+      <table class="h2h-table">
+        <tbody>
+          <tr><td class="h2h-val-left">${tTime.str1}</td><td class="h2h-label">Total Playtime</td><td class="h2h-val-right">${tTime.str2}</td></tr>
+          <tr><td class="h2h-val-left">${dPlayed.str1}</td><td class="h2h-label">Days Played</td><td class="h2h-val-right">${dPlayed.str2}</td></tr>
+          <tr><td class="h2h-val-left">${uGames.str1}</td><td class="h2h-label">Unique Games</td><td class="h2h-val-right">${uGames.str2}</td></tr>
+          <tr><td class="h2h-val-left">${aSess.str1}</td><td class="h2h-label">Avg. Session Time</td><td class="h2h-val-right">${aSess.str2}</td></tr>
+          <tr><td class="h2h-val-left">${ex.str1}</td><td class="h2h-label">Hardware Exclusivity</td><td class="h2h-val-right">${ex.str2}</td></tr>
+        </tbody>
+      </table>
+    `;
+    document.getElementById('h2h-content').innerHTML = html;
+  };
+
+  // 5. Attach Listeners and Execute Initial Render
+  document.getElementById('hub-system-select').addEventListener('change', (e) => renderSelectedSystem(e.target.value));
+  document.getElementById('h2h-sys1').addEventListener('change', renderH2H);
+  document.getElementById('h2h-sys2').addEventListener('change', renderH2H);
+  
   renderSelectedSystem(sortedSystems[0].name);
+  renderH2H();
 }
 
 function initSeriesPage() {}
