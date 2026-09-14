@@ -125,7 +125,8 @@ async function initDashboard() {
       }
     }
 
-    parseTop25Data(top25Data); // Move this OUT of initIndexPage so Spotlight is globally available
+    if (typeof parseTop25Data === 'function') parseTop25Data(top25Data);
+    
     renderGlobalHeader();
     setupThemeToggle();
     setupHoverHistory();
@@ -148,12 +149,16 @@ async function initDashboard() {
       if (msContainer) renderMilestones('milestones-page-container');
     }
     else if (path.includes('history')) initHistoryPage();
-    else {
-      initIndexPage(top25Data);
-    }
+    else initIndexPage(top25Data);
+
   } catch (error) {
     console.error("Dashboard Error:", error);
-    document.querySelectorAll('.card-content, .dashboard-container').forEach(el => el.innerHTML = `<div class="loading-text" style="color: red;">Error: ${error.message}</div>`);
+    document.querySelectorAll('.card-content, .dashboard-container').forEach(el => {
+      el.innerHTML = `<div class="loading-text" style="color: red; padding: 20px;">
+        <h3>Error Loading Dashboard</h3>
+        <p>${error.message}</p>
+      </div>`;
+    });
   }
 }
 
