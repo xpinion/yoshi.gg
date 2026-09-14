@@ -799,8 +799,10 @@ function initSystemsPage() {
   
   const generateLineChart = (isCumulative) => {
     if (allMonthKeys.length === 0) return '';
-    const width = 1000, height = 300, padding = 15;
-    const innerW = width - padding * 2, innerH = height - padding * 2;
+    // Increase size for wide display, configure margins to fit axes text
+    const width = 1200, height = 400;
+    const padL = 70, padR = 20, padT = 20, padB = 40;
+    const innerW = width - padL - padR, innerH = height - padT - padB;
     
     let chartMaxVal = 0;
     top10Systems.forEach(sys => {
@@ -812,10 +814,33 @@ function initSystemsPage() {
     if (chartMaxVal === 0) chartMaxVal = 1;
 
     let gridHtml = '';
+    
+    // Y-Axis: Horizontal Grid Lines & Time Labels
     for(let k=0; k<=4; k++) {
-       const y = padding + innerH - (k/4)*innerH;
-       gridHtml += `<line x1="${padding}" y1="${y}" x2="${width-padding}" y2="${y}" stroke="var(--border-table)" stroke-width="1" />`;
+       const y = padT + innerH - (k/4)*innerH;
+       const valSec = (k/4) * chartMaxVal;
+       const valLabel = Math.round(valSec / 3600) + 'h'; // Convert to Hours
+       
+       gridHtml += `<line x1="${padL}" y1="${y}" x2="${width-padR}" y2="${y}" stroke="var(--border-table)" stroke-width="1" />`;
+       gridHtml += `<text x="${padL - 10}" y="${y + 4}" fill="var(--text-muted)" font-family="Inter, sans-serif" font-size="12" font-weight="600" text-anchor="end">${valLabel}</text>`;
     }
+
+    // X-Axis: Vertical Tick Marks & Year Labels
+    let currentYearLabel = "";
+    allMonthKeys.forEach((mk, j) => {
+      const year = mk.split('-')[0];
+      if (year !== currentYearLabel) {
+         currentYearLabel = year;
+         const x = padL + (j / Math.max(1, allMonthKeys.length - 1)) * innerW;
+         
+         gridHtml += `<line x1="${x}" y1="${padT + innerH}" x2="${x}" y2="${padT + innerH + 5}" stroke="var(--text-muted)" stroke-width="2" />`;
+         gridHtml += `<text x="${x}" y="${padT + innerH + 20}" fill="var(--text-muted)" font-family="Inter, sans-serif" font-size="12" font-weight="600" text-anchor="middle">${year}</text>`;
+      }
+    });
+
+    // Main Axes Base Lines
+    gridHtml += `<line x1="${padL}" y1="${padT}" x2="${padL}" y2="${padT + innerH}" stroke="var(--text-muted)" stroke-width="2" />`; // Y-axis
+    gridHtml += `<line x1="${padL}" y1="${padT + innerH}" x2="${width-padR}" y2="${padT + innerH}" stroke="var(--text-muted)" stroke-width="2" />`; // X-axis
 
     let linesHtml = '';
     let circlesHtml = '';
@@ -824,12 +849,12 @@ function initSystemsPage() {
       let points = [];
       allMonthKeys.forEach((mk, j) => {
         const val = isCumulative ? (sys.cumulativeTime[mk] || 0) : (sys.monthlyTime[mk] || 0);
-        const x = padding + (j / Math.max(1, allMonthKeys.length - 1)) * innerW;
-        const y = padding + innerH - (val / chartMaxVal) * innerH;
+        const x = padL + (j / Math.max(1, allMonthKeys.length - 1)) * innerW;
+        const y = padT + innerH - (val / chartMaxVal) * innerH;
         points.push(`${x},${y}`);
         
         if (val > 0) {
-          circlesHtml += `<circle cx="${x}" cy="${y}" r="6" fill="transparent" stroke="transparent">
+          circlesHtml += `<circle cx="${x}" cy="${y}" r="6" fill="transparent" stroke="transparent" style="cursor: pointer;">
                             <title>${escapeHTML(sys.name)} - ${mk}: ${formatTime(val)}</title>
                           </circle>`;
         }
@@ -946,8 +971,8 @@ function initSystemsPage() {
       </div>
     </section>
 
-    <!-- Global Trend Line Charts -->
-    <section class="card-row grid-2" style="margin-top: 20px;">
+    <!-- Global Trend Line Charts (Stacked) -->
+    <section class="card-row grid-1" style="margin-top: 20px;">
       <div class="card">
         <div class="card-header"><h2>Top 10 Systems: Monthly Playtime</h2></div>
         <div class="card-content" style="padding: 10px 20px;">
@@ -955,7 +980,7 @@ function initSystemsPage() {
           ${legendHtml}
         </div>
       </div>
-      <div class="card">
+      <div class="card" style="margin-top: 20px;">
         <div class="card-header"><h2>Top 10 Systems: Cumulative Playtime</h2></div>
         <div class="card-content" style="padding: 10px 20px;">
           ${generateLineChart(true)}
