@@ -626,7 +626,256 @@ function initGotyPage() {
   });
 }
 
-function initSystemsPage() {}
+// --- SYSTEMS PAGE ROUTING ---
+function initSystemsPage() {
+  const container = document.getElementById('systems-page-container');
+  if (!container || !rawData || !rawData.allEntries) return;
+
+  // 1. Aggregate Comprehensive System Data
+  const systemData = {};
+  let totalGlobalTime = 0;
+
+  rawData.allEntries.forEach(e => {
+    const sysName = e.system || "Unknown";
+    const sec = timeStringToSeconds(e.time);
+    const dateKey = e.date.split('T')[0];
+    
+    totalGlobalTime += sec;
+
+    if (!systemData[sysName]) {
+      systemData[sysName] = {
+        name: sysName,
+        totalSeconds: 0,
+        days: new Set(),
+        games: new Set(),
+        sessions: [],
+        gamePlaytimes: {} // Tracks time & days per game on this specific system
+      };
+    }
+
+    const sys = systemData[sysName];
+    sys.totalSeconds += sec;
+    sys.days.add(dateKey);
+    sys.games.add(e.game);
+    sys.sessions.push({ game: e.game, time: sec, date: e.date });
+
+    if (!sys.gamePlaytimes[e.game]) {
+      sys.gamePlaytimes[e.game] = { seconds: 0, days: new Set() };
+    }
+    sys.gamePlaytimes[e.game].seconds += sec;
+    sys.gamePlaytimes[e.game].days.add(dateKey);
+  });
+
+  const sortedSystems = Object.values(systemData).sort((a, b) => b.totalSeconds - a.totalSeconds);
+  const mostPlayedSys = sortedSystems[0];
+  const mostDiverseSys = [...sortedSystems].sort((a, b) => b.games.size - a.games.size)[0];
+
+  // 2. Build the Static Hub UI (Ribbon & Selector)
+  let html = `
+    <!-- Global Systems Ribbon -->
+    <section class="card-row grid-4">
+      <div class="card" style="text-align: center; padding: 20px;">
+        <div style="font-size: 0.85rem; color: var(--text-muted); font-weight: 800; text-transform: uppercase;">Total Systems</div>
+        <div style="font-size: 2rem; font-weight: 900; color: var(--primary-green);">${sortedSystems.length}</div>
+      </div>
+      <div class="card" style="text-align: center; padding: 20px;">
+        <div style="font-size: 0.85rem; color: var(--text-muted); font-weight: 800; text-transform: uppercase;">Most Played</div>
+        <div style="font-size: 1.4rem; font-weight: 900; color: var(--text-title);">${escapeHTML(mostPlayedSys.name)}</div>
+        <div style="font-size: 0.8rem; color: var(--text-sub);">${formatTime(mostPlayedSys.totalSeconds)}</div>
+      </div>
+      <div class="card" style="text-align: center; padding: 20px;">
+        <div style="font-size: 0.85rem; color: var(--text-muted); font-weight: 800; text-transform: uppercase;">Largest Library</div>
+        <div style="font-size: 1.4rem; font-weight: 900; color: var(--text-title);">${escapeHTML(mostDiverseSys.name)}</div>
+        <div style="font-size: 0.8rem; color: var(--text-sub);">${mostDiverseSys.games.size} Unique Games</div>
+      </div>
+      <div class="card" style="text-align: center; padding: 20px;">
+        <div style="font-size: 0.85rem; color: var(--text-muted); font-weight: 800; text-transform: uppercase;">Total Logged Time</div>
+        <div style="font-size: 1.8rem; font-weight: 900; color: var(--text-title);">${formatTime(totalGlobalTime)}</div>
+      </div>
+    </section>
+
+    <!-- System Selector -->
+    <section class="card-row grid-1">
+      <div class="card">
+        <div class="card-header" style="border-bottom: none; margin-bottom: 0; padding-bottom: 0;">
+          <h2 style="font-size: 2rem;">
+            System: 
+            <select id="hub-system-select" class="header-dropdown" style="font-size: 2rem;">
+              ${sortedSystems.map(s => `<option value="${escapeHTML(s.name)}">${escapeHTML(s.name)}</option>`).join('')}
+            </select>
+          </h2>
+        </div>
+      </div>
+    </section>
+
+    <!-- Dynamic Container for Selected System -->
+    <div id="dynamic-system-content"></div>
+  `;
+
+  container.innerHTML = html;
+
+  // 3. Dynamic Rendering Logic
+  const renderSelectedSystem = (sysName) => {
+    const sys = systemData[sysName];
+    if (!sys) return;
+
+    const dynamicContainer = document.getElementById('dynamic-system-content');
+    
+    // Sort Data for Leaderboards
+    const topGamesTime = Object.entries(sys.gamePlaytimes)
+      .map(([name, data]) => ({ name, ...data }))
+      .sort((a, b) => b.seconds - a.seconds).slice(0, 10);
+      
+    const topGamesDays = Object.entries(sys.gamePlaytimes)
+      .map(([name, data]) => ({ name, ...data }))
+      .sort((a, b) => b.days.size - a.days.size).slice(0, 10);
+
+    const topSessions = [...sys.sessions].sort((a, b) => b.time - a.time).slice(0, 10);
+
+    // Filter Playthroughs spanning this system
+    const sysPlaythroughs = Object.values(rawData.playthroughHistory).filter(pt => 
+      pt.systems && (pt.systems.has ? pt.systems.has(sysName) : Array.from(pt.systems).includes(sysName))
+    );
+    sysPlaythroughs.sort((a, b) => new Date(b.lastDate) - new Date(a.lastDate));
+
+    let sysHtml = `
+      <!-- System Stats Summary -->
+      <section class="card-row grid-3" style="margin-top: -10px;">
+        <div class="card" style="background: var(--primary-green); color: white; text-align: center; border: none;">
+          <div style="font-size: 2.5rem; font-weight: 900;">${formatTime(sys.totalSeconds)}</div>
+          <div style="font-size: 0.9rem; font-weight: 700; text-transform: uppercase; opacity: 0.9;">Total Time</div>
+        </div>
+        <div class="card" style="background: var(--text-header); color: white; text-align: center; border: none;">
+          <div style="font-size: 2.5rem; font-weight: 900;">${sys.days.size}</div>
+          <div style="font-size: 0.9rem; font-weight: 700; text-transform: uppercase; opacity: 0.9;">Days Played</div>
+        </div>
+        <div class="card" style="background: var(--text-header); color: white; text-align: center; border: none;">
+          <div style="font-size: 2.5rem; font-weight: 900;">${sys.games.size}</div>
+          <div style="font-size: 0.9rem; font-weight: 700; text-transform: uppercase; opacity: 0.9;">Unique Games</div>
+        </div>
+      </section>
+
+      <!-- Top 10 Leaderboards -->
+      <section class="card-row grid-3">
+        <div class="card">
+          <div class="card-header"><h2>Most Played Games (Time)</h2></div>
+          <div class="card-content">
+            ${topGamesTime.map((g, i) => `
+              <div class="list-item">
+                <div class="item-info">
+                  <span class="item-rank">#${i + 1}</span>
+                  <div class="item-text">
+                    <span class="item-title hover-trigger" data-game="${escapeHTML(g.name)}">${escapeHTML(g.name)}</span>
+                    <span class="item-sub">${g.days.size} Days on System</span>
+                  </div>
+                </div>
+                <div class="item-badge">${formatTime(g.seconds)}</div>
+              </div>
+            `).join('')}
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header"><h2>Most Played Games (Days)</h2></div>
+          <div class="card-content">
+            ${topGamesDays.map((g, i) => `
+              <div class="list-item">
+                <div class="item-info">
+                  <span class="item-rank">#${i + 1}</span>
+                  <div class="item-text">
+                    <span class="item-title hover-trigger" data-game="${escapeHTML(g.name)}">${escapeHTML(g.name)}</span>
+                    <span class="item-sub">${formatTime(g.seconds)} on System</span>
+                  </div>
+                </div>
+                <div class="item-badge" style="background: var(--text-main); color: var(--card-bg);">${g.days.size} Days</div>
+              </div>
+            `).join('')}
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header"><h2>Longest Sessions</h2></div>
+          <div class="card-content">
+            ${topSessions.map((s, i) => `
+              <div class="list-item">
+                <div class="item-info">
+                  <span class="item-rank">#${i + 1}</span>
+                  <div class="item-text">
+                    <span class="item-title hover-trigger" data-game="${escapeHTML(s.game)}">${escapeHTML(s.game)}</span>
+                    <span class="item-sub">${formatShortDate(s.date)}/${new Date(s.date).getUTCFullYear()}</span>
+                  </div>
+                </div>
+                <div class="item-badge" style="background: var(--text-title); color: var(--card-bg);">${formatTime(s.time)}</div>
+              </div>
+            `).join('')}
+          </div>
+        </div>
+      </section>
+
+      <!-- System Playthrough Archive -->
+      <section class="card-row grid-1">
+        <div class="card">
+          <div class="card-header"><h2>Full Playthrough Archive: ${escapeHTML(sysName)}</h2></div>
+          <div class="card-content" style="padding: 0;">
+            <div class="monthly-table-wrapper" style="padding: 20px;">
+              <table class="monthly-table" style="min-width: 1100px;">
+                <thead>
+                  <tr>
+                    <th rowspan="2">Videogame</th>
+                    <th rowspan="2">Systems Used</th>
+                    <th colspan="2">Playthrough Lifetime</th>
+                    <th colspan="2">Game Lifetime</th>
+                    <th rowspan="2">Date Started</th>
+                    <th rowspan="2">Last Updated</th>
+                    <th rowspan="2">Game Status</th>
+                    <th rowspan="2">Playthrough Details</th>
+                  </tr>
+                  <tr>
+                    <th>Time</th>
+                    <th>Days</th>
+                    <th>Time</th>
+                    <th>Days</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${sysPlaythroughs.map(pt => `
+                    <tr>
+                      <td class="text-left" style="font-weight: bold;">
+                        <span class="hover-trigger" data-game="${escapeHTML(pt.gameName)}">${escapeHTML(pt.gameName)}</span>
+                      </td>
+                      <td class="text-center">${escapeHTML(Array.from(pt.systems).join(', '))}</td>
+                      <td class="text-center">${pt.finalPtLifetime}</td>
+                      <td class="text-center">${pt.finalPtLifetimeDays}</td>
+                      <td class="text-center">${pt.finalGameLifetime}</td>
+                      <td class="text-center">${pt.finalGameLifetimeDays}</td>
+                      <td class="text-center">${formatFullDate(pt.startDate)}</td>
+                      <td class="text-center">${formatFullDate(pt.lastDate)}</td>
+                      <td class="text-center status-cell" style="background-color: ${getStatusColor(pt.finalStatus)}; font-weight: bold;">${pt.finalStatus}</td>
+                      <td class="text-left">${escapeHTML(pt.finalNote)}</td>
+                    </tr>
+                  `).join('')}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </section>
+    `;
+    
+    dynamicContainer.innerHTML = sysHtml;
+
+    // Trigger staggered animations for the newly rendered cards
+    dynamicContainer.querySelectorAll('.card').forEach((card, index) => {
+      card.style.animationDelay = `${Math.min(index * 0.05, 0.5)}s`;
+    });
+  };
+
+  // 4. Attach Event Listener and Render Initial Data
+  const selectEl = document.getElementById('hub-system-select');
+  selectEl.addEventListener('change', (e) => renderSelectedSystem(e.target.value));
+  renderSelectedSystem(sortedSystems[0].name);
+}
+
 function initSeriesPage() {}
 function initFranchisePage() {}
 function initGenrePage() {}
