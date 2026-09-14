@@ -765,3 +765,43 @@ body {
     margin-left: 0;
   }
 }
+
+/* --- GOTY / RANKINGS PAGE STYLES --- */
+.goty-card {
+  max-height: none; /* Override standard card max-height so expanded lists don't clip */
+}
+
+.goty-list-container {
+  display: flex;
+  flex-direction: column;
+}
+
+.goty-hidden-item {
+  display: none;
+}
+
+/* When the container has the 'expanded' class, reveal hidden items */
+.goty-list-container.expanded .goty-hidden-item {
+  display: flex;
+  animation: fadeInUp 0.4s ease forwards;
+}
+
+.goty-toggle-btn {
+  margin-top: 15px;
+  font-size: 0.85rem;
+  font-weight: 800;
+  color: #fff;
+  background: var(--primary-green);
+  padding: 10px;
+  text-align: center;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.2s ease, transform 0.1s ease;
+  user-select: none;
+  box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+}
+
+.goty-toggle-btn:hover {
+  background: #236026; /* Darker green for hover state */
+  transform: translateY(-1px);
+}
