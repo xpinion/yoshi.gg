@@ -654,7 +654,8 @@ function initSystemsPage() {
         gamePlaytimes: {},
         entries: [],
         yearStats: {},
-        dowStats: { 0:0, 1:0, 2:0, 3:0, 4:0, 5:0, 6:0 }
+        dowStats: { 0:0, 1:0, 2:0, 3:0, 4:0, 5:0, 6:0 },
+        completions: 0
       };
     }
 
@@ -675,11 +676,91 @@ function initSystemsPage() {
     sys.gamePlaytimes[e.game].days.add(dateKey);
   });
 
-  const sortedSystems = Object.values(systemData).sort((a, b) => b.totalSeconds - a.totalSeconds);
-  const mostPlayedSys = sortedSystems[0];
-  const mostDiverseSys = [...sortedSystems].sort((a, b) => b.games.size - a.games.size)[0];
+  // Tally Completions per system
+  if (rawData.playthroughHistory) {
+    Object.values(rawData.playthroughHistory).forEach(pt => {
+      if (['Completed', 'M-Completed', 'Postgame'].includes(pt.finalStatus)) {
+        const ptSystems = pt.systems && pt.systems.has ? Array.from(pt.systems) : (pt.systems || []);
+        ptSystems.forEach(sysName => {
+          if (systemData[sysName]) {
+            systemData[sysName].completions++;
+          }
+        });
+      }
+    });
+  }
 
-  // 2. Build the Static Hub UI (Ribbon, Selector, and H2H Showdown)
+  // 2. Prepare Derived Stats & Determine Maximums
+  let maxTime = 0, maxDays = 0, maxGames = 0, maxAvg = 0, maxComp = 0, maxLongestSess = 0;
+  
+  const sortedSystems = Object.values(systemData).sort((a, b) => b.totalSeconds - a.totalSeconds);
+  
+  sortedSystems.forEach(sys => {
+    sys.avgSessionSec = sys.sessions.length > 0 ? sys.totalSeconds / sys.sessions.length : 0;
+    
+    let mostPlayedGame = "N/A";
+    let maxGameSec = 0;
+    Object.entries(sys.gamePlaytimes).forEach(([g, data]) => {
+      if (data.seconds > maxGameSec) { maxGameSec = data.seconds; mostPlayedGame = g; }
+    });
+    sys.mostPlayedGame = mostPlayedGame;
+    
+    let longestSess = { game: "N/A", time: 0, date: null };
+    sys.sessions.forEach(s => {
+      if (s.time > longestSess.time) { longestSess = s; }
+    });
+    sys.longestSession = longestSess;
+
+    // Track Maximums for Highlighting
+    if (sys.totalSeconds > maxTime) maxTime = sys.totalSeconds;
+    if (sys.days.size > maxDays) maxDays = sys.days.size;
+    if (sys.games.size > maxGames) maxGames = sys.games.size;
+    if (sys.avgSessionSec > maxAvg) maxAvg = sys.avgSessionSec;
+    if (sys.completions > maxComp) maxComp = sys.completions;
+    if (sys.longestSession.time > maxLongestSess) maxLongestSess = sys.longestSession.time;
+  });
+
+  const mostPlayedSys = sortedSystems[0] || { name: "N/A", totalSeconds: 0 };
+  const mostDiverseSys = [...sortedSystems].sort((a, b) => b.games.size - a.games.size)[0] || { name: "N/A", games: new Set() };
+
+  // Helper to highlight the winning stat
+  const getHighlightStr = (val, max, formatFn) => {
+    const displayStr = formatFn ? formatFn(val) : val;
+    if (val === max && val > 0) {
+      return `<span style="color: var(--primary-green); font-weight: 900; background: var(--highlight-green-bg); padding: 4px 10px; border-radius: 6px;">${displayStr}</span>`;
+    }
+    return displayStr;
+  };
+
+  const summaryRowsHtml = sortedSystems.map(sys => {
+    const timeStr = getHighlightStr(sys.totalSeconds, maxTime, formatTime);
+    const daysStr = getHighlightStr(sys.days.size, maxDays);
+    const gamesStr = getHighlightStr(sys.games.size, maxGames);
+    const avgStr = getHighlightStr(sys.avgSessionSec, maxAvg, formatTime);
+    const compStr = getHighlightStr(sys.completions, maxComp);
+    
+    const ls = sys.longestSession;
+    const lsTimeStr = getHighlightStr(ls.time, maxLongestSess, formatTime);
+    const lsDate = ls.date ? `${formatShortDate(ls.date)}/${new Date(ls.date).getUTCFullYear()}` : "N/A";
+    
+    return `
+      <tr>
+        <td class="text-left" style="font-weight: 900; font-size: 1.05rem;">${escapeHTML(sys.name)}</td>
+        <td class="text-center">${timeStr}</td>
+        <td class="text-center">${daysStr}</td>
+        <td class="text-center">${gamesStr}</td>
+        <td class="text-center">${avgStr}</td>
+        <td class="text-center">${compStr}</td>
+        <td class="text-left"><span class="hover-trigger" data-game="${escapeHTML(sys.mostPlayedGame)}">${escapeHTML(sys.mostPlayedGame)}</span></td>
+        <td class="text-left" style="font-size: 0.85rem; line-height: 1.4;">
+          <strong>${lsTimeStr}</strong> - <span class="hover-trigger" data-game="${escapeHTML(ls.game)}">${escapeHTML(ls.game)}</span><br>
+          <span style="color: var(--text-sub);">${lsDate}</span>
+        </td>
+      </tr>
+    `;
+  }).join('');
+
+  // 3. Build the Static Hub UI
   let html = `
     <!-- Global Systems Ribbon -->
     <section class="card-row grid-4">
@@ -703,12 +784,42 @@ function initSystemsPage() {
       </div>
     </section>
 
-    <!-- System Selector -->
+    <!-- Global System Summary Table -->
     <section class="card-row grid-1">
+      <div class="card">
+        <div class="card-header">
+          <h2>All-Time Systems Summary</h2>
+        </div>
+        <div class="card-content" style="padding: 0;">
+          <div class="monthly-table-wrapper" style="padding: 20px;">
+            <table class="analysis-table" style="min-width: 1000px; text-align: left;">
+              <thead>
+                <tr>
+                  <th style="width: 150px; text-align: left;">System</th>
+                  <th style="width: 120px;">Total Playtime</th>
+                  <th style="width: 100px;">Days Played</th>
+                  <th style="width: 110px;">Unique Games</th>
+                  <th style="width: 120px;">Avg Session</th>
+                  <th style="width: 110px;">Completions</th>
+                  <th style="width: 200px; text-align: left;">Most Played Game</th>
+                  <th style="text-align: left;">Longest Single Session</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${summaryRowsHtml}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- System Selector -->
+    <section class="card-row grid-1" style="margin-top: 20px;">
       <div class="card">
         <div class="card-header" style="border-bottom: none; margin-bottom: 0; padding-bottom: 0;">
           <h2 style="font-size: 2rem;">
-            System: 
+            Deep Dive: 
             <select id="hub-system-select" class="header-dropdown" style="font-size: 2rem;">
               ${sortedSystems.map(s => `<option value="${escapeHTML(s.name)}">${escapeHTML(s.name)}</option>`).join('')}
             </select>
@@ -719,27 +830,11 @@ function initSystemsPage() {
 
     <!-- Dynamic Container for Selected System Deep Dive -->
     <div id="dynamic-system-content"></div>
-
-    <!-- Head-to-Head System Showdown -->
-    <section class="card-row grid-1" style="margin-top: 40px;">
-      <div class="card">
-        <div class="card-header" style="display: flex; justify-content: space-around; align-items: center; border-bottom: none; padding-bottom: 15px;">
-          <select id="h2h-sys1" class="h2h-select">
-            ${sortedSystems.map(s => `<option value="${escapeHTML(s.name)}">${escapeHTML(s.name)}</option>`).join('')}
-          </select>
-          <span style="font-size: 1.5rem; font-weight: 900; color: var(--text-muted); margin: 0 20px;">VS</span>
-          <select id="h2h-sys2" class="h2h-select">
-            ${sortedSystems.map((s, i) => `<option value="${escapeHTML(s.name)}" ${i === 1 ? 'selected' : ''}>${escapeHTML(s.name)}</option>`).join('')}
-          </select>
-        </div>
-        <div class="card-content" id="h2h-content"></div>
-      </div>
-    </section>
   `;
 
   container.innerHTML = html;
 
-  // 3. Dynamic Rendering Logic (Single System Deep Dive)
+  // 4. Dynamic Rendering Logic (Single System Deep Dive)
   const renderSelectedSystem = (sysName) => {
     const sys = systemData[sysName];
     if (!sys) return;
@@ -958,52 +1053,9 @@ function initSystemsPage() {
     });
   };
 
-  // 4. Head-to-Head Comparison Rendering
-  const renderH2H = () => {
-    const s1Name = document.getElementById('h2h-sys1').value;
-    const s2Name = document.getElementById('h2h-sys2').value;
-    const s1 = systemData[s1Name];
-    const s2 = systemData[s2Name];
-    if (!s1 || !s2) return;
-    
-    const compStr = (val1, val2, formatFn) => {
-      const v1 = formatFn ? formatFn(val1) : val1;
-      const v2 = formatFn ? formatFn(val2) : val2;
-      const w1 = val1 > val2 ? 'color: var(--primary-green); font-weight: 900; background: var(--highlight-green-bg); padding: 4px 10px; border-radius: 6px;' : '';
-      const w2 = val2 > val1 ? 'color: var(--primary-green); font-weight: 900; background: var(--highlight-green-bg); padding: 4px 10px; border-radius: 6px;' : '';
-      return { str1: `<span style="${w1}">${v1}</span>`, str2: `<span style="${w2}">${v2}</span>` };
-    };
-
-    const exc1 = Math.round(([...s1.games].filter(g => rawData.metrics?.allTimeGameStats?.[g]?.systems.size === 1).length / s1.games.size) * 100) || 0;
-    const exc2 = Math.round(([...s2.games].filter(g => rawData.metrics?.allTimeGameStats?.[g]?.systems.size === 1).length / s2.games.size) * 100) || 0;
-
-    const tTime = compStr(s1.totalSeconds, s2.totalSeconds, formatTime);
-    const dPlayed = compStr(s1.days.size, s2.days.size);
-    const uGames = compStr(s1.games.size, s2.games.size);
-    const aSess = compStr(s1.totalSeconds / (s1.sessions.length || 1), s2.totalSeconds / (s2.sessions.length || 1), formatTime);
-    const ex = compStr(exc1, exc2, v => v + "%");
-
-    const html = `
-      <table class="h2h-table">
-        <tbody>
-          <tr><td class="h2h-val-left">${tTime.str1}</td><td class="h2h-label">Total Playtime</td><td class="h2h-val-right">${tTime.str2}</td></tr>
-          <tr><td class="h2h-val-left">${dPlayed.str1}</td><td class="h2h-label">Days Played</td><td class="h2h-val-right">${dPlayed.str2}</td></tr>
-          <tr><td class="h2h-val-left">${uGames.str1}</td><td class="h2h-label">Unique Games</td><td class="h2h-val-right">${uGames.str2}</td></tr>
-          <tr><td class="h2h-val-left">${aSess.str1}</td><td class="h2h-label">Avg. Session Time</td><td class="h2h-val-right">${aSess.str2}</td></tr>
-          <tr><td class="h2h-val-left">${ex.str1}</td><td class="h2h-label">Hardware Exclusivity</td><td class="h2h-val-right">${ex.str2}</td></tr>
-        </tbody>
-      </table>
-    `;
-    document.getElementById('h2h-content').innerHTML = html;
-  };
-
-  // 5. Attach Listeners and Execute Initial Render
+  // 5. Attach Listener and Execute Initial Render
   document.getElementById('hub-system-select').addEventListener('change', (e) => renderSelectedSystem(e.target.value));
-  document.getElementById('h2h-sys1').addEventListener('change', renderH2H);
-  document.getElementById('h2h-sys2').addEventListener('change', renderH2H);
-  
   renderSelectedSystem(sortedSystems[0].name);
-  renderH2H();
 }
 
 function initSeriesPage() {}
