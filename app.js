@@ -635,19 +635,23 @@ function initSystemsPage() {
   const systemData = {};
   let totalGlobalTime = 0;
   
-  let globalMinDate = new Date();
+  // Initialize with extreme bounds to guarantee they get overwritten
+  let globalMinDate = new Date('2099-01-01');
   let globalMaxDate = new Date('2000-01-01');
 
   rawData.allEntries.forEach(e => {
     const sysName = e.system || "Unknown";
     const sec = timeStringToSeconds(e.time);
     const dateKey = e.date.split('T')[0];
-    const dow = new Date(e.date).getUTCDay();
-    const year = new Date(e.date).getUTCFullYear();
-    const monthKey = `${year}-${(new Date(e.date).getUTCMonth() + 1).toString().padStart(2, '0')}`;
     
-    if (e.date < globalMinDate) globalMinDate = e.date;
-    if (e.date > globalMaxDate) globalMaxDate = e.date;
+    // Parse the date properly for math and indexing
+    const entryDate = new Date(e.date);
+    const dow = entryDate.getUTCDay();
+    const year = entryDate.getUTCFullYear();
+    const monthKey = `${year}-${(entryDate.getUTCMonth() + 1).toString().padStart(2, '0')}`;
+    
+    if (entryDate < globalMinDate) globalMinDate = entryDate;
+    if (entryDate > globalMaxDate) globalMaxDate = entryDate;
 
     totalGlobalTime += sec;
 
@@ -705,17 +709,19 @@ function initSystemsPage() {
     });
   }
 
-  // Generate All Month Keys for Timelines & Charts
+  // Generate All Month Keys for Timelines & Charts safely
   const allMonthKeys = [];
-  let currY = globalMinDate.getUTCFullYear();
-  let currM = globalMinDate.getUTCMonth() + 1;
-  const endY = globalMaxDate.getUTCFullYear();
-  const endM = globalMaxDate.getUTCMonth() + 1;
+  if (globalMinDate <= globalMaxDate) {
+    let currY = globalMinDate.getUTCFullYear();
+    let currM = globalMinDate.getUTCMonth() + 1;
+    const endY = globalMaxDate.getUTCFullYear();
+    const endM = globalMaxDate.getUTCMonth() + 1;
 
-  while (currY < endY || (currY === endY && currM <= endM)) {
-    allMonthKeys.push(`${currY}-${currM.toString().padStart(2, '0')}`);
-    currM++;
-    if (currM > 12) { currM = 1; currY++; }
+    while (currY < endY || (currY === endY && currM <= endM)) {
+      allMonthKeys.push(`${currY}-${currM.toString().padStart(2, '0')}`);
+      currM++;
+      if (currM > 12) { currM = 1; currY++; }
+    }
   }
 
   // 2. Prepare Derived Stats & Determine Maximums
@@ -787,45 +793,47 @@ function initSystemsPage() {
     `;
   }).join('');
 
-  // Build the Visual Gantt-Style Eras Timeline
-  let timelineHtml = `
-    <div style="overflow-x: auto; padding-bottom: 10px;">
-      <div style="display: flex; min-width: max-content; border-bottom: 2px solid var(--border-light); padding-bottom: 5px;">
-        <div style="width: 140px; position: sticky; left: 0; background: var(--card-bg); z-index: 2;"></div>
-  `;
-  
-  let currentYearStr = allMonthKeys[0].substring(0,4);
-  let yearColspan = 0;
-  allMonthKeys.forEach((mk, i) => {
-    if (mk.substring(0,4) !== currentYearStr || i === allMonthKeys.length - 1) {
-      if (i === allMonthKeys.length - 1) yearColspan++;
-      timelineHtml += `<div style="width: ${yearColspan * 14}px; font-size: 0.75rem; font-weight: 900; color: var(--text-muted); border-left: 1px solid var(--border-light); padding-left: 4px;">${currentYearStr}</div>`;
-      currentYearStr = mk.substring(0,4);
-      yearColspan = 1;
-    } else {
-      yearColspan++;
-    }
-  });
-  timelineHtml += `</div>`;
-
-  sortedSystems.forEach(sys => {
-    timelineHtml += `<div style="display: flex; min-width: max-content; margin-top: 6px; align-items: center;">`;
-    timelineHtml += `<div style="width: 140px; position: sticky; left: 0; background: var(--card-bg); z-index: 2; font-weight: 800; font-size: 0.85rem; padding-right: 15px; text-align: right; text-transform: uppercase;">${escapeHTML(sys.name)}</div>`;
-    timelineHtml += `<div style="display: flex; gap: 2px;">`;
+  // Build the Visual Gantt-Style Eras Timeline Safely
+  let timelineHtml = '';
+  if (allMonthKeys.length > 0) {
+    timelineHtml += `
+      <div style="overflow-x: auto; padding-bottom: 10px;">
+        <div style="display: flex; min-width: max-content; border-bottom: 2px solid var(--border-light); padding-bottom: 5px;">
+          <div style="width: 140px; position: sticky; left: 0; background: var(--card-bg); z-index: 2;"></div>
+    `;
     
-    allMonthKeys.forEach(mk => {
-      const time = sys.monthlyTime[mk] || 0;
-      const bg = time > 0 ? 'var(--primary-green)' : 'var(--heatmap-empty)';
-      const opacity = time > 0 ? Math.min(1, 0.4 + (time / 36000)) : 1; // Slight heat effect
-      timelineHtml += `<div title="${mk}: ${formatTime(time)}" style="width: 12px; height: 12px; background: ${bg}; opacity: ${opacity}; border-radius: 2px;"></div>`;
+    let currentYearStr = allMonthKeys[0].substring(0,4);
+    let yearColspan = 0;
+    allMonthKeys.forEach((mk, i) => {
+      if (mk.substring(0,4) !== currentYearStr || i === allMonthKeys.length - 1) {
+        if (i === allMonthKeys.length - 1) yearColspan++;
+        timelineHtml += `<div style="width: ${yearColspan * 14}px; font-size: 0.75rem; font-weight: 900; color: var(--text-muted); border-left: 1px solid var(--border-light); padding-left: 4px;">${currentYearStr}</div>`;
+        currentYearStr = mk.substring(0,4);
+        yearColspan = 1;
+      } else {
+        yearColspan++;
+      }
     });
-    timelineHtml += `</div></div>`;
-  });
-  timelineHtml += `</div>`;
+    timelineHtml += `</div>`;
+
+    sortedSystems.forEach(sys => {
+      timelineHtml += `<div style="display: flex; min-width: max-content; margin-top: 6px; align-items: center;">`;
+      timelineHtml += `<div style="width: 140px; position: sticky; left: 0; background: var(--card-bg); z-index: 2; font-weight: 800; font-size: 0.85rem; padding-right: 15px; text-align: right; text-transform: uppercase;">${escapeHTML(sys.name)}</div>`;
+      timelineHtml += `<div style="display: flex; gap: 2px;">`;
+      
+      allMonthKeys.forEach(mk => {
+        const time = sys.monthlyTime[mk] || 0;
+        const bg = time > 0 ? 'var(--primary-green)' : 'var(--heatmap-empty)';
+        const opacity = time > 0 ? Math.min(1, 0.4 + (time / 36000)) : 1; 
+        timelineHtml += `<div title="${mk}: ${formatTime(time)}" style="width: 12px; height: 12px; background: ${bg}; opacity: ${opacity}; border-radius: 2px;"></div>`;
+      });
+      timelineHtml += `</div></div>`;
+    });
+    timelineHtml += `</div>`;
+  }
 
   // 3. Build the Static Hub UI
   let html = `
-    <!-- Global Systems Ribbon -->
     <section class="card-row grid-4">
       <div class="card" style="text-align: center; padding: 20px;">
         <div class="sys-widget-title">Total Hardware</div>
@@ -847,7 +855,6 @@ function initSystemsPage() {
       </div>
     </section>
 
-    <!-- Global System Summary Table -->
     <section class="card-row grid-1">
       <div class="card">
         <div class="card-header"><h2>All-Time Systems Summary</h2></div>
@@ -873,7 +880,6 @@ function initSystemsPage() {
       </div>
     </section>
 
-    <!-- Global Eras Timeline -->
     <section class="card-row grid-1" style="margin-top: 20px;">
       <div class="card">
         <div class="card-header"><h2>Global Hardware Eras Timeline (2015 - Present)</h2></div>
@@ -883,7 +889,6 @@ function initSystemsPage() {
       </div>
     </section>
 
-    <!-- System Selector -->
     <section class="card-row grid-1" style="margin-top: 20px;">
       <div class="card">
         <div class="card-header" style="border-bottom: none; margin-bottom: 0; padding-bottom: 0;">
@@ -897,7 +902,6 @@ function initSystemsPage() {
       </div>
     </section>
 
-    <!-- Dynamic Container for Selected System Deep Dive -->
     <div id="dynamic-system-content"></div>
   `;
 
@@ -919,7 +923,7 @@ function initSystemsPage() {
 
     // Timeline Bar Charts Generation
     let maxMonthlySec = Math.max(...Object.values(sys.monthlyTime));
-    if (maxMonthlySec === 0) maxMonthlySec = 1; // Prevent division by zero
+    if (maxMonthlySec === 0) maxMonthlySec = 1; 
     
     let activityChartHtml = `<div class="sys-chart-wrapper">`;
     let cumulativeChartHtml = `<div class="sys-chart-wrapper">`;
@@ -928,7 +932,7 @@ function initSystemsPage() {
        const mTime = sys.monthlyTime[mk] || 0;
        const cTime = sys.cumulativeTime[mk] || 0;
        const mPct = (mTime / maxMonthlySec) * 100;
-       const cPct = (cTime / sys.totalSeconds) * 100;
+       const cPct = sys.totalSeconds > 0 ? (cTime / sys.totalSeconds) * 100 : 0;
        
        activityChartHtml += `
          <div class="sys-chart-col">
@@ -942,7 +946,6 @@ function initSystemsPage() {
     activityChartHtml += `</div>`;
     cumulativeChartHtml += `</div>`;
 
-    // Standard Deep Dive Derived Stats
     const firstEntry = sys.entries[0];
     const lastEntry = sys.entries[sys.entries.length - 1];
     let exclusiveCount = 0;
@@ -980,7 +983,6 @@ function initSystemsPage() {
     const topSessions = [...sys.sessions].sort((a, b) => b.time - a.time).slice(0, 10);
 
     let sysHtml = `
-      <!-- Vibe Check Persona -->
       <section class="card-row grid-1" style="margin-top: -10px;">
         <div class="card" style="text-align: center; padding: 25px; background: linear-gradient(135deg, var(--card-bg) 0%, var(--item-bg) 100%);">
           <div class="sys-widget-title" style="letter-spacing: 2px;">Hardware Identity</div>
@@ -1002,7 +1004,6 @@ function initSystemsPage() {
         </div>
       </section>
 
-      <!-- Analytical Visualizations -->
       <section class="card-row grid-2">
         <div class="card">
           <div class="card-header"><h2>Monthly Activity (Hours)</h2></div>
@@ -1018,7 +1019,6 @@ function initSystemsPage() {
         </div>
       </section>
 
-      <!-- Deep Dive Analytics -->
       <section class="card-row grid-2">
         <div class="card" style="display: flex; flex-direction: row; align-items: center; justify-content: space-between; padding: 20px;">
           <div style="flex: 1; text-align: center; border-right: 1px dashed var(--border-light);">
@@ -1067,7 +1067,6 @@ function initSystemsPage() {
         </div>
       </section>
 
-      <!-- Top 10 Leaderboards -->
       <section class="card-row grid-strict-3">
         <div class="card">
           <div class="card-header"><h2>Most Played Games (Time)</h2></div>
@@ -1124,7 +1123,6 @@ function initSystemsPage() {
         </div>
       </section>
 
-      <!-- System Playthrough Archive -->
       <section class="card-row grid-1">
         <div class="card">
           <div class="card-header"><h2>Full Playthrough Archive: ${escapeHTML(sysName)}</h2></div>
