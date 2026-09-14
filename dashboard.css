@@ -805,3 +805,38 @@ body {
   background: #236026; /* Darker green for hover state */
   transform: translateY(-1px);
 }
+
+/* --- SMOOTH SCROLLING FOR TOC --- */
+html {
+  scroll-behavior: smooth;
+}
+
+/* --- GOTY TOC STYLES --- */
+.goty-toc {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: center;
+  padding: 10px;
+}
+
+.goty-toc-link {
+  text-decoration: none;
+  background: var(--item-bg);
+  color: var(--text-main);
+  padding: 8px 16px;
+  border-radius: 20px;
+  font-weight: 800;
+  font-size: 0.9rem;
+  border: 1px solid var(--border-table);
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+}
+
+.goty-toc-link:hover {
+  background: var(--primary-green);
+  color: #fff;
+  border-color: var(--primary-green);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+}
