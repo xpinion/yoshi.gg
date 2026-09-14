@@ -631,9 +631,12 @@ function initSystemsPage() {
   const container = document.getElementById('systems-page-container');
   if (!container || !rawData || !rawData.allEntries) return;
 
-  // 1. Aggregate Comprehensive System Data
+  // 1. Aggregate Comprehensive System Data & Dates
   const systemData = {};
   let totalGlobalTime = 0;
+  
+  let globalMinDate = new Date();
+  let globalMaxDate = new Date('2000-01-01');
 
   rawData.allEntries.forEach(e => {
     const sysName = e.system || "Unknown";
@@ -641,7 +644,11 @@ function initSystemsPage() {
     const dateKey = e.date.split('T')[0];
     const dow = new Date(e.date).getUTCDay();
     const year = new Date(e.date).getUTCFullYear();
+    const monthKey = `${year}-${(new Date(e.date).getUTCMonth() + 1).toString().padStart(2, '0')}`;
     
+    if (e.date < globalMinDate) globalMinDate = e.date;
+    if (e.date > globalMaxDate) globalMaxDate = e.date;
+
     totalGlobalTime += sec;
 
     if (!systemData[sysName]) {
@@ -654,6 +661,10 @@ function initSystemsPage() {
         gamePlaytimes: {},
         entries: [],
         yearStats: {},
+        monthlyTime: {},
+        cumulativeTime: {},
+        genreTime: {},
+        devTime: {},
         dowStats: { 0:0, 1:0, 2:0, 3:0, 4:0, 5:0, 6:0 },
         completions: 0
       };
@@ -667,7 +678,12 @@ function initSystemsPage() {
     sys.entries.push(e);
     
     sys.yearStats[year] = (sys.yearStats[year] || 0) + sec;
+    sys.monthlyTime[monthKey] = (sys.monthlyTime[monthKey] || 0) + sec;
     sys.dowStats[dow] += sec;
+
+    // Metadata Tracking for "Vibe Check"
+    if (e.genre && e.genre !== "N/A") sys.genreTime[e.genre] = (sys.genreTime[e.genre] || 0) + sec;
+    if (e.developer && e.developer !== "N/A") sys.devTime[e.developer] = (sys.devTime[e.developer] || 0) + sec;
 
     if (!sys.gamePlaytimes[e.game]) {
       sys.gamePlaytimes[e.game] = { seconds: 0, days: new Set(), minDate: e.date, maxDate: e.date };
@@ -679,23 +695,31 @@ function initSystemsPage() {
     if (e.date > sys.gamePlaytimes[e.game].maxDate) sys.gamePlaytimes[e.game].maxDate = e.date;
   });
 
-  // Tally Completions per system
+  // Tally Completions
   if (rawData.playthroughHistory) {
     Object.values(rawData.playthroughHistory).forEach(pt => {
       if (['Completed', 'M-Completed', 'Postgame'].includes(pt.finalStatus)) {
         const ptSystems = pt.systems && pt.systems.has ? Array.from(pt.systems) : (pt.systems || []);
-        ptSystems.forEach(sysName => {
-          if (systemData[sysName]) {
-            systemData[sysName].completions++;
-          }
-        });
+        ptSystems.forEach(sysName => { if (systemData[sysName]) systemData[sysName].completions++; });
       }
     });
   }
 
+  // Generate All Month Keys for Timelines & Charts
+  const allMonthKeys = [];
+  let currY = globalMinDate.getUTCFullYear();
+  let currM = globalMinDate.getUTCMonth() + 1;
+  const endY = globalMaxDate.getUTCFullYear();
+  const endM = globalMaxDate.getUTCMonth() + 1;
+
+  while (currY < endY || (currY === endY && currM <= endM)) {
+    allMonthKeys.push(`${currY}-${currM.toString().padStart(2, '0')}`);
+    currM++;
+    if (currM > 12) { currM = 1; currY++; }
+  }
+
   // 2. Prepare Derived Stats & Determine Maximums
   let maxTime = 0, maxDays = 0, maxGames = 0, maxComp = 0, maxLongestSess = 0, maxMpgTime = 0;
-  
   const sortedSystems = Object.values(systemData).sort((a, b) => b.totalSeconds - a.totalSeconds);
   
   sortedSystems.forEach(sys => {
@@ -704,17 +728,20 @@ function initSystemsPage() {
     
     let mostPlayedGame = { name: "N/A", seconds: 0, minDate: null, maxDate: null };
     Object.entries(sys.gamePlaytimes).forEach(([g, data]) => {
-      if (data.seconds > mostPlayedGame.seconds) { 
-        mostPlayedGame = { name: g, seconds: data.seconds, minDate: data.minDate, maxDate: data.maxDate }; 
-      }
+      if (data.seconds > mostPlayedGame.seconds) mostPlayedGame = { name: g, seconds: data.seconds, minDate: data.minDate, maxDate: data.maxDate }; 
     });
     sys.mostPlayedGame = mostPlayedGame;
     
     let longestSess = { game: "N/A", time: 0, date: null };
-    sys.sessions.forEach(s => {
-      if (s.time > longestSess.time) { longestSess = s; }
-    });
+    sys.sessions.forEach(s => { if (s.time > longestSess.time) longestSess = s; });
     sys.longestSession = longestSess;
+
+    // Calculate Cumulative Timeline
+    let runningSec = 0;
+    allMonthKeys.forEach(mk => {
+      runningSec += (sys.monthlyTime[mk] || 0);
+      sys.cumulativeTime[mk] = runningSec;
+    });
 
     if (sys.totalSeconds > maxTime) maxTime = sys.totalSeconds;
     if (sys.days.size > maxDays) maxDays = sys.days.size;
@@ -726,60 +753,79 @@ function initSystemsPage() {
 
   const mostPlayedSys = sortedSystems[0] || { name: "N/A", totalSeconds: 0 };
   const mostDiverseSys = [...sortedSystems].sort((a, b) => b.games.size - a.games.size)[0] || { name: "N/A", games: new Set() };
-
-  // Formatter to remove the space from the time string (e.g., "3963h 25m" -> "3963h25m")
   const formatTimeCompact = (val) => formatTime(val).replace(' ', '');
-
-  // Helper to highlight the winning stat with forced single-line wrapping
   const getHighlightStr = (val, max, formatFn) => {
     const displayStr = formatFn ? formatFn(val) : val;
-    if (val === max && val > 0) {
-      return `<span style="color: var(--primary-green); font-weight: 900; background: var(--highlight-green-bg); padding: 4px 8px; border-radius: 6px; display: inline-block; white-space: nowrap;">${displayStr}</span>`;
-    }
+    if (val === max && val > 0) return `<span class="stat-highlight">${displayStr}</span>`;
     return displayStr;
   };
 
   const summaryRowsHtml = sortedSystems.map(sys => {
-    const timeStr = getHighlightStr(sys.totalSeconds, maxTime, formatTimeCompact);
-    const daysStr = getHighlightStr(sys.days.size, maxDays);
-    const gamesStr = getHighlightStr(sys.games.size, maxGames);
-    const compStr = getHighlightStr(sys.completions, maxComp);
-    
     const mpg = sys.mostPlayedGame;
-    const mpgTimeStr = getHighlightStr(mpg.seconds, maxMpgTime, formatTimeCompact);
-    const mpgMin = mpg.minDate ? formatFullDate(mpg.minDate) : "-";
-    const mpgMax = mpg.maxDate ? formatFullDate(mpg.maxDate) : "-";
-    
     const ls = sys.longestSession;
-    const lsTimeStr = getHighlightStr(ls.time, maxLongestSess, formatTimeCompact);
-    const lsDate = ls.date ? formatFullDate(ls.date) : "-";
-    
     return `
       <tr>
         <td class="text-left" style="font-weight: 900; font-size: 1.05rem;">${escapeHTML(sys.name)}</td>
         <td class="text-center" style="font-size: 0.85rem; white-space: nowrap;">${formatFullDate(sys.firstEntryDate)}-${formatFullDate(sys.lastEntryDate)}</td>
-        <td class="text-center" style="white-space: nowrap;">${timeStr}</td>
-        <td class="text-center">${daysStr}</td>
-        <td class="text-center">${gamesStr}</td>
-        <td class="text-center">${compStr}</td>
+        <td class="text-center" style="white-space: nowrap;">${getHighlightStr(sys.totalSeconds, maxTime, formatTimeCompact)}</td>
+        <td class="text-center">${getHighlightStr(sys.days.size, maxDays)}</td>
+        <td class="text-center">${getHighlightStr(sys.games.size, maxGames)}</td>
+        <td class="text-center">${getHighlightStr(sys.completions, maxComp)}</td>
         <td class="text-left" style="line-height: 1.5;">
           <span class="hover-trigger" style="font-weight: 800; font-size: 0.95rem; color: var(--text-title);" data-game="${escapeHTML(mpg.name)}">${escapeHTML(mpg.name)}</span><br>
           <span style="font-size: 0.8rem; color: var(--text-sub); white-space: nowrap;">
-            ${mpgTimeStr} &nbsp;|&nbsp; (${mpgMin}-${mpgMax})
+            ${getHighlightStr(mpg.seconds, maxMpgTime, formatTimeCompact)} &nbsp;|&nbsp; (${mpg.minDate ? formatFullDate(mpg.minDate) : "-"}-${mpg.maxDate ? formatFullDate(mpg.maxDate) : "-"})
           </span>
         </td>
         <td class="text-left" style="line-height: 1.5;">
           <span class="hover-trigger" style="font-weight: 800; font-size: 0.95rem; color: var(--text-title);" data-game="${escapeHTML(ls.game)}">${escapeHTML(ls.game)}</span><br>
           <span style="font-size: 0.8rem; color: var(--text-sub); white-space: nowrap;">
-            ${lsTimeStr} &nbsp;|&nbsp; Date: ${lsDate}
+            ${getHighlightStr(ls.time, maxLongestSess, formatTimeCompact)} &nbsp;|&nbsp; Date: ${ls.date ? formatFullDate(ls.date) : "-"}
           </span>
         </td>
       </tr>
     `;
   }).join('');
 
+  // Build the Visual Gantt-Style Eras Timeline
+  let timelineHtml = `
+    <div style="overflow-x: auto; padding-bottom: 10px;">
+      <div style="display: flex; min-width: max-content; border-bottom: 2px solid var(--border-light); padding-bottom: 5px;">
+        <div style="width: 140px; position: sticky; left: 0; background: var(--card-bg); z-index: 2;"></div>
+  `;
+  
+  let currentYearStr = allMonthKeys[0].substring(0,4);
+  let yearColspan = 0;
+  allMonthKeys.forEach((mk, i) => {
+    if (mk.substring(0,4) !== currentYearStr || i === allMonthKeys.length - 1) {
+      if (i === allMonthKeys.length - 1) yearColspan++;
+      timelineHtml += `<div style="width: ${yearColspan * 14}px; font-size: 0.75rem; font-weight: 900; color: var(--text-muted); border-left: 1px solid var(--border-light); padding-left: 4px;">${currentYearStr}</div>`;
+      currentYearStr = mk.substring(0,4);
+      yearColspan = 1;
+    } else {
+      yearColspan++;
+    }
+  });
+  timelineHtml += `</div>`;
+
+  sortedSystems.forEach(sys => {
+    timelineHtml += `<div style="display: flex; min-width: max-content; margin-top: 6px; align-items: center;">`;
+    timelineHtml += `<div style="width: 140px; position: sticky; left: 0; background: var(--card-bg); z-index: 2; font-weight: 800; font-size: 0.85rem; padding-right: 15px; text-align: right; text-transform: uppercase;">${escapeHTML(sys.name)}</div>`;
+    timelineHtml += `<div style="display: flex; gap: 2px;">`;
+    
+    allMonthKeys.forEach(mk => {
+      const time = sys.monthlyTime[mk] || 0;
+      const bg = time > 0 ? 'var(--primary-green)' : 'var(--heatmap-empty)';
+      const opacity = time > 0 ? Math.min(1, 0.4 + (time / 36000)) : 1; // Slight heat effect
+      timelineHtml += `<div title="${mk}: ${formatTime(time)}" style="width: 12px; height: 12px; background: ${bg}; opacity: ${opacity}; border-radius: 2px;"></div>`;
+    });
+    timelineHtml += `</div></div>`;
+  });
+  timelineHtml += `</div>`;
+
   // 3. Build the Static Hub UI
   let html = `
+    <!-- Global Systems Ribbon -->
     <section class="card-row grid-4">
       <div class="card" style="text-align: center; padding: 20px;">
         <div class="sys-widget-title">Total Hardware</div>
@@ -801,11 +847,10 @@ function initSystemsPage() {
       </div>
     </section>
 
+    <!-- Global System Summary Table -->
     <section class="card-row grid-1">
       <div class="card">
-        <div class="card-header">
-          <h2>All-Time Systems Summary</h2>
-        </div>
+        <div class="card-header"><h2>All-Time Systems Summary</h2></div>
         <div class="card-content" style="padding: 0;">
           <div class="monthly-table-wrapper" style="padding: 20px;">
             <table class="analysis-table" style="min-width: 1200px; text-align: left;">
@@ -821,15 +866,24 @@ function initSystemsPage() {
                   <th style="text-align: left;">Longest Single Session</th>
                 </tr>
               </thead>
-              <tbody>
-                ${summaryRowsHtml}
-              </tbody>
+              <tbody>${summaryRowsHtml}</tbody>
             </table>
           </div>
         </div>
       </div>
     </section>
 
+    <!-- Global Eras Timeline -->
+    <section class="card-row grid-1" style="margin-top: 20px;">
+      <div class="card">
+        <div class="card-header"><h2>Global Hardware Eras Timeline (2015 - Present)</h2></div>
+        <div class="card-content">
+          ${timelineHtml}
+        </div>
+      </div>
+    </section>
+
+    <!-- System Selector -->
     <section class="card-row grid-1" style="margin-top: 20px;">
       <div class="card">
         <div class="card-header" style="border-bottom: none; margin-bottom: 0; padding-bottom: 0;">
@@ -843,6 +897,7 @@ function initSystemsPage() {
       </div>
     </section>
 
+    <!-- Dynamic Container for Selected System Deep Dive -->
     <div id="dynamic-system-content"></div>
   `;
 
@@ -855,20 +910,47 @@ function initSystemsPage() {
 
     const dynamicContainer = document.getElementById('dynamic-system-content');
     
+    // Identity "Vibe Check" Algorithm
+    const topGenres = Object.entries(sys.genreTime).sort((a, b) => b[1] - a[1]);
+    const topDevs = Object.entries(sys.devTime).sort((a, b) => b[1] - a[1]);
+    const bestGenre = topGenres.length > 0 ? topGenres[0][0] : "Gaming";
+    const bestDev = topDevs.length > 0 ? topDevs[0][0] : "";
+    const identityTitle = bestDev ? `The ${bestDev} ${bestGenre} Machine` : `The ${bestGenre} Machine`;
+
+    // Timeline Bar Charts Generation
+    let maxMonthlySec = Math.max(...Object.values(sys.monthlyTime));
+    if (maxMonthlySec === 0) maxMonthlySec = 1; // Prevent division by zero
+    
+    let activityChartHtml = `<div class="sys-chart-wrapper">`;
+    let cumulativeChartHtml = `<div class="sys-chart-wrapper">`;
+    
+    allMonthKeys.forEach(mk => {
+       const mTime = sys.monthlyTime[mk] || 0;
+       const cTime = sys.cumulativeTime[mk] || 0;
+       const mPct = (mTime / maxMonthlySec) * 100;
+       const cPct = (cTime / sys.totalSeconds) * 100;
+       
+       activityChartHtml += `
+         <div class="sys-chart-col">
+           <div class="sys-chart-bar" style="height: ${mPct}%;" title="${mk}: ${formatTime(mTime)}"></div>
+         </div>`;
+       cumulativeChartHtml += `
+         <div class="sys-chart-col">
+           <div class="sys-chart-bar cumulative-bar" style="height: ${cPct}%;" title="${mk}: ${formatTime(cTime)}"></div>
+         </div>`;
+    });
+    activityChartHtml += `</div>`;
+    cumulativeChartHtml += `</div>`;
+
+    // Standard Deep Dive Derived Stats
     const firstEntry = sys.entries[0];
     const lastEntry = sys.entries[sys.entries.length - 1];
-
     let exclusiveCount = 0;
-    sys.games.forEach(game => {
-      const allTimeStats = rawData.metrics?.allTimeGameStats?.[game];
-      if (allTimeStats && allTimeStats.systems.size === 1) exclusiveCount++;
-    });
+    sys.games.forEach(game => { if (rawData.metrics?.allTimeGameStats?.[game]?.systems.size === 1) exclusiveCount++; });
     const exclusivityPct = sys.games.size > 0 ? Math.round((exclusiveCount / sys.games.size) * 100) : 0;
 
     let peakYear = "-", peakTime = 0;
-    Object.entries(sys.yearStats).forEach(([year, time]) => {
-      if (time > peakTime) { peakTime = time; peakYear = year; }
-    });
+    Object.entries(sys.yearStats).forEach(([year, time]) => { if (time > peakTime) { peakTime = time; peakYear = year; } });
     const peakPct = sys.totalSeconds > 0 ? Math.round((peakTime / sys.totalSeconds) * 100) : 0;
 
     const weekdaySec = sys.dowStats[1] + sys.dowStats[2] + sys.dowStats[3] + sys.dowStats[4] + sys.dowStats[5];
@@ -876,9 +958,7 @@ function initSystemsPage() {
     const weekdayPct = sys.totalSeconds > 0 ? Math.round((weekdaySec / sys.totalSeconds) * 100) : 0;
     const weekendPct = sys.totalSeconds > 0 ? Math.round((weekendSec / sys.totalSeconds) * 100) : 0;
 
-    const sysPlaythroughs = Object.values(rawData.playthroughHistory).filter(pt => 
-      pt.systems && (pt.systems.has ? pt.systems.has(sysName) : Array.from(pt.systems).includes(sysName))
-    );
+    const sysPlaythroughs = Object.values(rawData.playthroughHistory).filter(pt => pt.systems && (pt.systems.has ? pt.systems.has(sysName) : Array.from(pt.systems).includes(sysName)));
     sysPlaythroughs.sort((a, b) => new Date(b.lastDate) - new Date(a.lastDate));
     
     let compCount = 0, abanCount = 0, actCount = 0, multiCount = 0;
@@ -889,8 +969,7 @@ function initSystemsPage() {
       else multiCount++;
     });
     
-    const totalDecided = compCount + abanCount;
-    const compRate = totalDecided > 0 ? Math.round((compCount / totalDecided) * 100) : 0;
+    const compRate = (compCount + abanCount) > 0 ? Math.round((compCount / (compCount + abanCount)) * 100) : 0;
     const totalPts = sysPlaythroughs.length;
     const compRatePct = totalPts > 0 ? ((compCount / totalPts) * 100) : 0;
     const actRatePct = totalPts > 0 ? ((actCount / totalPts) * 100) : 0;
@@ -901,7 +980,46 @@ function initSystemsPage() {
     const topSessions = [...sys.sessions].sort((a, b) => b.time - a.time).slice(0, 10);
 
     let sysHtml = `
-      <section class="card-row grid-2" style="margin-top: -10px;">
+      <!-- Vibe Check Persona -->
+      <section class="card-row grid-1" style="margin-top: -10px;">
+        <div class="card" style="text-align: center; padding: 25px; background: linear-gradient(135deg, var(--card-bg) 0%, var(--item-bg) 100%);">
+          <div class="sys-widget-title" style="letter-spacing: 2px;">Hardware Identity</div>
+          <div style="font-size: 2.2rem; font-weight: 900; color: var(--primary-green); text-transform: uppercase;">${escapeHTML(identityTitle)}</div>
+          <div style="display: flex; justify-content: center; gap: 40px; margin-top: 15px;">
+            <div>
+              <div class="sys-widget-title">Top Genres</div>
+              <div style="font-size: 0.9rem; font-weight: 700; color: var(--text-title);">
+                ${topGenres.slice(0,3).map(g => `${g[0]} <span style="color:var(--text-sub)">(${formatTime(g[1])})</span>`).join('<br>')}
+              </div>
+            </div>
+            <div>
+              <div class="sys-widget-title">Top Developers</div>
+              <div style="font-size: 0.9rem; font-weight: 700; color: var(--text-title);">
+                ${topDevs.slice(0,3).map(d => `${d[0]} <span style="color:var(--text-sub)">(${formatTime(d[1])})</span>`).join('<br>')}
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Analytical Visualizations -->
+      <section class="card-row grid-2">
+        <div class="card">
+          <div class="card-header"><h2>Monthly Activity (Hours)</h2></div>
+          <div class="card-content" style="overflow-x: auto; padding-bottom: 5px;">
+            ${activityChartHtml}
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-header"><h2>Cumulative Growth Tracker</h2></div>
+          <div class="card-content" style="overflow-x: auto; padding-bottom: 5px;">
+            ${cumulativeChartHtml}
+          </div>
+        </div>
+      </section>
+
+      <!-- Deep Dive Analytics -->
+      <section class="card-row grid-2">
         <div class="card" style="display: flex; flex-direction: row; align-items: center; justify-content: space-between; padding: 20px;">
           <div style="flex: 1; text-align: center; border-right: 1px dashed var(--border-light);">
             <div class="sys-widget-title">Inaugural Session</div>
@@ -949,6 +1067,7 @@ function initSystemsPage() {
         </div>
       </section>
 
+      <!-- Top 10 Leaderboards -->
       <section class="card-row grid-strict-3">
         <div class="card">
           <div class="card-header"><h2>Most Played Games (Time)</h2></div>
@@ -1005,6 +1124,7 @@ function initSystemsPage() {
         </div>
       </section>
 
+      <!-- System Playthrough Archive -->
       <section class="card-row grid-1">
         <div class="card">
           <div class="card-header"><h2>Full Playthrough Archive: ${escapeHTML(sysName)}</h2></div>
@@ -1061,9 +1181,7 @@ function initSystemsPage() {
     });
   };
 
-  // 5. Attach Listeners and Execute Initial Render
   document.getElementById('hub-system-select').addEventListener('change', (e) => renderSelectedSystem(e.target.value));
-  
   renderSelectedSystem(sortedSystems[0].name);
 }
 
