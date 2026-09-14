@@ -2850,18 +2850,25 @@ function generateSpotlightTableHtml(listKey) {
 // Routes to spotlight.html
 function initSpotlightPage() {
   const container = document.getElementById('spotlight-page-container');
-  if (!container || !rawData || !rawData.metrics || !rawData.metrics.spotlight) return;
+  if (!container || !rawData || !rawData.metrics) return;
 
-  const pairs = [
+  if (!rawData.metrics.spotlight) {
+    container.innerHTML = `<div class="loading-text" style="color: #ff9f1c;">Spotlight data not found in JSON. Please re-run DataAggregator.gs!</div>`;
+    return;
+  }
+
+  let html = '';
+
+  // 1. Render the new Dynamic Lists (with World Record Progression)
+  const dynamicPairs = [
     ['mostPlayed', 'longestSession'],
     ['malloryMultiplayer', 'enzoMultiplayer']
   ];
 
-  let html = '';
-  pairs.forEach(pair => {
+  dynamicPairs.forEach(pair => {
     const leftKey = pair[0];
     const rightKey = pair[1];
-    
+
     html += `
       <section class="card-row grid-1" style="margin-bottom: 40px;">
         <div class="card" style="max-height: none;">
@@ -2886,6 +2893,39 @@ function initSpotlightPage() {
     `;
   });
 
+  // 2. Render all existing Static Lists from your Google Sheet
+  if (typeof allTop25Tables !== 'undefined' && allTop25Tables.length > 0) {
+    const renderTable = (data, title) => `
+    <div class="spotlight-section">
+      <h3 class="spotlight-subtitle">${escapeHTML(title)}</h3>
+      <table class="top25-table">
+        <thead><tr>${data.headers.map(h => `<th>${escapeHTML(h)}</th>`).join('')}</tr></thead>
+        <tbody>
+        ${data.rows.map(row => `<tr>${row.map(cell => {
+          const boldStyle = cell.isBold ? 'style="font-weight: 800; color: #000; background-color: #f0fff4;"' : '';
+          return `<td ${boldStyle}><span class="hover-trigger" data-game="${escapeHTML(cell.val)}">${escapeHTML(cell.val)}</span></td>`;
+        }).join('')}</tr>`).join('')}
+        </tbody>
+      </table>
+    </div>`;
+
+    allTop25Tables.forEach(pair => {
+      html += `
+        <section class="card-row grid-1" style="margin-bottom: 30px;">
+          <div class="card" style="max-height: none;">
+            <div class="card-header"><h2>${escapeHTML(pair.mainTitle)}</h2></div>
+            <div class="card-content" style="padding: 0;">
+              <div class="spotlight-dual-container" style="padding: 20px;">
+                ${renderTable(pair.left, pair.left.title)}
+                ${pair.right ? renderTable(pair.right, pair.right.title) : ''}
+              </div>
+            </div>
+          </div>
+        </section>
+      `;
+    });
+  }
+
   container.innerHTML = html;
 }
 
@@ -2905,13 +2945,5 @@ function renderSpotlightSingle(listKey, targetContainerId = 'top25-table-contain
   container.innerHTML = html;
 }
 
-function initSpotlightPage() {
-  const container = document.getElementById('spotlight-page-container');
-  if (!container || !rawData || !rawData.metrics) return;
-  
-  if (!rawData.metrics.spotlight) {
-    container.innerHTML = `<div class="loading-text" style="color: #ff9f1c;">Spotlight data not found in JSON. Please re-run DataAggregator.gs!</div>`;
-    return;
-  }
-
+// Initialize the dashboard
 initDashboard();
