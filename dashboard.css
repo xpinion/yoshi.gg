@@ -1015,7 +1015,7 @@ html {
   padding: 15px 20px;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 12px;
 }
 .wrp-slim-label {
   font-size: 0.75rem;
@@ -1027,13 +1027,11 @@ html {
 .wrp-slim-track {
   display: flex;
   align-items: center;
-  overflow-x: auto;
-  padding-bottom: 5px;
+  flex-wrap: wrap; /* NEW: Allows the tracker to wrap to the next line */
   gap: 12px;
+  row-gap: 20px;   /* NEW: Extra vertical space when items wrap */
+  padding-bottom: 5px;
 }
-.wrp-slim-track::-webkit-scrollbar { height: 6px; }
-.wrp-slim-track::-webkit-scrollbar-track { background: var(--scrollbar-track); border-radius: 4px; }
-.wrp-slim-track::-webkit-scrollbar-thumb { background: var(--scrollbar-thumb); border-radius: 4px; }
 .wrp-step {
   display: flex;
   flex-direction: column;
@@ -1045,7 +1043,7 @@ html {
   border-left: 3px solid var(--primary-green);
   background: var(--highlight-green-bg);
   padding: 6px 12px;
-  border-radius: 0 4px 4px 0;
+  border-radius: 4px; /* Fixed: Rounded corners for its new position */
 }
 .wrp-step-date {
   font-size: 0.7rem;
@@ -1065,5 +1063,6 @@ html {
 }
 .wrp-arrow {
   color: var(--border-table);
-  font-size: 1.1rem;
+  font-size: 1.2rem;
+  font-weight: 900;
 }
