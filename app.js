@@ -2843,35 +2843,53 @@ function generateSpotlightDualTableHtml(listKey) {
   const currentYear = new Date().getFullYear();
 
   const renderTable = (items, isYearly) => {
-    let headers = isYearly ? ['Year', 'Videogame', 'Time'] : ['Rank', 'Videogame', 'Time'];
-    let html = `<table class="top25-table"><thead><tr>`;
-    headers.forEach(h => html += `<th>${escapeHTML(h)}</th>`);
-    html += `</tr></thead><tbody>`;
+    let headers = isYearly
+      ? ['Year', 'Videogame', 'Time', 'Start Date', 'End Date']
+      : ['Rank', 'Videogame', 'Time', 'Start Date', 'End Date'];
+
+    let html = `<table class="top25-table">
+      <thead>
+        <tr>
+          <th style="width: 55px;">${headers[0]}</th>
+          <th>${headers[1]}</th>
+          <th style="width: 95px;">${headers[2]}</th>
+          <th style="width: 95px;">${headers[3]}</th>
+          <th style="width: 95px;">${headers[4]}</th>
+        </tr>
+      </thead>
+      <tbody>`;
 
     items.forEach((item, index) => {
       const col1 = isYearly ? item.year : `#${index + 1}`;
       const isBold = isYearly ? (item.year === currentYear) : false;
       const boldStyle = isBold ? 'style="font-weight: 800; color: #000; background-color: #f0fff4;"' : '';
-      
+      const sysStr = item.system || item.systems || '-';
+
       html += `
       <tr>
         <td class="text-center" style="font-weight: 800; color: var(--text-muted);">${col1}</td>
-        <td class="text-left" ${boldStyle}><span class="hover-trigger" data-game="${escapeHTML(item.game)}">${escapeHTML(item.game)}</span></td>
-        <td class="text-center" style="background: var(--highlight-green-bg); color: var(--primary-green); font-weight: 900;">${formatTime(item.time)}</td>
+        <td class="text-left" ${boldStyle}>
+          <span class="hover-trigger" data-game="${escapeHTML(item.game)}">${escapeHTML(item.game)}</span> 
+          <span style="color: var(--text-muted); font-size: 0.85rem; font-weight: 600;">(${escapeHTML(sysStr)})</span>
+        </td>
+        <td class="text-center" style="background: var(--highlight-green-bg); color: var(--primary-green); font-weight: 900; white-space: nowrap;">${formatTime(item.time)}</td>
+        <td class="text-center" style="font-size: 0.85rem; white-space: nowrap;">${formatFullDate(item.startDate)}</td>
+        <td class="text-center" style="font-size: 0.85rem; white-space: nowrap;">${formatFullDate(item.endDate)}</td>
       </tr>
       `;
     });
+
     html += `</tbody></table>`;
     return html;
   };
 
   return `
   <div class="spotlight-dual-container" style="padding: 20px;">
-    <div class="spotlight-section">
+    <div class="spotlight-section" style="overflow-x: auto;">
       <h3 class="spotlight-subtitle">Top 25 All-Time</h3>
       ${renderTable(data.allTime, false)}
     </div>
-    <div class="spotlight-section">
+    <div class="spotlight-section" style="overflow-x: auto;">
       <h3 class="spotlight-subtitle">Best by Year</h3>
       ${renderTable(data.yearly, true)}
     </div>
