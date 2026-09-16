@@ -149,7 +149,7 @@ async function initDashboard() {
       if (msContainer) renderMilestones('milestones-page-container');
     }
     else if (path.includes('history')) initHistoryPage();
-    else initIndexPage(top25Data);
+    else initIndexPage();
 
   } catch (error) {
     console.error("Dashboard Error:", error);
@@ -163,7 +163,7 @@ async function initDashboard() {
 }
 
 // --- UPDATE: INIT INDEX PAGE (Remove redundant parseTop25Data) ---
-function initIndexPage(top25Data) {
+function initIndexPage() {
   setupDropdowns();
   setupLiveSearch();
   renderOnThisDay(); // Calls the generalized render function
@@ -174,45 +174,6 @@ function initIndexPage(top25Data) {
   document.querySelectorAll('.card').forEach((card, index) => {
     card.style.animationDelay = `${index * 0.08}s`;
   });
-}
-
-// --- NEW: SPOTLIGHT PAGE ROUTING ---
-function initSpotlightPage() {
-  const container = document.getElementById('spotlight-page-container');
-  if (!container || allTop25Tables.length === 0) return;
-
-  const renderTable = (data, title) => `
-  <div class="spotlight-section">
-    <h3 class="spotlight-subtitle">${escapeHTML(title)}</h3>
-    <table class="top25-table">
-      <thead><tr>${data.headers.map(h => `<th>${escapeHTML(h)}</th>`).join('')}</tr></thead>
-      <tbody>
-      ${data.rows.map(row => `<tr>${row.map(cell => {
-        const boldStyle = cell.isBold ? 'style="font-weight: 800; color: #000; background-color: #f0fff4;"' : '';
-        return `<td ${boldStyle}><span class="hover-trigger" data-game="${escapeHTML(cell.val)}">${escapeHTML(cell.val)}</span></td>`;
-      }).join('')}</tr>`).join('')}
-      </tbody>
-    </table>
-  </div>`;
-
-  let html = '';
-  allTop25Tables.forEach(pair => {
-    html += `
-      <section class="card-row grid-1" style="margin-bottom: 30px;">
-        <div class="card" style="max-height: none;">
-          <div class="card-header"><h2>${escapeHTML(pair.mainTitle)}</h2></div>
-          <div class="card-content" style="padding: 0;">
-            <div class="spotlight-dual-container" style="padding: 20px;">
-              ${renderTable(pair.left, pair.left.title)}
-              ${pair.right ? renderTable(pair.right, pair.right.title) : ''}
-            </div>
-          </div>
-        </div>
-      </section>
-    `;
-  });
-
-  container.innerHTML = html;
 }
 
 // --- NEW: ANALYSIS PAGE ROUTING ---
@@ -1635,62 +1596,6 @@ function buildAnalyticsHub(containerId, dataKey, titleLabel) {
 }
 
 // --- SPOTLIGHT PARSING (Grouped & Bolded) ---
-function parseTop25Data(top25Data) {
-  allTop25Tables = [];
-  const { values, backgrounds, fontWeights } = top25Data;
-  if (!values || !backgrounds) return;
-
-  const TITLE_BG = "#0000ff";
-
-  const extractBlock = (r, c, width) => {
-    let headers = [];
-    let rows = [];
-    if (!values[r+1]) return { headers, rows };
-
-    // Grab headers from the row immediately below the title
-    for (let i = 0; i < width; i++) headers.push(values[r+1][c+i]);
-
-    // Grab data rows until we hit another title background
-    let dr = r + 2;
-    while (dr < values.length && backgrounds[dr] && backgrounds[dr][c] !== TITLE_BG) {
-      let rowHasData = false;
-      let rowVals = [];
-      for (let i = 0; i < width; i++) {
-        const val = values[dr][c+i] || "";
-        if (val.trim() !== "") rowHasData = true;
-        // Check for "bold" weight provided by the sheet
-        const isBold = fontWeights && fontWeights[dr] ? fontWeights[dr][c+i] === "bold" : false;
-        rowVals.push({ val, isBold });
-      }
-      if (!rowHasData) break;
-      rows.push(rowVals);
-      dr++;
-    }
-    return { headers, rows };
-  };
-
-  // Scan only Column A (Index 0) for titles to initiate a pairing
-  for (let r = 0; r < values.length; r++) {
-    if (backgrounds[r] && backgrounds[r][0] === TITLE_BG && values[r][0]) {
-      const left = extractBlock(r, 0, 5);
-      const hasRight = backgrounds[r][6] === TITLE_BG;
-
-      allTop25Tables.push({
-        type: hasRight ? 'dual' : 'single',
-        mainTitle: values[r][0], // The left title is our key
-        left: { title: values[r][0], ...left },
-        right: hasRight ? { title: values[r][6], ...extractBlock(r, 6, 5) } : null
-      });
-    }
-  }
-
-  const select = document.getElementById('random-top25-select');
-  if (select && allTop25Tables.length > 0) {
-    select.innerHTML = allTop25Tables.map(t => `<option value="${escapeHTML(t.mainTitle)}">${escapeHTML(t.mainTitle)}</option>`).join('');
-    select.onchange = renderRandomTop25;
-    renderRandomTop25();
-  }
-}
 
 // --- DROPDOWN SETUP ---
 function setupDropdowns() {
@@ -2153,33 +2058,6 @@ function renderOnThisDay(monthIndex = new Date().getMonth(), dayIndex = new Date
     </div>
     `;
   }).join('');
-}
-
-function renderRandomTop25() {
-  const selected = document.getElementById('random-top25-select').value;
-  const pair = allTop25Tables.find(t => t.mainTitle === selected);
-  if (!pair) return;
-
-  const renderTable = (data, title) => `
-    <div class="spotlight-section">
-      <h3 class="spotlight-subtitle">${escapeHTML(title)}</h3>
-      <table class="top25-table">
-        <thead><tr>${data.headers.map(h => `<th>${escapeHTML(h)}</th>`).join('')}</tr></thead>
-        <tbody>
-          ${data.rows.map(row => `<tr>${row.map(cell => {
-            // Apply inline style for bolding if marked in the sheet
-            const boldStyle = cell.isBold ? 'style="font-weight: 800; color: #000; background-color: #f0fff4;"' : '';
-            return `<td ${boldStyle}><span class="hover-trigger" data-game="${escapeHTML(cell.val)}">${escapeHTML(cell.val)}</span></td>`;
-          }).join('')}</tr>`).join('')}
-        </tbody>
-      </table>
-    </div>`;
-
-  document.getElementById('random-top25-content').innerHTML = `
-    <div class="spotlight-dual-container">
-      ${renderTable(pair.left, pair.left.title)}
-      ${pair.right ? renderTable(pair.right, pair.right.title) : ''}
-    </div>`;
 }
 
 // --- UPDATE: RENDER ANALYSIS (Add Container ID parameter) ---
