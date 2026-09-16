@@ -1058,9 +1058,11 @@ html {
   margin-top: 2px;
 }
 .wrp-step-sub {
-  font-size: 0.75rem;
-  color: var(--text-sub);
-  margin-top: 2px;
+  font-size: 0.8rem;         /* Bumping up the size */
+  color: var(--text-muted);  /* Darker gray for better contrast */
+  font-weight: 600;          /* Slightly thicker text */
+  line-height: 1.4;          /* Adds breathing room when text wraps */
+  margin-top: 4px;
 }
 .wrp-arrow {
   color: var(--text-muted); /* NEW: Darker color for better contrast */
