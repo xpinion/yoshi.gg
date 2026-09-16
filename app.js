@@ -94,10 +94,13 @@ function renderGlobalHeader() {
 // --- UPDATE: DASHBOARD INIT (Add routing and global parsing) ---
 async function initDashboard() {
   try {
+    // NEW: Generate a unique timestamp to bust the browser cache
+    const cacheBuster = new Date().getTime(); 
+
     const [rawResponse, metaResponse, top25Response] = await Promise.all([
-      fetch('raw_dashboard_data.json'),
-      fetch('metadata_data.json'),
-      fetch('top25_data.json')
+      fetch(`raw_dashboard_data.json?v=${cacheBuster}`),
+      fetch(`metadata_data.json?v=${cacheBuster}`),
+      fetch(`top25_data.json?v=${cacheBuster}`)
     ]);
 
     const rawText = await rawResponse.text();
