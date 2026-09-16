@@ -1035,7 +1035,8 @@ html {
 .wrp-step {
   display: flex;
   flex-direction: column;
-  min-width: max-content;
+  width: 240px; /* NEW: Fixed width for uniform block sizes */
+  flex: 0 0 auto; /* NEW: Prevents blocks from shrinking or stretching */
   padding-left: 12px;
   border-left: 3px solid var(--border-table);
 }
@@ -1062,7 +1063,10 @@ html {
   margin-top: 2px;
 }
 .wrp-arrow {
-  color: var(--border-table);
-  font-size: 1.2rem;
+  color: var(--text-muted); /* NEW: Darker color for better contrast */
+  font-size: 1.6rem; /* NEW: Much larger size */
   font-weight: 900;
+  padding: 0 8px; /* NEW: Gives the arrow a little breathing room */
+  display: flex;
+  align-items: center;
 }
