@@ -2794,16 +2794,14 @@ function generateWRPTrackerHtml(wrpData) {
   const blocks = [];
   const currentEvent = wrpData.timeline[wrpData.timeline.length - 1];
   
-  // 1. Current Record Block
   blocks.push(`
     <div class="wrp-step current">
       <div class="wrp-step-date">CURRENT RECORD</div>
       <div class="wrp-step-title hover-trigger" data-game="${escapeHTML(currentEvent.champion)}">${escapeHTML(currentEvent.champion)}</div>
-      <div class="wrp-step-sub" style="color: var(--primary-green); font-weight: bold;">Extended to ${formatTime(wrpData.val)}</div>
+      <div class="wrp-step-sub" style="color: var(--primary-green); font-weight: bold;">Extended to ${escapeHTML(wrpData.val)}</div>
     </div>
   `);
 
-  // 2. Historical Takeovers (Reverse Order)
   for (let i = wrpData.timeline.length - 1; i >= 0; i--) {
     const event = wrpData.timeline[i];
     const isFirst = (i === 0);
@@ -2811,7 +2809,7 @@ function generateWRPTrackerHtml(wrpData) {
       <div class="wrp-step">
         <div class="wrp-step-date">${formatFullDate(event.date)}</div>
         <div class="wrp-step-title hover-trigger" data-game="${escapeHTML(event.champion)}">${escapeHTML(event.champion)}</div>
-        <div class="wrp-step-sub">${isFirst ? 'Inaugural Record' : `Dethroned ${escapeHTML(event.dethroned)}`} &bull; <strong style="color: var(--text-title);">${formatTime(event.takeoverValue)}</strong></div>
+        <div class="wrp-step-sub">${isFirst ? 'Inaugural Record' : `Dethroned ${escapeHTML(event.dethroned)}`} &bull; <strong style="color: var(--text-title);">${escapeHTML(event.takeoverValue)}</strong></div>
       </div>
     `);
   }
@@ -2839,7 +2837,6 @@ function generateUniversalDualTableHtml(listObj) {
       <tbody>`;
 
     rows.forEach(row => {
-      // row indices: [0:Rank/Year, 1:Detail, 2:System, 3:Val, 4:Start, 5:End]
       const col1 = row[0] || '';
       const detail = row[1] || '';
       const sysStr = row[2] || '';
@@ -2870,9 +2867,7 @@ function generateUniversalDualTableHtml(listObj) {
   };
 
   let wrpHtml = '';
-  if (listObj.wrp) {
-     wrpHtml = generateWRPTrackerHtml(listObj.wrp);
-  }
+  if (listObj.wrp) wrpHtml = generateWRPTrackerHtml(listObj.wrp);
 
   return `
     <div class="card-header" style="display: flex; justify-content: space-between; border-bottom: 2px solid var(--border-light); padding: 15px 20px;">
@@ -2898,115 +2893,43 @@ function initSpotlightPage() {
   const container = document.getElementById('spotlight-page-container');
   if (!container || !rawData || !rawData.metrics) return;
 
-  if (!rawData.metrics.spotlight && !rawData.metrics.top25Lists) {
-    container.innerHTML = `<div class="loading-text" style="color: #ff9f1c;">Spotlight data not found in JSON. Please re-run DataAggregator.gs!</div>`;
+  if (!rawData.metrics.top25Lists) {
+    container.innerHTML = `<div class="loading-text" style="color: #ff9f1c;">Spotlight data not found. Please clear cache and sync!</div>`;
     return;
   }
 
   let html = '';
-
-  // 1. Manually adapt and render the 4 core lists WITH WRP attached
-  if (rawData.metrics.spotlight) {
-    const coreLists = [
-      { key: 'mostPlayed', titleLeft: 'Most Played Games', titleRight: 'Most Played Game by Year' },
-      { key: 'longestSession', titleLeft: 'Longest Single Sessions', titleRight: 'Longest Session by Year' },
-      { key: 'malloryMultiplayer', titleLeft: 'Mallory Multiplayer Experiences', titleRight: 'Mallory Multiplayer by Year' },
-      { key: 'enzoMultiplayer', titleLeft: 'Enzo Multiplayer Experiences', titleRight: 'Enzo Multiplayer by Year' }
-    ];
-
-    coreLists.forEach(config => {
-      const data = rawData.metrics.spotlight.lists[config.key];
-      const wrp = rawData.metrics.spotlight.wrp[config.key];
-      
-      if (data) {
-        const adaptedList = {
-          titleLeft: config.titleLeft,
-          titleRight: config.titleRight,
-          headersLeft: ['Rank', 'Videogame', 'System', 'Time', 'Start Date', 'End Date'],
-          headersRight: ['Year', 'Videogame', 'System', 'Time', 'Start Date', 'End Date'],
-          allTime: data.allTime.map((item, i) => [`#${i+1}`, item.game, item.system, formatTime(item.time), formatFullDate(item.startDate), formatFullDate(item.endDate)]),
-          yearly: data.yearly.map(item => [item.year, item.game, item.system, formatTime(item.time), formatFullDate(item.startDate), formatFullDate(item.endDate)]),
-          wrp: wrp
-        };
-        html += `<section class="card-row grid-1" style="margin-bottom: 30px;"><div class="card" style="max-height: none; padding: 0;">${generateUniversalDualTableHtml(adaptedList)}</div></section>`;
-      }
-    });
-  }
-
-  // 2. Render all the NEW Nuclear Architecture Lists!
-  if (rawData.metrics.top25Lists && rawData.metrics.top25Lists.length > 0) {
-    rawData.metrics.top25Lists.forEach(list => {
-      html += `<section class="card-row grid-1" style="margin-bottom: 30px;"><div class="card" style="max-height: none; padding: 0;">${generateUniversalDualTableHtml(list)}</div></section>`;
-    });
-  }
-
+  rawData.metrics.top25Lists.forEach(list => {
+    html += `<section class="card-row grid-1" style="margin-bottom: 30px;"><div class="card" style="max-height: none; padding: 0;">${generateUniversalDualTableHtml(list)}</div></section>`;
+  });
+  
   container.innerHTML = html;
 }
 
 // Setup for the Index Page Dropdown
 function setupSpotlightDropdown() {
   const spotSelect = document.getElementById('random-top25-select');
-  if (!spotSelect || !rawData || !rawData.metrics) return;
+  if (!spotSelect || !rawData || !rawData.metrics || !rawData.metrics.top25Lists) return;
 
-  const options = [];
-  if (rawData.metrics.spotlight) {
-    options.push({ val: 'spot-mostPlayed', text: 'Most Played Games' });
-    options.push({ val: 'spot-longestSession', text: 'Longest Single Sessions' });
-    options.push({ val: 'spot-malloryMultiplayer', text: 'Mallory Multiplayer Experiences' });
-    options.push({ val: 'spot-enzoMultiplayer', text: 'Enzo Multiplayer Experiences' });
-  }
-  if (rawData.metrics.top25Lists) {
-    rawData.metrics.top25Lists.forEach((list, i) => {
-      options.push({ val: `list-${i}`, text: list.titleLeft });
-    });
-  }
+  const options = rawData.metrics.top25Lists.map((list, i) => ({ val: `list-${i}`, text: list.titleLeft }));
   
   spotSelect.innerHTML = options.map(o => `<option value="${o.val}">${escapeHTML(o.text)}</option>`).join('');
   spotSelect.addEventListener('change', (e) => renderSpotlightSingle(e.target.value, 'random-top25-content'));
   
-  // Render the first one by default on load
   if (options.length > 0) renderSpotlightSingle(options[0].val, 'random-top25-content');
 }
 
 // Routes to index.html widget
 function renderSpotlightSingle(selectionVal, targetContainerId) {
   const container = document.getElementById(targetContainerId);
-  if (!container) return;
+  if (!container || !selectionVal.startsWith('list-')) return;
+  
+  const index = parseInt(selectionVal.replace('list-', ''));
+  const listObj = rawData.metrics.top25Lists[index];
 
-  let listObj = null;
-
-  if (selectionVal.startsWith('spot-')) {
-    const key = selectionVal.replace('spot-', '');
-    const data = rawData.metrics.spotlight.lists[key];
-    const wrp = rawData.metrics.spotlight.wrp[key];
-    
-    const titleMap = {
-      mostPlayed: { left: 'Most Played Games', right: 'Most Played by Year' },
-      longestSession: { left: 'Longest Single Sessions', right: 'Longest Session by Year' },
-      malloryMultiplayer: { left: 'Mallory Multiplayer Experiences', right: 'Mallory Multiplayer by Year' },
-      enzoMultiplayer: { left: 'Enzo Multiplayer Experiences', right: 'Enzo Multiplayer by Year' }
-    };
-
-    if (data) {
-      listObj = {
-        titleLeft: titleMap[key].left,
-        titleRight: titleMap[key].right,
-        headersLeft: ['Rank', 'Videogame', 'System', 'Time', 'Start Date', 'End Date'],
-        headersRight: ['Year', 'Videogame', 'System', 'Time', 'Start Date', 'End Date'],
-        allTime: data.allTime.map((item, i) => [`#${i+1}`, item.game, item.system, formatTime(item.time), formatFullDate(item.startDate), formatFullDate(item.endDate)]),
-        yearly: data.yearly.map(item => [item.year, item.game, item.system, formatTime(item.time), formatFullDate(item.startDate), formatFullDate(item.endDate)]),
-        wrp: wrp
-      };
-    }
-  } else if (selectionVal.startsWith('list-')) {
-    const index = parseInt(selectionVal.replace('list-', ''));
-    listObj = rawData.metrics.top25Lists[index];
-  }
-
-  if (listObj) {
-    container.innerHTML = generateUniversalDualTableHtml(listObj);
-  }
+  if (listObj) container.innerHTML = generateUniversalDualTableHtml(listObj);
 }
+
 
 // Initialize the dashboard
 initDashboard();
