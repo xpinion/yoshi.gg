@@ -2795,56 +2795,82 @@ const spotlightTitles = {
   enzoMultiplayer: "Top 25: Enzo Multiplayer Experiences"
 };
 
+// --- SPOTLIGHT RENDERING ---
 function generateWRPTrackerHtml(listKey) {
   const wrpData = rawData.metrics.spotlight.wrp[listKey];
   if (!wrpData || wrpData.timeline.length === 0) return '';
-  
-  let cardsHtml = wrpData.timeline.map(event => `
-    <div class="wrp-card">
-      <div class="wrp-date">${formatFullDate(event.date)}</div>
-      <div class="wrp-champion hover-trigger" data-game="${escapeHTML(event.champion)}">${escapeHTML(event.champion)}</div>
-      <div class="wrp-value">Took lead with ${formatTime(event.takeoverValue)}</div>
-      ${event.dethroned ? `<div class="wrp-dethroned">Dethroned: ${escapeHTML(event.dethroned)}</div>` : `<div class="wrp-dethroned">Inaugural Record</div>`}
+
+  let timelineHtml = wrpData.timeline.map((event, index) => {
+    const isFirst = index === 0;
+    return `
+    <div class="wrp-step">
+      <div class="wrp-step-date">${formatFullDate(event.date)}</div>
+      <div class="wrp-step-title hover-trigger" data-game="${escapeHTML(event.champion)}">${escapeHTML(event.champion)}</div>
+      <div class="wrp-step-sub">${isFirst ? 'Inaugural Record' : `Dethroned ${escapeHTML(event.dethroned)}`} &bull; ${formatTime(event.takeoverValue)}</div>
     </div>
-  `).join(`
-    <div style="display: flex; align-items: center; color: var(--border-light); font-size: 1.5rem;">➔</div>
-  `);
+    `;
+  }).join('<div class="wrp-arrow">➔</div>');
 
   // Append Current Record Leader
   const currentLeader = wrpData.timeline[wrpData.timeline.length - 1];
-  cardsHtml += `
-    <div style="display: flex; align-items: center; color: var(--primary-green); font-size: 1.5rem;">➔</div>
-    <div class="wrp-card current-record">
-      <div class="wrp-date">CURRENT RECORD</div>
-      <div class="wrp-champion hover-trigger" data-game="${escapeHTML(currentLeader.champion)}">${escapeHTML(currentLeader.champion)}</div>
-      <div class="wrp-value" style="font-size: 1.1rem; color: var(--primary-green);">Extended to ${formatTime(wrpData.val)}</div>
+  timelineHtml += `
+    <div class="wrp-arrow">➔</div>
+    <div class="wrp-step current">
+      <div class="wrp-step-date">CURRENT RECORD</div>
+      <div class="wrp-step-title hover-trigger" data-game="${escapeHTML(currentLeader.champion)}">${escapeHTML(currentLeader.champion)}</div>
+      <div class="wrp-step-sub" style="color: var(--primary-green); font-weight: bold;">Extended to ${formatTime(wrpData.val)}</div>
     </div>
   `;
 
   return `
-    <div class="wrp-container">
-      <div class="wrp-title">World Record Progression</div>
-      <div class="wrp-timeline">${cardsHtml}</div>
-    </div>
+  <div class="wrp-slim-container">
+    <div class="wrp-slim-label">World Record Progression</div>
+    <div class="wrp-slim-track">${timelineHtml}</div>
+  </div>
   `;
 }
 
-function generateSpotlightTableHtml(listKey) {
-  const listData = rawData.metrics.spotlight.lists[listKey];
-  if (!listData) return `<div class="loading-text">No data found.</div>`;
+function generateSpotlightDualTableHtml(listKey) {
+  const data = rawData.metrics.spotlight.lists[listKey];
+  if (!data) return `<div class="loading-text">No data found.</div>`;
 
-  let html = `<table class="top25-table"><thead><tr><th style="width: 50px;">Rank</th><th>Videogame</th><th style="width: 120px;">Time</th></tr></thead><tbody>`;
-  listData.forEach((item, index) => {
-    html += `
+  const currentYear = new Date().getFullYear();
+
+  const renderTable = (items, isYearly) => {
+    let headers = isYearly ? ['Year', 'Videogame', 'Time'] : ['Rank', 'Videogame', 'Time'];
+    let html = `<table class="top25-table"><thead><tr>`;
+    headers.forEach(h => html += `<th>${escapeHTML(h)}</th>`);
+    html += `</tr></thead><tbody>`;
+
+    items.forEach((item, index) => {
+      const col1 = isYearly ? item.year : `#${index + 1}`;
+      const isBold = isYearly ? (item.year === currentYear) : false;
+      const boldStyle = isBold ? 'style="font-weight: 800; color: #000; background-color: #f0fff4;"' : '';
+      
+      html += `
       <tr>
-        <td class="text-center" style="font-weight: 800; color: var(--text-muted);">#${index + 1}</td>
-        <td class="text-left" style="font-weight: 800;"><span class="hover-trigger" data-game="${escapeHTML(item.game)}">${escapeHTML(item.game)}</span></td>
+        <td class="text-center" style="font-weight: 800; color: var(--text-muted);">${col1}</td>
+        <td class="text-left" ${boldStyle}><span class="hover-trigger" data-game="${escapeHTML(item.game)}">${escapeHTML(item.game)}</span></td>
         <td class="text-center" style="background: var(--highlight-green-bg); color: var(--primary-green); font-weight: 900;">${formatTime(item.time)}</td>
       </tr>
-    `;
-  });
-  html += `</tbody></table>`;
-  return html;
+      `;
+    });
+    html += `</tbody></table>`;
+    return html;
+  };
+
+  return `
+  <div class="spotlight-dual-container" style="padding: 20px;">
+    <div class="spotlight-section">
+      <h3 class="spotlight-subtitle">Top 25 All-Time</h3>
+      ${renderTable(data.allTime, false)}
+    </div>
+    <div class="spotlight-section">
+      <h3 class="spotlight-subtitle">Best by Year</h3>
+      ${renderTable(data.yearly, true)}
+    </div>
+  </div>
+  `;
 }
 
 // Routes to spotlight.html
@@ -2859,37 +2885,25 @@ function initSpotlightPage() {
 
   let html = '';
 
-  // 1. Render the new Dynamic Lists (with World Record Progression)
-  const dynamicPairs = [
-    ['mostPlayed', 'longestSession'],
-    ['malloryMultiplayer', 'enzoMultiplayer']
+  // 1. Render the new Dynamic Dual Lists
+  const dynamicLists = [
+    { key: 'mostPlayed', title: 'Most Played Games' },
+    { key: 'longestSession', title: 'Longest Single Sessions' },
+    { key: 'malloryMultiplayer', title: 'Mallory Multiplayer Experiences' },
+    { key: 'enzoMultiplayer', title: 'Enzo Multiplayer Experiences' }
   ];
 
-  dynamicPairs.forEach(pair => {
-    const leftKey = pair[0];
-    const rightKey = pair[1];
-
+  dynamicLists.forEach(list => {
     html += `
-      <section class="card-row grid-1" style="margin-bottom: 40px;">
-        <div class="card" style="max-height: none;">
-          <div class="card-header" style="display: flex; justify-content: space-between;">
-            <h2 style="flex: 1; text-align: center;">${spotlightTitles[leftKey]}</h2>
-            <h2 style="flex: 1; text-align: center;">${spotlightTitles[rightKey]}</h2>
-          </div>
-          <div class="card-content" style="padding: 0;">
-            <div style="display: flex; flex-direction: row; gap: 20px; padding: 20px;">
-              <div style="flex: 1;">${generateSpotlightTableHtml(leftKey)}</div>
-              <div style="flex: 1;">${generateSpotlightTableHtml(rightKey)}</div>
-            </div>
-            <div style="border-top: 1px dashed var(--border-light);">
-              ${generateWRPTrackerHtml(leftKey)}
-            </div>
-            <div style="border-top: 1px dashed var(--border-light);">
-              ${generateWRPTrackerHtml(rightKey)}
-            </div>
-          </div>
+    <section class="card-row grid-1" style="margin-bottom: 30px;">
+      <div class="card" style="max-height: none;">
+        <div class="card-header"><h2>${escapeHTML(list.title)}</h2></div>
+        <div class="card-content" style="padding: 0;">
+          ${generateSpotlightDualTableHtml(list.key)}
+          ${generateWRPTrackerHtml(list.key)}
         </div>
-      </section>
+      </div>
+    </section>
     `;
   });
 
@@ -2897,31 +2911,31 @@ function initSpotlightPage() {
   if (typeof allTop25Tables !== 'undefined' && allTop25Tables.length > 0) {
     const renderTable = (data, title) => `
     <div class="spotlight-section">
-      <h3 class="spotlight-subtitle">${escapeHTML(title)}</h3>
-      <table class="top25-table">
-        <thead><tr>${data.headers.map(h => `<th>${escapeHTML(h)}</th>`).join('')}</tr></thead>
-        <tbody>
-        ${data.rows.map(row => `<tr>${row.map(cell => {
-          const boldStyle = cell.isBold ? 'style="font-weight: 800; color: #000; background-color: #f0fff4;"' : '';
-          return `<td ${boldStyle}><span class="hover-trigger" data-game="${escapeHTML(cell.val)}">${escapeHTML(cell.val)}</span></td>`;
-        }).join('')}</tr>`).join('')}
-        </tbody>
-      </table>
+    <h3 class="spotlight-subtitle">${escapeHTML(title)}</h3>
+    <table class="top25-table">
+    <thead><tr>${data.headers.map(h => `<th>${escapeHTML(h)}</th>`).join('')}</tr></thead>
+    <tbody>
+    ${data.rows.map(row => `<tr>${row.map(cell => {
+      const boldStyle = cell.isBold ? 'style="font-weight: 800; color: #000; background-color: #f0fff4;"' : '';
+      return `<td ${boldStyle}><span class="hover-trigger" data-game="${escapeHTML(cell.val)}">${escapeHTML(cell.val)}</span></td>`;
+    }).join('')}</tr>`).join('')}
+    </tbody>
+    </table>
     </div>`;
 
     allTop25Tables.forEach(pair => {
       html += `
-        <section class="card-row grid-1" style="margin-bottom: 30px;">
-          <div class="card" style="max-height: none;">
-            <div class="card-header"><h2>${escapeHTML(pair.mainTitle)}</h2></div>
-            <div class="card-content" style="padding: 0;">
-              <div class="spotlight-dual-container" style="padding: 20px;">
-                ${renderTable(pair.left, pair.left.title)}
-                ${pair.right ? renderTable(pair.right, pair.right.title) : ''}
-              </div>
-            </div>
-          </div>
-        </section>
+      <section class="card-row grid-1" style="margin-bottom: 30px;">
+      <div class="card" style="max-height: none;">
+      <div class="card-header"><h2>${escapeHTML(pair.mainTitle)}</h2></div>
+      <div class="card-content" style="padding: 0;">
+      <div class="spotlight-dual-container" style="padding: 20px;">
+      ${renderTable(pair.left, pair.left.title)}
+      ${pair.right ? renderTable(pair.right, pair.right.title) : ''}
+      </div>
+      </div>
+      </div>
+      </section>
       `;
     });
   }
@@ -2934,15 +2948,7 @@ function renderSpotlightSingle(listKey, targetContainerId = 'top25-table-contain
   const container = document.getElementById(targetContainerId);
   if (!container || !rawData || !rawData.metrics || !rawData.metrics.spotlight) return;
 
-  let html = `
-    <div style="padding: 15px;">
-      ${generateSpotlightTableHtml(listKey)}
-    </div>
-    <div style="border-top: 1px dashed var(--border-light);">
-      ${generateWRPTrackerHtml(listKey)}
-    </div>
-  `;
-  container.innerHTML = html;
+  container.innerHTML = generateSpotlightDualTableHtml(listKey) + generateWRPTrackerHtml(listKey);
 }
 
 // Initialize the dashboard
