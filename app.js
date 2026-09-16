@@ -2800,31 +2800,37 @@ function generateWRPTrackerHtml(listKey) {
   const wrpData = rawData.metrics.spotlight.wrp[listKey];
   if (!wrpData || wrpData.timeline.length === 0) return '';
 
-  let timelineHtml = wrpData.timeline.map((event, index) => {
-    const isFirst = index === 0;
-    return `
-    <div class="wrp-step">
-      <div class="wrp-step-date">${formatFullDate(event.date)}</div>
-      <div class="wrp-step-title hover-trigger" data-game="${escapeHTML(event.champion)}">${escapeHTML(event.champion)}</div>
-      <div class="wrp-step-sub">${isFirst ? 'Inaugural Record' : `Dethroned ${escapeHTML(event.dethroned)}`} &bull; ${formatTime(event.takeoverValue)}</div>
-    </div>
-    `;
-  }).join('<div class="wrp-arrow">➔</div>');
+  const blocks = [];
 
-  // Append Current Record Leader
-  const currentLeader = wrpData.timeline[wrpData.timeline.length - 1];
-  timelineHtml += `
-    <div class="wrp-arrow">➔</div>
+  // 1. Current Record Block (Left-most)
+  const currentEvent = wrpData.timeline[wrpData.timeline.length - 1];
+  blocks.push(`
     <div class="wrp-step current">
       <div class="wrp-step-date">CURRENT RECORD</div>
-      <div class="wrp-step-title hover-trigger" data-game="${escapeHTML(currentLeader.champion)}">${escapeHTML(currentLeader.champion)}</div>
+      <div class="wrp-step-title hover-trigger" data-game="${escapeHTML(currentEvent.champion)}">${escapeHTML(currentEvent.champion)}</div>
       <div class="wrp-step-sub" style="color: var(--primary-green); font-weight: bold;">Extended to ${formatTime(wrpData.val)}</div>
     </div>
-  `;
+  `);
+
+  // 2. Historical Takeovers (Reverse Order)
+  for (let i = wrpData.timeline.length - 1; i >= 0; i--) {
+    const event = wrpData.timeline[i];
+    const isFirst = (i === 0);
+    blocks.push(`
+      <div class="wrp-step">
+        <div class="wrp-step-date">${formatFullDate(event.date)}</div>
+        <div class="wrp-step-title hover-trigger" data-game="${escapeHTML(event.champion)}">${escapeHTML(event.champion)}</div>
+        <div class="wrp-step-sub">${isFirst ? 'Inaugural Record' : `Dethroned ${escapeHTML(event.dethroned)}`} &bull; ${formatTime(event.takeoverValue)}</div>
+      </div>
+    `);
+  }
+
+  // Join them with a left-pointing arrow
+  const timelineHtml = blocks.join('<div class="wrp-arrow">←</div>');
 
   return `
   <div class="wrp-slim-container">
-    <div class="wrp-slim-label">World Record Progression</div>
+    <div class="wrp-slim-label">World Record Progression (Newest to Oldest)</div>
     <div class="wrp-slim-track">${timelineHtml}</div>
   </div>
   `;
