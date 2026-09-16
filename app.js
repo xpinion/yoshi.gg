@@ -94,13 +94,11 @@ function renderGlobalHeader() {
 // --- UPDATE: DASHBOARD INIT (Add routing and global parsing) ---
 async function initDashboard() {
   try {
-    // NEW: Generate a unique timestamp to bust the browser cache
     const cacheBuster = new Date().getTime(); 
 
-    const [rawResponse, metaResponse, top25Response] = await Promise.all([
+    const [rawResponse, metaResponse] = await Promise.all([
       fetch(`raw_dashboard_data.json?v=${cacheBuster}`),
-      fetch(`metadata_data.json?v=${cacheBuster}`),
-      fetch(`top25_data.json?v=${cacheBuster}`)
+      fetch(`metadata_data.json?v=${cacheBuster}`)
     ]);
 
     const rawText = await rawResponse.text();
@@ -112,7 +110,6 @@ async function initDashboard() {
     });
 
     const metaData = await metaResponse.json();
-    const top25Data = await top25Response.json();
 
     for (let i = 1; i < metaData.values.length; i++) {
       const row = metaData.values[i];
@@ -128,8 +125,8 @@ async function initDashboard() {
       }
     }
 
-    if (typeof parseTop25Data === 'function') parseTop25Data(top25Data);
-    
+    setupSpotlightDropdown(); // NEW: Wires up the Index page dropdown!
+
     renderGlobalHeader();
     setupThemeToggle();
     setupHoverHistory();
