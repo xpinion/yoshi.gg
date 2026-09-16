@@ -2839,45 +2839,46 @@ function generateWRPTrackerHtml(listKey) {
   `;
 }
 
-function generateSpotlightDualTableHtml(listKey) {
-  const data = rawData.metrics.spotlight.lists[listKey];
-  if (!data) return `<div class="loading-text">No data found.</div>`;
-
-  const currentYear = new Date().getFullYear();
-
-  const renderTable = (items, isYearly) => {
-    let headers = isYearly
-      ? ['Year', 'Videogame', 'Time', 'Start Date', 'End Date']
-      : ['Rank', 'Videogame', 'Time', 'Start Date', 'End Date'];
-
+function generateUniversalDualTableHtml(listObj) {
+  const renderTable = (rows, headers) => {
     let html = `<table class="top25-table">
       <thead>
         <tr>
-          <th style="width: 55px;">${headers[0]}</th>
-          <th>${headers[1]}</th>
-          <th style="width: 95px;">${headers[2]}</th>
-          <th style="width: 95px;">${headers[3]}</th>
-          <th style="width: 95px;">${headers[4]}</th>
+          <th style="width: 55px;">${escapeHTML(headers[0])}</th>
+          <th>${escapeHTML(headers[1])}</th>
+          <th style="width: 90px;">${escapeHTML(headers[2])}</th>
+          <th style="width: 95px;">${escapeHTML(headers[3])}</th>
+          <th style="width: 95px;">${escapeHTML(headers[4])}</th>
+          <th style="width: 95px;">${escapeHTML(headers[5])}</th>
         </tr>
       </thead>
       <tbody>`;
 
-    items.forEach((item, index) => {
-      const col1 = isYearly ? item.year : `#${index + 1}`;
-      const isBold = isYearly ? (item.year === currentYear) : false;
+    rows.forEach(row => {
+      // Structure: [Rank/Year, Detail, System, Value, Start, End]
+      const col1 = row[0];
+      const detail = row[1];
+      const sysStr = row[2];
+      const val = row[3];
+      const start = row[4];
+      const end = row[5];
+
+      // Automatically bold the row if the End Date happened this year!
+      const currentYear = new Date().getFullYear().toString();
+      const isBold = (end && end.startsWith(currentYear)) || (col1 && col1.toString() === currentYear);
       const boldStyle = isBold ? 'style="font-weight: 800; color: #000; background-color: #f0fff4;"' : '';
-      const sysStr = item.system || item.systems || '-';
 
       html += `
       <tr>
-        <td class="text-center" style="font-weight: 800; color: var(--text-muted);">${col1}</td>
+        <td class="text-center" style="font-weight: 800; color: var(--text-muted);">${escapeHTML(col1)}</td>
         <td class="text-left" ${boldStyle}>
-          <span class="hover-trigger" data-game="${escapeHTML(item.game)}">${escapeHTML(item.game)}</span> 
-          <span style="color: var(--text-muted); font-size: 0.85rem; font-weight: 600;">(${escapeHTML(sysStr)})</span>
+          <span class="hover-trigger" data-game="${escapeHTML(detail)}">${escapeHTML(detail)}</span> 
+          ${sysStr ? `<span style="color: var(--text-muted); font-size: 0.85rem; font-weight: 600;">(${escapeHTML(sysStr)})</span>` : ''}
         </td>
-        <td class="text-center" style="background: var(--highlight-green-bg); color: var(--primary-green); font-weight: 900; white-space: nowrap;">${formatTime(item.time)}</td>
-        <td class="text-center" style="font-size: 0.85rem; white-space: nowrap;">${formatFullDate(item.startDate)}</td>
-        <td class="text-center" style="font-size: 0.85rem; white-space: nowrap;">${formatFullDate(item.endDate)}</td>
+        <td class="text-center" style="font-size: 0.85rem; font-weight: 600;">${sysStr ? escapeHTML(sysStr) : '-'}</td>
+        <td class="text-center" style="background: var(--highlight-green-bg); color: var(--primary-green); font-weight: 900; white-space: nowrap;">${escapeHTML(val)}</td>
+        <td class="text-center" style="font-size: 0.85rem; white-space: nowrap;">${escapeHTML(start)}</td>
+        <td class="text-center" style="font-size: 0.85rem; white-space: nowrap;">${escapeHTML(end)}</td>
       </tr>
       `;
     });
@@ -2887,16 +2888,24 @@ function generateSpotlightDualTableHtml(listKey) {
   };
 
   return `
-  <div class="spotlight-dual-container" style="padding: 20px;">
-    <div class="spotlight-section" style="overflow-x: auto;">
-      <h3 class="spotlight-subtitle">Top 25 All-Time</h3>
-      ${renderTable(data.allTime, false)}
+  <section class="card-row grid-1" style="margin-bottom: 30px;">
+    <div class="card" style="max-height: none;">
+      <div class="card-header" style="display: flex; justify-content: space-between;">
+        <h2 style="flex: 1; text-align: center;">${escapeHTML(listObj.titleLeft)}</h2>
+        <h2 style="flex: 1; text-align: center;">${escapeHTML(listObj.titleRight)}</h2>
+      </div>
+      <div class="card-content" style="padding: 0;">
+        <div class="spotlight-dual-container" style="padding: 20px;">
+          <div class="spotlight-section" style="overflow-x: auto;">
+            ${renderTable(listObj.allTime, listObj.headersLeft)}
+          </div>
+          <div class="spotlight-section" style="overflow-x: auto;">
+            ${renderTable(listObj.yearly, listObj.headersRight)}
+          </div>
+        </div>
+      </div>
     </div>
-    <div class="spotlight-section" style="overflow-x: auto;">
-      <h3 class="spotlight-subtitle">Best by Year</h3>
-      ${renderTable(data.yearly, true)}
-    </div>
-  </div>
+  </section>
   `;
 }
 
@@ -2912,58 +2921,13 @@ function initSpotlightPage() {
 
   let html = '';
 
-  // 1. Render the new Dynamic Dual Lists
-  const dynamicLists = [
-    { key: 'mostPlayed', title: 'Most Played Games' },
-    { key: 'longestSession', title: 'Longest Single Sessions' },
-    { key: 'malloryMultiplayer', title: 'Mallory Multiplayer Experiences' },
-    { key: 'enzoMultiplayer', title: 'Enzo Multiplayer Experiences' }
-  ];
+  // 1. Render the WRP Dynamic Lists (Most Played, Sessions, Mallory, Enzo)
+  // ... (You can leave your existing WRP loops here if you want to keep them at the top)
 
-  dynamicLists.forEach(list => {
-    html += `
-    <section class="card-row grid-1" style="margin-bottom: 30px;">
-      <div class="card" style="max-height: none;">
-        <div class="card-header"><h2>${escapeHTML(list.title)}</h2></div>
-        <div class="card-content" style="padding: 0;">
-          ${generateSpotlightDualTableHtml(list.key)}
-          ${generateWRPTrackerHtml(list.key)}
-        </div>
-      </div>
-    </section>
-    `;
-  });
-
-  // 2. Render all existing Static Lists from your Google Sheet
-  if (typeof allTop25Tables !== 'undefined' && allTop25Tables.length > 0) {
-    const renderTable = (data, title) => `
-    <div class="spotlight-section">
-    <h3 class="spotlight-subtitle">${escapeHTML(title)}</h3>
-    <table class="top25-table">
-    <thead><tr>${data.headers.map(h => `<th>${escapeHTML(h)}</th>`).join('')}</tr></thead>
-    <tbody>
-    ${data.rows.map(row => `<tr>${row.map(cell => {
-      const boldStyle = cell.isBold ? 'style="font-weight: 800; color: #000; background-color: #f0fff4;"' : '';
-      return `<td ${boldStyle}><span class="hover-trigger" data-game="${escapeHTML(cell.val)}">${escapeHTML(cell.val)}</span></td>`;
-    }).join('')}</tr>`).join('')}
-    </tbody>
-    </table>
-    </div>`;
-
-    allTop25Tables.forEach(pair => {
-      html += `
-      <section class="card-row grid-1" style="margin-bottom: 30px;">
-      <div class="card" style="max-height: none;">
-      <div class="card-header"><h2>${escapeHTML(pair.mainTitle)}</h2></div>
-      <div class="card-content" style="padding: 0;">
-      <div class="spotlight-dual-container" style="padding: 20px;">
-      ${renderTable(pair.left, pair.left.title)}
-      ${pair.right ? renderTable(pair.right, pair.right.title) : ''}
-      </div>
-      </div>
-      </div>
-      </section>
-      `;
+  // 2. Render the NEW Nuclear Architecture Lists!
+  if (rawData.metrics.top25Lists && rawData.metrics.top25Lists.length > 0) {
+    rawData.metrics.top25Lists.forEach(list => {
+      html += generateUniversalDualTableHtml(list);
     });
   }
 
