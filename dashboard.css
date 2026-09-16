@@ -1008,62 +1008,62 @@ html {
   background: var(--text-title);
 }
 
-/* --- WORLD RECORD PROGRESSION TRACKER --- */
-.wrp-container {
-  padding: 20px;
-  background: rgba(0, 0, 0, 0.02);
-}
-.wrp-title {
-  font-size: 0.9rem;
-  font-weight: 900;
-  text-transform: uppercase;
-  color: var(--text-muted);
-  margin-bottom: 15px;
-  letter-spacing: 1px;
-}
-.wrp-timeline {
-  display: flex;
-  overflow-x: auto;
-  gap: 15px;
-  padding-bottom: 10px;
-  align-items: stretch;
-}
-.wrp-card {
-  min-width: 240px;
-  background: var(--card-bg);
-  padding: 15px;
-  border-left: 4px solid var(--border-table);
-  border-radius: 6px;
-  box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+/* --- WORLD RECORD PROGRESSION TRACKER (STREAMLINED) --- */
+.wrp-slim-container {
+  background: var(--inactive-row-bg);
+  border-top: 1px dashed var(--border-light);
+  padding: 15px 20px;
   display: flex;
   flex-direction: column;
-  justify-content: center;
+  gap: 10px;
 }
-.wrp-card.current-record {
-  border-left: 4px solid var(--primary-green);
-  background: var(--highlight-green-bg);
-}
-.wrp-date {
+.wrp-slim-label {
   font-size: 0.75rem;
-  font-weight: 800;
-  color: var(--text-sub);
-  text-transform: uppercase;
-}
-.wrp-champion {
   font-weight: 900;
-  font-size: 1.1rem;
-  color: var(--text-title);
-  margin: 5px 0;
-}
-.wrp-value {
-  font-size: 0.85rem;
-  font-weight: 700;
-  color: var(--text-main);
-}
-.wrp-dethroned {
-  font-size: 0.75rem;
+  text-transform: uppercase;
   color: var(--text-muted);
-  margin-top: 8px;
-  padding-top: 8px;
-  border-top: 1px dotted var(--border-light);
+  letter-spacing: 1px;
+}
+.wrp-slim-track {
+  display: flex;
+  align-items: center;
+  overflow-x: auto;
+  padding-bottom: 5px;
+  gap: 12px;
+}
+.wrp-slim-track::-webkit-scrollbar { height: 6px; }
+.wrp-slim-track::-webkit-scrollbar-track { background: var(--scrollbar-track); border-radius: 4px; }
+.wrp-slim-track::-webkit-scrollbar-thumb { background: var(--scrollbar-thumb); border-radius: 4px; }
+.wrp-step {
+  display: flex;
+  flex-direction: column;
+  min-width: max-content;
+  padding-left: 12px;
+  border-left: 3px solid var(--border-table);
+}
+.wrp-step.current {
+  border-left: 3px solid var(--primary-green);
+  background: var(--highlight-green-bg);
+  padding: 6px 12px;
+  border-radius: 0 4px 4px 0;
+}
+.wrp-step-date {
+  font-size: 0.7rem;
+  font-weight: 800;
+  color: var(--text-muted);
+}
+.wrp-step-title {
+  font-size: 0.95rem;
+  font-weight: 900;
+  color: var(--text-title);
+  margin-top: 2px;
+}
+.wrp-step-sub {
+  font-size: 0.75rem;
+  color: var(--text-sub);
+  margin-top: 2px;
+}
+.wrp-arrow {
+  color: var(--border-table);
+  font-size: 1.1rem;
 }
