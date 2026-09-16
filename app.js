@@ -2787,23 +2787,14 @@ function setupLiveSearch() {
   }
 }
 
-// --- SPOTLIGHT RENDERING ---
-const spotlightTitles = {
-  mostPlayed: "All-Time Most Played Games",
-  longestSession: "Longest Single Sessions",
-  malloryMultiplayer: "Top 25: Mallory Multiplayer Experiences",
-  enzoMultiplayer: "Top 25: Enzo Multiplayer Experiences"
-};
-
-// --- SPOTLIGHT RENDERING ---
-function generateWRPTrackerHtml(listKey) {
-  const wrpData = rawData.metrics.spotlight.wrp[listKey];
-  if (!wrpData || wrpData.timeline.length === 0) return '';
+// --- SPOTLIGHT RENDERING & UNIVERSAL ENGINE ---
+function generateWRPTrackerHtml(wrpData) {
+  if (!wrpData || !wrpData.timeline || wrpData.timeline.length === 0) return '';
 
   const blocks = [];
-
-  // 1. Current Record Block (Left-most)
   const currentEvent = wrpData.timeline[wrpData.timeline.length - 1];
+  
+  // 1. Current Record Block
   blocks.push(`
     <div class="wrp-step current">
       <div class="wrp-step-date">CURRENT RECORD</div>
@@ -2820,18 +2811,15 @@ function generateWRPTrackerHtml(listKey) {
       <div class="wrp-step">
         <div class="wrp-step-date">${formatFullDate(event.date)}</div>
         <div class="wrp-step-title hover-trigger" data-game="${escapeHTML(event.champion)}">${escapeHTML(event.champion)}</div>
-        <div class="wrp-step-sub">${isFirst ? 'Inaugural Record' : `Dethroned ${escapeHTML(event.dethroned)}`} &bull; ${formatTime(event.takeoverValue)}</div>
+        <div class="wrp-step-sub">${isFirst ? 'Inaugural Record' : `Dethroned ${escapeHTML(event.dethroned)}`} &bull; <strong style="color: var(--text-title);">${formatTime(event.takeoverValue)}</strong></div>
       </div>
     `);
   }
 
-  // Join them with a left-pointing arrow
-  const timelineHtml = blocks.join('<div class="wrp-arrow">←</div>');
-
   return `
   <div class="wrp-slim-container">
     <div class="wrp-slim-label">World Record Progression (Newest to Oldest)</div>
-    <div class="wrp-slim-track">${timelineHtml}</div>
+    <div class="wrp-slim-track">${blocks.join('<div class="wrp-arrow">←</div>')}</div>
   </div>
   `;
 }
@@ -2843,7 +2831,6 @@ function generateUniversalDualTableHtml(listObj) {
         <tr>
           <th style="width: 55px;">${escapeHTML(headers[0])}</th>
           <th>${escapeHTML(headers[1])}</th>
-          <th style="width: 90px;">${escapeHTML(headers[2])}</th>
           <th style="width: 95px;">${escapeHTML(headers[3])}</th>
           <th style="width: 95px;">${escapeHTML(headers[4])}</th>
           <th style="width: 95px;">${escapeHTML(headers[5])}</th>
@@ -2852,30 +2839,28 @@ function generateUniversalDualTableHtml(listObj) {
       <tbody>`;
 
     rows.forEach(row => {
-      // Structure: [Rank/Year, Detail, System, Value, Start, End]
-      const col1 = row[0];
-      const detail = row[1];
-      const sysStr = row[2];
-      const val = row[3];
-      const start = row[4];
-      const end = row[5];
+      // row indices: [0:Rank/Year, 1:Detail, 2:System, 3:Val, 4:Start, 5:End]
+      const col1 = row[0] || '';
+      const detail = row[1] || '';
+      const sysStr = row[2] || '';
+      const val = row[3] || '';
+      const start = row[4] || '';
+      const end = row[5] || '';
 
-      // Automatically bold the row if the End Date happened this year!
       const currentYear = new Date().getFullYear().toString();
-      const isBold = (end && end.startsWith(currentYear)) || (col1 && col1.toString() === currentYear);
+      const isBold = (end && end.toString().startsWith(currentYear)) || (col1 && col1.toString() === currentYear);
       const boldStyle = isBold ? 'style="font-weight: 800; color: #000; background-color: #f0fff4;"' : '';
 
       html += `
       <tr>
-        <td class="text-center" style="font-weight: 800; color: var(--text-muted);">${escapeHTML(col1)}</td>
+        <td class="text-center" style="font-weight: 800; color: var(--text-muted);">${escapeHTML(String(col1))}</td>
         <td class="text-left" ${boldStyle}>
-          <span class="hover-trigger" data-game="${escapeHTML(detail)}">${escapeHTML(detail)}</span> 
-          ${sysStr ? `<span style="color: var(--text-muted); font-size: 0.85rem; font-weight: 600;">(${escapeHTML(sysStr)})</span>` : ''}
+          <span class="hover-trigger" data-game="${escapeHTML(String(detail))}">${escapeHTML(String(detail))}</span> 
+          ${sysStr ? `<span style="color: var(--text-muted); font-size: 0.85rem; font-weight: 600;">(${escapeHTML(String(sysStr))})</span>` : ''}
         </td>
-        <td class="text-center" style="font-size: 0.85rem; font-weight: 600;">${sysStr ? escapeHTML(sysStr) : '-'}</td>
-        <td class="text-center" style="background: var(--highlight-green-bg); color: var(--primary-green); font-weight: 900; white-space: nowrap;">${escapeHTML(val)}</td>
-        <td class="text-center" style="font-size: 0.85rem; white-space: nowrap;">${escapeHTML(start)}</td>
-        <td class="text-center" style="font-size: 0.85rem; white-space: nowrap;">${escapeHTML(end)}</td>
+        <td class="text-center" style="background: var(--highlight-green-bg); color: var(--primary-green); font-weight: 900; white-space: nowrap;">${escapeHTML(String(val))}</td>
+        <td class="text-center" style="font-size: 0.85rem; white-space: nowrap;">${escapeHTML(String(start))}</td>
+        <td class="text-center" style="font-size: 0.85rem; white-space: nowrap;">${escapeHTML(String(end))}</td>
       </tr>
       `;
     });
@@ -2884,25 +2869,27 @@ function generateUniversalDualTableHtml(listObj) {
     return html;
   };
 
+  let wrpHtml = '';
+  if (listObj.wrp) {
+     wrpHtml = generateWRPTrackerHtml(listObj.wrp);
+  }
+
   return `
-  <section class="card-row grid-1" style="margin-bottom: 30px;">
-    <div class="card" style="max-height: none;">
-      <div class="card-header" style="display: flex; justify-content: space-between;">
-        <h2 style="flex: 1; text-align: center;">${escapeHTML(listObj.titleLeft)}</h2>
-        <h2 style="flex: 1; text-align: center;">${escapeHTML(listObj.titleRight)}</h2>
-      </div>
-      <div class="card-content" style="padding: 0;">
-        <div class="spotlight-dual-container" style="padding: 20px;">
-          <div class="spotlight-section" style="overflow-x: auto;">
-            ${renderTable(listObj.allTime, listObj.headersLeft)}
-          </div>
-          <div class="spotlight-section" style="overflow-x: auto;">
-            ${renderTable(listObj.yearly, listObj.headersRight)}
-          </div>
+    <div class="card-header" style="display: flex; justify-content: space-between; border-bottom: 2px solid var(--border-light); padding: 15px 20px;">
+      <h2 style="flex: 1; text-align: center; font-size: 1.2rem; color: var(--primary-green); font-weight: 800;">${escapeHTML(listObj.titleLeft)}</h2>
+      <h2 style="flex: 1; text-align: center; font-size: 1.2rem; color: var(--primary-green); font-weight: 800;">${escapeHTML(listObj.titleRight)}</h2>
+    </div>
+    <div class="card-content" style="padding: 0;">
+      <div class="spotlight-dual-container" style="padding: 20px;">
+        <div class="spotlight-section" style="overflow-x: auto;">
+          ${renderTable(listObj.allTime, listObj.headersLeft)}
+        </div>
+        <div class="spotlight-section" style="overflow-x: auto;">
+          ${renderTable(listObj.yearly, listObj.headersRight)}
         </div>
       </div>
+      ${wrpHtml}
     </div>
-  </section>
   `;
 }
 
@@ -2911,32 +2898,114 @@ function initSpotlightPage() {
   const container = document.getElementById('spotlight-page-container');
   if (!container || !rawData || !rawData.metrics) return;
 
-  if (!rawData.metrics.spotlight) {
+  if (!rawData.metrics.spotlight && !rawData.metrics.top25Lists) {
     container.innerHTML = `<div class="loading-text" style="color: #ff9f1c;">Spotlight data not found in JSON. Please re-run DataAggregator.gs!</div>`;
     return;
   }
 
   let html = '';
 
-  // 1. Render the WRP Dynamic Lists (Most Played, Sessions, Mallory, Enzo)
-  // ... (You can leave your existing WRP loops here if you want to keep them at the top)
+  // 1. Manually adapt and render the 4 core lists WITH WRP attached
+  if (rawData.metrics.spotlight) {
+    const coreLists = [
+      { key: 'mostPlayed', titleLeft: 'Most Played Games', titleRight: 'Most Played Game by Year' },
+      { key: 'longestSession', titleLeft: 'Longest Single Sessions', titleRight: 'Longest Session by Year' },
+      { key: 'malloryMultiplayer', titleLeft: 'Mallory Multiplayer Experiences', titleRight: 'Mallory Multiplayer by Year' },
+      { key: 'enzoMultiplayer', titleLeft: 'Enzo Multiplayer Experiences', titleRight: 'Enzo Multiplayer by Year' }
+    ];
 
-  // 2. Render the NEW Nuclear Architecture Lists!
+    coreLists.forEach(config => {
+      const data = rawData.metrics.spotlight.lists[config.key];
+      const wrp = rawData.metrics.spotlight.wrp[config.key];
+      
+      if (data) {
+        const adaptedList = {
+          titleLeft: config.titleLeft,
+          titleRight: config.titleRight,
+          headersLeft: ['Rank', 'Videogame', 'System', 'Time', 'Start Date', 'End Date'],
+          headersRight: ['Year', 'Videogame', 'System', 'Time', 'Start Date', 'End Date'],
+          allTime: data.allTime.map((item, i) => [`#${i+1}`, item.game, item.system, formatTime(item.time), formatFullDate(item.startDate), formatFullDate(item.endDate)]),
+          yearly: data.yearly.map(item => [item.year, item.game, item.system, formatTime(item.time), formatFullDate(item.startDate), formatFullDate(item.endDate)]),
+          wrp: wrp
+        };
+        html += `<section class="card-row grid-1" style="margin-bottom: 30px;"><div class="card" style="max-height: none; padding: 0;">${generateUniversalDualTableHtml(adaptedList)}</div></section>`;
+      }
+    });
+  }
+
+  // 2. Render all the NEW Nuclear Architecture Lists!
   if (rawData.metrics.top25Lists && rawData.metrics.top25Lists.length > 0) {
     rawData.metrics.top25Lists.forEach(list => {
-      html += generateUniversalDualTableHtml(list);
+      html += `<section class="card-row grid-1" style="margin-bottom: 30px;"><div class="card" style="max-height: none; padding: 0;">${generateUniversalDualTableHtml(list)}</div></section>`;
     });
   }
 
   container.innerHTML = html;
 }
 
-// Routes to index.html widget
-function renderSpotlightSingle(listKey, targetContainerId = 'top25-table-container') {
-  const container = document.getElementById(targetContainerId);
-  if (!container || !rawData || !rawData.metrics || !rawData.metrics.spotlight) return;
+// Setup for the Index Page Dropdown
+function setupSpotlightDropdown() {
+  const spotSelect = document.getElementById('random-top25-select');
+  if (!spotSelect || !rawData || !rawData.metrics) return;
 
-  container.innerHTML = generateSpotlightDualTableHtml(listKey) + generateWRPTrackerHtml(listKey);
+  const options = [];
+  if (rawData.metrics.spotlight) {
+    options.push({ val: 'spot-mostPlayed', text: 'Most Played Games' });
+    options.push({ val: 'spot-longestSession', text: 'Longest Single Sessions' });
+    options.push({ val: 'spot-malloryMultiplayer', text: 'Mallory Multiplayer Experiences' });
+    options.push({ val: 'spot-enzoMultiplayer', text: 'Enzo Multiplayer Experiences' });
+  }
+  if (rawData.metrics.top25Lists) {
+    rawData.metrics.top25Lists.forEach((list, i) => {
+      options.push({ val: `list-${i}`, text: list.titleLeft });
+    });
+  }
+  
+  spotSelect.innerHTML = options.map(o => `<option value="${o.val}">${escapeHTML(o.text)}</option>`).join('');
+  spotSelect.addEventListener('change', (e) => renderSpotlightSingle(e.target.value, 'random-top25-content'));
+  
+  // Render the first one by default on load
+  if (options.length > 0) renderSpotlightSingle(options[0].val, 'random-top25-content');
+}
+
+// Routes to index.html widget
+function renderSpotlightSingle(selectionVal, targetContainerId) {
+  const container = document.getElementById(targetContainerId);
+  if (!container) return;
+
+  let listObj = null;
+
+  if (selectionVal.startsWith('spot-')) {
+    const key = selectionVal.replace('spot-', '');
+    const data = rawData.metrics.spotlight.lists[key];
+    const wrp = rawData.metrics.spotlight.wrp[key];
+    
+    const titleMap = {
+      mostPlayed: { left: 'Most Played Games', right: 'Most Played by Year' },
+      longestSession: { left: 'Longest Single Sessions', right: 'Longest Session by Year' },
+      malloryMultiplayer: { left: 'Mallory Multiplayer Experiences', right: 'Mallory Multiplayer by Year' },
+      enzoMultiplayer: { left: 'Enzo Multiplayer Experiences', right: 'Enzo Multiplayer by Year' }
+    };
+
+    if (data) {
+      listObj = {
+        titleLeft: titleMap[key].left,
+        titleRight: titleMap[key].right,
+        headersLeft: ['Rank', 'Videogame', 'System', 'Time', 'Start Date', 'End Date'],
+        headersRight: ['Year', 'Videogame', 'System', 'Time', 'Start Date', 'End Date'],
+        allTime: data.allTime.map((item, i) => [`#${i+1}`, item.game, item.system, formatTime(item.time), formatFullDate(item.startDate), formatFullDate(item.endDate)]),
+        yearly: data.yearly.map(item => [item.year, item.game, item.system, formatTime(item.time), formatFullDate(item.startDate), formatFullDate(item.endDate)]),
+        wrp: wrp
+      };
+    }
+  } else if (selectionVal.startsWith('list-')) {
+    const index = parseInt(selectionVal.replace('list-', ''));
+    listObj = rawData.metrics.top25Lists[index];
+  }
+
+  if (listObj) {
+    container.innerHTML = generateUniversalDualTableHtml(listObj);
+  }
 }
 
 // Initialize the dashboard
