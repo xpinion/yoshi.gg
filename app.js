@@ -2791,6 +2791,7 @@ function generateUniversalDualTableHtml(listObj) {
 }
 
 // Routes to spotlight.html
+// Routes to spotlight.html
 function initSpotlightPage() {
   const container = document.getElementById('spotlight-page-container');
   if (!container || !rawData || !rawData.metrics) return;
@@ -2800,11 +2801,99 @@ function initSpotlightPage() {
     return;
   }
 
-  let html = '';
-  rawData.metrics.top25Lists.forEach(list => {
-    html += `<section class="card-row grid-1" style="margin-bottom: 30px;"><div class="card" style="max-height: none; padding: 0;">${generateUniversalDualTableHtml(list)}</div></section>`;
+  // 1. Categorize lists for the Table of Contents
+  const categories = {
+    "Playtime & Activity": [],
+    "Co-Op & Multiplayer": [],
+    "Metadata Hubs": [],
+    "Streaks & Habits": [],
+    "Completions & Abandons": [],
+    "Other": []
+  };
+
+  rawData.metrics.top25Lists.forEach((list, index) => {
+    let category = "Other";
+    const title = list.titleLeft;
+    
+    // Auto-categorize based on title keywords
+    if (title.includes("Multiplayer") || title.includes("Mallory") || title.includes("Enzo")) category = "Co-Op & Multiplayer";
+    else if (title.includes("Streak")) category = "Streaks & Habits";
+    else if (title.includes("Completion") || title.includes("Abandon")) category = "Completions & Abandons";
+    else if (title.includes("Series") || title.includes("Genre") || title.includes("Developer") || title.includes("Publisher") || title.includes("Release Year")) category = "Metadata Hubs";
+    else category = "Playtime & Activity";
+
+    // Extract the #1 Record Holder from the first row of the All-Time list
+    let recordName = "N/A", recordVal = "-", recordSys = "";
+    if (list.allTime && list.allTime.length > 0) {
+      const topRow = list.allTime[0];
+      recordName = topRow[1] || "N/A";
+      recordSys = topRow[2] || "";
+      recordVal = topRow[3] || "-";
+    }
+
+    categories[category].push({ index, title, recordName, recordSys, recordVal });
   });
+
+  // 2. Build the TOC HTML with injected CSS for hover states
+  let html = `
+  <style>
+    .spotlight-toc-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 20px; margin-bottom: 40px; }
+    .toc-category-title { font-size: 1rem; color: var(--primary-green); margin-bottom: 10px; border-bottom: 1px solid var(--border-light); padding-bottom: 5px; font-weight: 900; text-transform: uppercase; letter-spacing: 1px; }
+    .toc-item { display: flex; flex-direction: column; text-decoration: none; color: var(--text-main); padding: 10px 12px; border-radius: 6px; transition: all 0.2s ease; border-left: 4px solid transparent; background: transparent; }
+    .toc-item:hover { background: var(--item-bg); border-left-color: var(--primary-green); transform: translateX(4px); box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
+    .toc-item-title { font-size: 0.9rem; font-weight: 800; margin-bottom: 4px; }
+    .toc-item-details { display: flex; justify-content: space-between; align-items: center; font-size: 0.75rem; color: var(--text-muted); }
+    .toc-item-name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 75%; font-weight: 600; }
+    .toc-item-val { font-weight: 900; color: var(--primary-green); background: var(--highlight-green-bg); padding: 3px 8px; border-radius: 6px; }
+  </style>
   
+  <div class="card-row grid-1">
+    <h2 style="font-size: 2.5rem; color: var(--text-header); font-weight: 900; text-align: center; margin-bottom: 10px;">Spotlight Archive Directory</h2>
+  </div>
+  
+  <div class="spotlight-toc-grid">
+  `;
+
+  // Render each category block
+  for (const [catName, items] of Object.entries(categories)) {
+    if (items.length === 0) continue;
+    
+    html += `
+    <div class="card" style="padding: 20px; animation: fadeInUp 0.4s ease forwards;">
+      <h3 class="toc-category-title">${escapeHTML(catName)}</h3>
+      <div style="display: flex; flex-direction: column; gap: 4px;">
+    `;
+    
+    items.forEach(item => {
+      // Cleanly append the system/game-count string if it exists
+      const sysHtml = item.recordSys ? `<span style="color: var(--text-sub); font-weight: normal;"> (${escapeHTML(item.recordSys)})</span>` : '';
+      
+      html += `
+        <a href="#spotlight-list-${item.index}" class="toc-item">
+          <div class="toc-item-title">${escapeHTML(item.title)}</div>
+          <div class="toc-item-details">
+            <span class="toc-item-name">🥇 ${escapeHTML(item.recordName)}${sysHtml}</span>
+            <span class="toc-item-val">${escapeHTML(item.recordVal)}</span>
+          </div>
+        </a>
+      `;
+    });
+    
+    html += `</div></div>`;
+  }
+  html += `</div>`;
+
+  // 3. Build the actual spotlight lists underneath, wrapping them in anchor IDs
+  rawData.metrics.top25Lists.forEach((list, index) => {
+    html += `
+    <section id="spotlight-list-${index}" class="card-row grid-1" style="margin-bottom: 30px; scroll-margin-top: 80px;">
+      <div class="card" style="max-height: none; padding: 0;">
+        ${generateUniversalDualTableHtml(list)}
+      </div>
+    </section>
+    `;
+  });
+
   container.innerHTML = html;
 }
 
