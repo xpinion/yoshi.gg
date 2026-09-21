@@ -2665,37 +2665,44 @@ function setupLiveSearch() {
   }
 }
 
-// --- SPOTLIGHT RENDERING & UNIVERSAL ENGINE ---
-function generateWRPTrackerHtml(wrpData) {
+function generateWRPTrackerHtml(wrpData, isGame = true) {
   if (!wrpData || !wrpData.timeline || wrpData.timeline.length === 0) return '';
 
   const blocks = [];
   const currentEvent = wrpData.timeline[wrpData.timeline.length - 1];
-  
+
+  const currentChampHtml = isGame
+    ? `<div class="wrp-step-title hover-trigger" data-game="${escapeHTML(currentEvent.champion)}">${escapeHTML(currentEvent.champion)}</div>`
+    : `<div class="wrp-step-title">${escapeHTML(currentEvent.champion)}</div>`;
+
   blocks.push(`
-    <div class="wrp-step current">
-      <div class="wrp-step-date">CURRENT RECORD</div>
-      <div class="wrp-step-title hover-trigger" data-game="${escapeHTML(currentEvent.champion)}">${escapeHTML(currentEvent.champion)}</div>
-      <div class="wrp-step-sub" style="color: var(--primary-green); font-weight: bold;">Extended to ${escapeHTML(wrpData.val)}</div>
-    </div>
+  <div class="wrp-step current">
+  <div class="wrp-step-date">CURRENT RECORD</div>
+  ${currentChampHtml}
+  <div class="wrp-step-sub" style="color: var(--primary-green); font-weight: bold;">Extended to ${escapeHTML(wrpData.val)}</div>
+  </div>
   `);
 
   for (let i = wrpData.timeline.length - 1; i >= 0; i--) {
     const event = wrpData.timeline[i];
     const isFirst = (i === 0);
+    const eventChampHtml = isGame
+      ? `<div class="wrp-step-title hover-trigger" data-game="${escapeHTML(event.champion)}">${escapeHTML(event.champion)}</div>`
+      : `<div class="wrp-step-title">${escapeHTML(event.champion)}</div>`;
+
     blocks.push(`
-      <div class="wrp-step">
-        <div class="wrp-step-date">${formatFullDate(event.date)}</div>
-        <div class="wrp-step-title hover-trigger" data-game="${escapeHTML(event.champion)}">${escapeHTML(event.champion)}</div>
-        <div class="wrp-step-sub">${isFirst ? 'Inaugural Record' : `Dethroned ${escapeHTML(event.dethroned)}`} &bull; <strong style="color: var(--text-title);">${escapeHTML(event.takeoverValue)}</strong></div>
-      </div>
+    <div class="wrp-step">
+    <div class="wrp-step-date">${formatFullDate(event.date)}</div>
+    ${eventChampHtml}
+    <div class="wrp-step-sub">${isFirst ? 'Inaugural Record' : `Dethroned ${escapeHTML(event.dethroned)}`} &bull; <strong style="color: var(--text-title);">${escapeHTML(event.takeoverValue)}</strong></div>
+    </div>
     `);
   }
 
   return `
   <div class="wrp-slim-container">
-    <div class="wrp-slim-label">World Record Progression (Newest to Oldest)</div>
-    <div class="wrp-slim-track">${blocks.join('<div class="wrp-arrow">←</div>')}</div>
+  <div class="wrp-slim-label">World Record Progression (Newest to Oldest)</div>
+  <div class="wrp-slim-track">${blocks.join('<div class="wrp-arrow">←</div>')}</div>
   </div>
   `;
 }
@@ -2703,16 +2710,18 @@ function generateWRPTrackerHtml(wrpData) {
 function generateUniversalDualTableHtml(listObj) {
   const renderTable = (rows, headers) => {
     let html = `<table class="top25-table">
-      <thead>
-        <tr>
-          <th style="width: 55px;">${escapeHTML(headers[0])}</th>
-          <th>${escapeHTML(headers[1])}</th>
-          <th style="width: 95px;">${escapeHTML(headers[3])}</th>
-          <th style="width: 95px;">${escapeHTML(headers[4])}</th>
-          <th style="width: 95px;">${escapeHTML(headers[5])}</th>
-        </tr>
-      </thead>
-      <tbody>`;
+    <thead>
+    <tr>
+    <th style="width: 55px;">${escapeHTML(headers[0])}</th>
+    <th>${escapeHTML(headers[1])}</th>
+    <th style="width: 95px;">${escapeHTML(headers[3])}</th>
+    <th style="width: 95px;">${escapeHTML(headers[4])}</th>
+    <th style="width: 95px;">${escapeHTML(headers[5])}</th>
+    </tr>
+    </thead>
+    <tbody>`;
+
+    const isGame = headers[1] === "Videogame";
 
     rows.forEach(row => {
       const col1 = row[0] || '';
@@ -2726,16 +2735,20 @@ function generateUniversalDualTableHtml(listObj) {
       const isBold = (end && end.toString().startsWith(currentYear)) || (col1 && col1.toString() === currentYear);
       const boldStyle = isBold ? 'style="font-weight: 800; color: #000; background-color: #f0fff4;"' : '';
 
+      const detailHtml = isGame
+        ? `<span class="hover-trigger" data-game="${escapeHTML(String(detail))}">${escapeHTML(String(detail))}</span>`
+        : `<span>${escapeHTML(String(detail))}</span>`;
+
       html += `
       <tr>
-        <td class="text-center" style="font-weight: 800; color: var(--text-muted);">${escapeHTML(String(col1))}</td>
-        <td class="text-left" ${boldStyle}>
-          <span class="hover-trigger" data-game="${escapeHTML(String(detail))}">${escapeHTML(String(detail))}</span> 
-          ${sysStr ? `<span style="color: var(--text-muted); font-size: 0.85rem; font-weight: 600;">(${escapeHTML(String(sysStr))})</span>` : ''}
-        </td>
-        <td class="text-center" style="background: var(--highlight-green-bg); color: var(--primary-green); font-weight: 900; white-space: nowrap;">${escapeHTML(String(val))}</td>
-        <td class="text-center" style="font-size: 0.85rem; white-space: nowrap;">${escapeHTML(String(start))}</td>
-        <td class="text-center" style="font-size: 0.85rem; white-space: nowrap;">${escapeHTML(String(end))}</td>
+      <td class="text-center" style="font-weight: 800; color: var(--text-muted);">${escapeHTML(String(col1))}</td>
+      <td class="text-left" ${boldStyle}>
+      ${detailHtml}
+      ${sysStr ? `<span style="color: var(--text-muted); font-size: 0.85rem; font-weight: 600;">(${escapeHTML(String(sysStr))})</span>` : ''}
+      </td>
+      <td class="text-center" style="background: var(--highlight-green-bg); color: var(--primary-green); font-weight: 900; white-space: nowrap;">${escapeHTML(String(val))}</td>
+      <td class="text-center" style="font-size: 0.85rem; white-space: nowrap;">${escapeHTML(String(start))}</td>
+      <td class="text-center" style="font-size: 0.85rem; white-space: nowrap;">${escapeHTML(String(end))}</td>
       </tr>
       `;
     });
@@ -2744,25 +2757,27 @@ function generateUniversalDualTableHtml(listObj) {
     return html;
   };
 
+  const isGameLeft = listObj.headersLeft && listObj.headersLeft[1] === "Videogame";
+
   let wrpHtml = '';
-  if (listObj.wrp) wrpHtml = generateWRPTrackerHtml(listObj.wrp);
+  if (listObj.wrp) wrpHtml = generateWRPTrackerHtml(listObj.wrp, isGameLeft);
 
   return `
-    <div class="card-header" style="display: flex; justify-content: space-between; border-bottom: 2px solid var(--border-light); padding: 15px 20px;">
-      <h2 style="flex: 1; text-align: center; font-size: 1.2rem; color: var(--primary-green); font-weight: 800;">${escapeHTML(listObj.titleLeft)}</h2>
-      <h2 style="flex: 1; text-align: center; font-size: 1.2rem; color: var(--primary-green); font-weight: 800;">${escapeHTML(listObj.titleRight)}</h2>
-    </div>
-    <div class="card-content" style="padding: 0;">
-      <div class="spotlight-dual-container" style="padding: 20px;">
-        <div class="spotlight-section" style="overflow-x: auto;">
-          ${renderTable(listObj.allTime, listObj.headersLeft)}
-        </div>
-        <div class="spotlight-section" style="overflow-x: auto;">
-          ${renderTable(listObj.yearly, listObj.headersRight)}
-        </div>
-      </div>
-      ${wrpHtml}
-    </div>
+  <div class="card-header" style="display: flex; justify-content: space-between; border-bottom: 2px solid var(--border-light); padding: 15px 20px;">
+  <h2 style="flex: 1; text-align: center; font-size: 1.2rem; color: var(--primary-green); font-weight: 800;">${escapeHTML(listObj.titleLeft)}</h2>
+  <h2 style="flex: 1; text-align: center; font-size: 1.2rem; color: var(--primary-green); font-weight: 800;">${escapeHTML(listObj.titleRight)}</h2>
+  </div>
+  <div class="card-content" style="padding: 0;">
+  <div class="spotlight-dual-container" style="padding: 20px;">
+  <div class="spotlight-section" style="overflow-x: auto;">
+  ${renderTable(listObj.allTime, listObj.headersLeft)}
+  </div>
+  <div class="spotlight-section" style="overflow-x: auto;">
+  ${renderTable(listObj.yearly, listObj.headersRight)}
+  </div>
+  </div>
+  ${wrpHtml}
+  </div>
   `;
 }
 
