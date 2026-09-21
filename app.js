@@ -2807,12 +2807,11 @@ function initSpotlightPage() {
     "Co-Op & Multiplayer": [],
     "Metadata Hubs": [],
     "Streaks & Habits": [],
-    "Completions & Abandons": [],
-    "Other": []
+    "Completions & Abandons": []
   };
 
   rawData.metrics.top25Lists.forEach((list, index) => {
-    let category = "Other";
+    let category = "Playtime & Activity";
     const title = list.titleLeft;
     
     // Auto-categorize based on title keywords
@@ -2820,68 +2819,82 @@ function initSpotlightPage() {
     else if (title.includes("Streak")) category = "Streaks & Habits";
     else if (title.includes("Completion") || title.includes("Abandon")) category = "Completions & Abandons";
     else if (title.includes("Series") || title.includes("Genre") || title.includes("Developer") || title.includes("Publisher") || title.includes("Release Year")) category = "Metadata Hubs";
-    else category = "Playtime & Activity";
 
     // Extract the #1 Record Holder from the first row of the All-Time list
-    let recordName = "N/A", recordVal = "-", recordSys = "";
+    let colB = "-", colC = "-", colD = "-", colE = "-", subDetail = "";
+
     if (list.allTime && list.allTime.length > 0) {
       const topRow = list.allTime[0];
-      recordName = topRow[1] || "N/A";
-      recordSys = topRow[2] || "";
-      recordVal = topRow[3] || "-";
+      colB = topRow[1] || "-";
+      colC = topRow[2] || "-";
+      colD = topRow[3] || "-";
+      colE = topRow[4] || "-";
+      subDetail = topRow[6] || "";
     }
 
-    categories[category].push({ index, title, recordName, recordSys, recordVal });
+    categories[category].push({ index, title, colB, colC, colD, colE, subDetail });
   });
 
-  // 2. Build the TOC HTML with injected CSS for hover states
+  // 2. Build the TOC HTML with inline table styling
   let html = `
   <style>
-    .spotlight-toc-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 20px; margin-bottom: 40px; }
-    .toc-category-title { font-size: 1rem; color: var(--primary-green); margin-bottom: 10px; border-bottom: 1px solid var(--border-light); padding-bottom: 5px; font-weight: 900; text-transform: uppercase; letter-spacing: 1px; }
-    .toc-item { display: flex; flex-direction: column; text-decoration: none; color: var(--text-main); padding: 10px 12px; border-radius: 6px; transition: all 0.2s ease; border-left: 4px solid transparent; background: transparent; }
-    .toc-item:hover { background: var(--item-bg); border-left-color: var(--primary-green); transform: translateX(4px); box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
-    .toc-item-title { font-size: 0.9rem; font-weight: 800; margin-bottom: 4px; }
-    .toc-item-details { display: flex; justify-content: space-between; align-items: center; font-size: 0.75rem; color: var(--text-muted); }
-    .toc-item-name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 75%; font-weight: 600; }
-    .toc-item-val { font-weight: 900; color: var(--primary-green); background: var(--highlight-green-bg); padding: 3px 8px; border-radius: 6px; }
+    .toc-category-wrapper { margin-bottom: 40px; }
+    .toc-category-title { font-size: 1.2rem; color: var(--primary-green); margin-bottom: 12px; border-bottom: 2px solid var(--primary-green); padding-bottom: 5px; font-weight: 900; text-transform: uppercase; letter-spacing: 1px; }
+    .toc-table { width: 100%; border-collapse: collapse; font-size: 0.9rem; background: var(--card-bg); box-shadow: 0 4px 15px rgba(0,0,0,0.05); border-radius: 8px; overflow: hidden; }
+    .toc-table th { background-color: var(--primary-green); color: white; padding: 12px 10px; text-align: left; font-weight: 700; border: 1px solid rgba(0,0,0,0.2); }
+    .toc-table td { padding: 12px 10px; border: 1px solid var(--border-table); vertical-align: middle; }
+    .toc-table tr:nth-child(even) { background-color: var(--table-row-even); }
+    .toc-table tr:hover { background-color: var(--table-row-hover); }
+    .toc-link { font-weight: 900; color: var(--primary-green); text-decoration: none; display: flex; align-items: center; gap: 5px; transition: color 0.2s; }
+    .toc-link:hover { color: var(--text-main); text-decoration: underline; }
   </style>
   
   <div class="card-row grid-1">
-    <h2 style="font-size: 2.5rem; color: var(--text-header); font-weight: 900; text-align: center; margin-bottom: 10px;">Spotlight Archive Directory</h2>
+    <h2 style="font-size: 2.5rem; color: var(--text-header); font-weight: 900; text-align: center; margin-bottom: 15px;">Spotlight Archive Directory</h2>
   </div>
-  
-  <div class="spotlight-toc-grid">
   `;
 
-  // Render each category block
+  // Render each category block as a wide table
   for (const [catName, items] of Object.entries(categories)) {
     if (items.length === 0) continue;
     
     html += `
-    <div class="card" style="padding: 20px; animation: fadeInUp 0.4s ease forwards;">
+    <div class="toc-category-wrapper" style="animation: fadeInUp 0.4s ease forwards;">
       <h3 class="toc-category-title">${escapeHTML(catName)}</h3>
-      <div style="display: flex; flex-direction: column; gap: 4px;">
+      <div style="overflow-x: auto;">
+        <table class="toc-table">
+          <thead>
+            <tr>
+              <th style="width: 25%;">List Name</th>
+              <th style="width: 35%;">Record Holder (Col B)</th>
+              <th style="width: 15%;">Context (Col C)</th>
+              <th style="width: 10%; text-align: center;">Record (Col D)</th>
+              <th style="width: 15%; text-align: center;">Start Date (Col E)</th>
+            </tr>
+          </thead>
+          <tbody>
     `;
     
     items.forEach(item => {
-      // Cleanly append the system/game-count string if it exists
-      const sysHtml = item.recordSys ? `<span style="color: var(--text-sub); font-weight: normal;"> (${escapeHTML(item.recordSys)})</span>` : '';
+      // Inject the subtext if it exists (e.g., "Most Played: Legend of Zelda...")
+      const subDetailHtml = item.subDetail ? `<div style="font-size: 0.75rem; color: var(--text-sub); margin-top: 4px; font-weight: 600;">Most Played: ${escapeHTML(item.subDetail)}</div>` : '';
       
       html += `
-        <a href="#spotlight-list-${item.index}" class="toc-item">
-          <div class="toc-item-title">${escapeHTML(item.title)}</div>
-          <div class="toc-item-details">
-            <span class="toc-item-name">🥇 ${escapeHTML(item.recordName)}${sysHtml}</span>
-            <span class="toc-item-val">${escapeHTML(item.recordVal)}</span>
-          </div>
-        </a>
+        <tr>
+          <td><a href="#spotlight-list-${item.index}" class="toc-link">▶ ${escapeHTML(item.title)}</a></td>
+          <td style="font-weight: 800; color: var(--text-title);">
+            ${escapeHTML(item.colB)}
+            ${subDetailHtml}
+          </td>
+          <td style="color: var(--text-muted); font-weight: 600;">${escapeHTML(item.colC)}</td>
+          <td style="text-align: center; font-weight: 900; color: var(--primary-green); background: var(--highlight-green-bg); border-left: 2px solid var(--primary-green);">${escapeHTML(item.colD)}</td>
+          <td style="text-align: center; font-size: 0.85rem; color: var(--text-muted); font-weight: 600;">${escapeHTML(item.colE)}</td>
+        </tr>
       `;
     });
     
-    html += `</div></div>`;
+    html += `</tbody></table></div></div>`;
   }
-  html += `</div>`;
 
   // 3. Build the actual spotlight lists underneath, wrapping them in anchor IDs
   rawData.metrics.top25Lists.forEach((list, index) => {
