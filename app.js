@@ -2665,15 +2665,15 @@ function setupLiveSearch() {
   }
 }
 
-function generateWRPTrackerHtml(wrpData, isGame = true) {
+function generateWRPTrackerHtml(wrpData, isGameList = true) {
   if (!wrpData || !wrpData.timeline || wrpData.timeline.length === 0) return '';
 
   const blocks = [];
   const currentEvent = wrpData.timeline[wrpData.timeline.length - 1];
 
-  const currentChampHtml = isGame
+  const currentChampHtml = isGameList
     ? `<div class="wrp-step-title hover-trigger" data-game="${escapeHTML(currentEvent.champion)}">${escapeHTML(currentEvent.champion)}</div>`
-    : `<div class="wrp-step-title">${escapeHTML(currentEvent.champion)}</div>`;
+    : `<div class="wrp-step-title" style="font-weight: 800; color: var(--text-title);">${escapeHTML(currentEvent.champion)}</div>`;
 
   blocks.push(`
   <div class="wrp-step current">
@@ -2686,9 +2686,10 @@ function generateWRPTrackerHtml(wrpData, isGame = true) {
   for (let i = wrpData.timeline.length - 1; i >= 0; i--) {
     const event = wrpData.timeline[i];
     const isFirst = (i === 0);
-    const eventChampHtml = isGame
+    
+    const eventChampHtml = isGameList
       ? `<div class="wrp-step-title hover-trigger" data-game="${escapeHTML(event.champion)}">${escapeHTML(event.champion)}</div>`
-      : `<div class="wrp-step-title">${escapeHTML(event.champion)}</div>`;
+      : `<div class="wrp-step-title" style="font-weight: 800; color: var(--text-title);">${escapeHTML(event.champion)}</div>`;
 
     blocks.push(`
     <div class="wrp-step">
@@ -2714,6 +2715,7 @@ function generateUniversalDualTableHtml(listObj) {
     <tr>
     <th style="width: 55px;">${escapeHTML(headers[0])}</th>
     <th>${escapeHTML(headers[1])}</th>
+    <th style="width: 95px;">${escapeHTML(headers[2])}</th>
     <th style="width: 95px;">${escapeHTML(headers[3])}</th>
     <th style="width: 95px;">${escapeHTML(headers[4])}</th>
     <th style="width: 95px;">${escapeHTML(headers[5])}</th>
@@ -2721,7 +2723,7 @@ function generateUniversalDualTableHtml(listObj) {
     </thead>
     <tbody>`;
 
-    const isGame = headers[1] === "Videogame";
+    const isGameList = headers[1] === "Videogame";
 
     rows.forEach(row => {
       const col1 = row[0] || '';
@@ -2730,22 +2732,28 @@ function generateUniversalDualTableHtml(listObj) {
       const val = row[3] || '';
       const start = row[4] || '';
       const end = row[5] || '';
+      const detailSub = row[6] || ''; 
 
       const currentYear = new Date().getFullYear().toString();
       const isBold = (end && end.toString().startsWith(currentYear)) || (col1 && col1.toString() === currentYear);
       const boldStyle = isBold ? 'style="font-weight: 800; color: #000; background-color: #f0fff4;"' : '';
 
-      const detailHtml = isGame
+      const detailMainHtml = isGameList
         ? `<span class="hover-trigger" data-game="${escapeHTML(String(detail))}">${escapeHTML(String(detail))}</span>`
-        : `<span>${escapeHTML(String(detail))}</span>`;
+        : `<span style="font-weight: 800; color: var(--text-title);">${escapeHTML(String(detail))}</span>`;
+
+      const detailSubHtml = detailSub
+        ? `<div style="font-size: 0.8rem; font-weight: 600; color: var(--text-sub); margin-top: 2px;">Most Played: ${escapeHTML(String(detailSub))}</div>`
+        : '';
 
       html += `
       <tr>
       <td class="text-center" style="font-weight: 800; color: var(--text-muted);">${escapeHTML(String(col1))}</td>
       <td class="text-left" ${boldStyle}>
-      ${detailHtml}
-      ${sysStr ? `<span style="color: var(--text-muted); font-size: 0.85rem; font-weight: 600;">(${escapeHTML(String(sysStr))})</span>` : ''}
+        ${detailMainHtml}
+        ${detailSubHtml}
       </td>
+      <td class="text-center" style="font-size: 0.85rem; font-weight: 600;">${escapeHTML(String(sysStr))}</td>
       <td class="text-center" style="background: var(--highlight-green-bg); color: var(--primary-green); font-weight: 900; white-space: nowrap;">${escapeHTML(String(val))}</td>
       <td class="text-center" style="font-size: 0.85rem; white-space: nowrap;">${escapeHTML(String(start))}</td>
       <td class="text-center" style="font-size: 0.85rem; white-space: nowrap;">${escapeHTML(String(end))}</td>
