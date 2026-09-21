@@ -2715,7 +2715,6 @@ function generateUniversalDualTableHtml(listObj) {
     <tr>
     <th style="width: 55px;">${escapeHTML(headers[0])}</th>
     <th>${escapeHTML(headers[1])}</th>
-    <th style="width: 95px;">${escapeHTML(headers[2])}</th>
     <th style="width: 95px;">${escapeHTML(headers[3])}</th>
     <th style="width: 95px;">${escapeHTML(headers[4])}</th>
     <th style="width: 95px;">${escapeHTML(headers[5])}</th>
@@ -2736,12 +2735,14 @@ function generateUniversalDualTableHtml(listObj) {
 
       const currentYear = new Date().getFullYear().toString();
       const isBold = (end && end.toString().startsWith(currentYear)) || (col1 && col1.toString() === currentYear);
+      // Ensure we keep your custom active class or bold styling here
       const boldStyle = isBold ? 'style="font-weight: 800; color: #000; background-color: #f0fff4;"' : '';
 
       const detailMainHtml = isGameList
         ? `<span class="hover-trigger" data-game="${escapeHTML(String(detail))}">${escapeHTML(String(detail))}</span>`
         : `<span style="font-weight: 800; color: var(--text-title);">${escapeHTML(String(detail))}</span>`;
 
+      // Subtext rendering (e.g., "Most Played: Legend of Zelda... [224:30]")
       const detailSubHtml = detailSub
         ? `<div style="font-size: 0.8rem; font-weight: 600; color: var(--text-sub); margin-top: 2px;">Most Played: ${escapeHTML(String(detailSub))}</div>`
         : '';
@@ -2751,9 +2752,9 @@ function generateUniversalDualTableHtml(listObj) {
       <td class="text-center" style="font-weight: 800; color: var(--text-muted);">${escapeHTML(String(col1))}</td>
       <td class="text-left" ${boldStyle}>
         ${detailMainHtml}
+        ${sysStr ? `<span style="color: var(--text-muted); font-size: 0.85rem; font-weight: 600; margin-left: 4px;">(${escapeHTML(String(sysStr))})</span>` : ''}
         ${detailSubHtml}
       </td>
-      <td class="text-center" style="font-size: 0.85rem; font-weight: 600;">${escapeHTML(String(sysStr))}</td>
       <td class="text-center" style="background: var(--highlight-green-bg); color: var(--primary-green); font-weight: 900; white-space: nowrap;">${escapeHTML(String(val))}</td>
       <td class="text-center" style="font-size: 0.85rem; white-space: nowrap;">${escapeHTML(String(start))}</td>
       <td class="text-center" style="font-size: 0.85rem; white-space: nowrap;">${escapeHTML(String(end))}</td>
