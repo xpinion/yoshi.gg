@@ -2824,12 +2824,18 @@ function initSpotlightPage() {
 
     if (list.allTime && list.allTime.length > 0) {
       const topRow = list.allTime[0];
-      recordName = topRow[1] || "-";    // Main title
-      recordContext = topRow[2] || "";  // System or Games count
-      recordValue = topRow[3] || "-";   // Time/Days/Score value
-      startDate = topRow[4] || "-";     
-      endDate = topRow[5] || "-";       
-      subDetail = topRow[6] || "";      // Most Played detail
+      recordName = topRow[1] || "-";    
+      recordContext = topRow[2] || "";  
+      recordValue = topRow[3] || "-";   
+      startDate = topRow[4] || "-";
+      endDate = topRow[5] || "-";
+      
+      // FIX: Hide lengthy sub-details from the TOC for specific lists
+      if (title.includes("Diverse Days") || title.includes("Completion Days") || title.includes("Completion Months") || title.includes("Completion Weeks")) {
+        subDetail = "";
+      } else {
+        subDetail = topRow[6] || "";      
+      }
     }
 
     categories[category].push({ index, title, recordName, recordContext, recordValue, startDate, endDate, subDetail });
