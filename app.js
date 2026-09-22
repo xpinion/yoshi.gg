@@ -2791,7 +2791,6 @@ function generateUniversalDualTableHtml(listObj) {
 }
 
 // Routes to spotlight.html
-// Routes to spotlight.html
 function initSpotlightPage() {
   const container = document.getElementById('spotlight-page-container');
   if (!container || !rawData || !rawData.metrics) return;
@@ -2821,18 +2820,19 @@ function initSpotlightPage() {
     else if (title.includes("Series") || title.includes("Genre") || title.includes("Developer") || title.includes("Publisher") || title.includes("Release Year")) category = "Metadata Hubs";
 
     // Extract the #1 Record Holder from the first row of the All-Time list
-    let colB = "-", colC = "-", colD = "-", colE = "-", subDetail = "";
+    let recordName = "-", recordContext = "", recordValue = "-", startDate = "-", endDate = "-", subDetail = "";
 
     if (list.allTime && list.allTime.length > 0) {
       const topRow = list.allTime[0];
-      colB = topRow[1] || "-";
-      colC = topRow[2] || "-";
-      colD = topRow[3] || "-";
-      colE = topRow[4] || "-";
-      subDetail = topRow[6] || "";
+      recordName = topRow[1] || "-";    // Main title
+      recordContext = topRow[2] || "";  // System or Games count
+      recordValue = topRow[3] || "-";   // Time/Days/Score value
+      startDate = topRow[4] || "-";     
+      endDate = topRow[5] || "-";       
+      subDetail = topRow[6] || "";      // Most Played detail
     }
 
-    categories[category].push({ index, title, colB, colC, colD, colE, subDetail });
+    categories[category].push({ index, title, recordName, recordContext, recordValue, startDate, endDate, subDetail });
   });
 
   // 2. Build the TOC HTML with inline table styling
@@ -2866,29 +2866,29 @@ function initSpotlightPage() {
           <thead>
             <tr>
               <th style="width: 25%;">List Name</th>
-              <th style="width: 35%;">Record Holder (Col B)</th>
-              <th style="width: 15%;">Context (Col C)</th>
-              <th style="width: 10%; text-align: center;">Record (Col D)</th>
-              <th style="width: 15%; text-align: center;">Start Date (Col E)</th>
+              <th style="width: 35%;">Record Holder</th>
+              <th style="width: 15%; text-align: center;">Record</th>
+              <th style="width: 12.5%; text-align: center;">Start Date</th>
+              <th style="width: 12.5%; text-align: center;">End Date</th>
             </tr>
           </thead>
           <tbody>
     `;
     
     items.forEach(item => {
-      // Inject the subtext if it exists (e.g., "Most Played: Legend of Zelda...")
       const subDetailHtml = item.subDetail ? `<div style="font-size: 0.75rem; color: var(--text-sub); margin-top: 4px; font-weight: 600;">Most Played: ${escapeHTML(item.subDetail)}</div>` : '';
+      const contextHtml = (item.recordContext && item.recordContext !== '-') ? `<span style="color: var(--text-muted); font-size: 0.85rem; font-weight: 600; margin-left: 4px;">(${escapeHTML(item.recordContext)})</span>` : '';
       
       html += `
         <tr>
           <td><a href="#spotlight-list-${item.index}" class="toc-link">▶ ${escapeHTML(item.title)}</a></td>
           <td style="font-weight: 800; color: var(--text-title);">
-            ${escapeHTML(item.colB)}
+            ${escapeHTML(item.recordName)}${contextHtml}
             ${subDetailHtml}
           </td>
-          <td style="color: var(--text-muted); font-weight: 600;">${escapeHTML(item.colC)}</td>
-          <td style="text-align: center; font-weight: 900; color: var(--primary-green); background: var(--highlight-green-bg); border-left: 2px solid var(--primary-green);">${escapeHTML(item.colD)}</td>
-          <td style="text-align: center; font-size: 0.85rem; color: var(--text-muted); font-weight: 600;">${escapeHTML(item.colE)}</td>
+          <td style="text-align: center; font-weight: 900; color: var(--primary-green); background: var(--highlight-green-bg); border-left: 2px solid var(--primary-green);">${escapeHTML(item.recordValue)}</td>
+          <td style="text-align: center; font-size: 0.85rem; color: var(--text-muted); font-weight: 600;">${escapeHTML(item.startDate)}</td>
+          <td style="text-align: center; font-size: 0.85rem; color: var(--text-muted); font-weight: 600;">${escapeHTML(item.endDate)}</td>
         </tr>
       `;
     });
