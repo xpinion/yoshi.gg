@@ -2742,9 +2742,9 @@ function generateUniversalDualTableHtml(listObj) {
         ? `<span class="hover-trigger" data-game="${escapeHTML(String(detail))}">${escapeHTML(String(detail))}</span>`
         : `<span style="font-weight: 800; color: var(--text-title);">${escapeHTML(String(detail))}</span>`;
 
-      // Subtext rendering (e.g., "Most Played: Legend of Zelda... [224:30]")
+      // Subtext rendering
       const detailSubHtml = detailSub
-        ? `<div style="font-size: 0.8rem; font-weight: 600; color: var(--text-sub); margin-top: 2px;">Most Played: ${escapeHTML(String(detailSub))}</div>`
+        ? `<div style="font-size: 0.8rem; font-weight: 600; color: var(--text-sub); margin-top: 2px;">${escapeHTML(String(detailSub))}</div>`
         : '';
 
       html += `
@@ -2882,7 +2882,7 @@ function initSpotlightPage() {
     `;
     
     items.forEach(item => {
-      const subDetailHtml = item.subDetail ? `<div style="font-size: 0.75rem; color: var(--text-sub); margin-top: 4px; font-weight: 600;">Most Played: ${escapeHTML(item.subDetail)}</div>` : '';
+      const subDetailHtml = item.subDetail ? `<div style="font-size: 0.75rem; color: var(--text-sub); margin-top: 4px; font-weight: 600;">${escapeHTML(item.subDetail)}</div>` : '';
       const contextHtml = (item.recordContext && item.recordContext !== '-') ? `<span style="color: var(--text-muted); font-size: 0.85rem; font-weight: 600; margin-left: 4px;">(${escapeHTML(item.recordContext)})</span>` : '';
       
       // Determine if this record is active in the current calendar year
