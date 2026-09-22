@@ -2836,6 +2836,8 @@ function initSpotlightPage() {
   });
 
   // 2. Build the TOC HTML with inline table styling
+  const currentYearStr = new Date().getFullYear().toString();
+
   let html = `
   <style>
     .toc-category-wrapper { margin-bottom: 40px; }
@@ -2847,6 +2849,10 @@ function initSpotlightPage() {
     .toc-table tr:hover { background-color: var(--table-row-hover); }
     .toc-link { font-weight: 900; color: var(--primary-green); text-decoration: none; display: flex; align-items: center; gap: 5px; transition: color 0.2s; }
     .toc-link:hover { color: var(--text-main); text-decoration: underline; }
+    
+    /* NEW: Active Record Highlighting */
+    .toc-active-row { background-color: var(--highlight-green-bg) !important; }
+    .toc-active-row td:first-child { border-left: 4px solid var(--primary-green) !important; }
   </style>
   
   <div class="card-row grid-1">
@@ -2879,8 +2885,13 @@ function initSpotlightPage() {
       const subDetailHtml = item.subDetail ? `<div style="font-size: 0.75rem; color: var(--text-sub); margin-top: 4px; font-weight: 600;">Most Played: ${escapeHTML(item.subDetail)}</div>` : '';
       const contextHtml = (item.recordContext && item.recordContext !== '-') ? `<span style="color: var(--text-muted); font-size: 0.85rem; font-weight: 600; margin-left: 4px;">(${escapeHTML(item.recordContext)})</span>` : '';
       
+      // Determine if this record is active in the current calendar year
+      const isActive = (item.endDate && item.endDate.toString().startsWith(currentYearStr)) || 
+                       (item.startDate && item.startDate.toString().startsWith(currentYearStr));
+      const rowClass = isActive ? 'class="toc-active-row"' : '';
+
       html += `
-        <tr>
+        <tr ${rowClass}>
           <td><a href="#spotlight-list-${item.index}" class="toc-link">▶ ${escapeHTML(item.title)}</a></td>
           <td style="font-weight: 800; color: var(--text-title);">
             ${escapeHTML(item.recordName)}${contextHtml}
