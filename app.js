@@ -2830,9 +2830,12 @@ function initSpotlightPage() {
       startDate = topRow[4] || "-";
       endDate = topRow[5] || "-";
       
-      // FIX: Hide lengthy sub-details from the TOC for specific lists
       if (title.includes("Diverse Days") || title.includes("Completion Days") || title.includes("Completion Months") || title.includes("Completion Weeks")) {
-        subDetail = "";
+        if (recordName === "2022-08" || recordName === "Week of 2026/03/10") {
+          subDetail = topRow[6] || "";
+        } else {
+          subDetail = "";
+        }
       } else {
         subDetail = topRow[6] || "";      
       }
