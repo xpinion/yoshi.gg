@@ -1175,7 +1175,7 @@ details.toc-category-wrapper:not([open]) > summary .toc-category-title::before {
 .hub-bucket-label { width: 130px; text-align: right; font-weight: 800; font-size: 0.9rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .hub-bucket-bar { flex: 1; display: flex; height: 24px; border-radius: 4px; overflow: hidden; background: var(--item-bg); }
 .hub-value-lg { font-size: 1.8rem; }
-.hub-summary-table { min-width: 1200px; text-align: left; }
+.hub-summary-table { min-width: 1450px; text-align: left; }
 .analysis-table th.hub-col-name { width: 130px; text-align: left; }
 .hub-col-period { width: 180px; }
 .hub-col-100 { width: 100px; }
@@ -1258,3 +1258,21 @@ details.toc-category-wrapper:not([open]) > summary .toc-category-title::before {
 
 /* The header is only a wrapper: without this the nav could only "stick" inside it, so it scrolled away */
 #global-header { display: contents; }
+
+/* Hub pages: scores */
+.hub-goty { margin-top: 18px; font-weight: 800; color: var(--text-title); }
+.hub-goty a { color: var(--primary-green); text-decoration: none; }
+.hub-goty-score { display: inline-block; margin-left: 6px; padding: 2px 8px; border-radius: 6px; background: var(--highlight-green-bg); color: var(--primary-green); font-weight: 900; }
+.score-dist-summary { margin-bottom: 14px; color: var(--text-sub); font-weight: 600; }
+.score-dist-row { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+.score-dist-label { width: 70px; font-weight: 800; font-size: 0.85rem; color: var(--text-title); }
+.score-dist-track { flex: 1; height: 18px; border-radius: 4px; background: var(--item-bg); overflow: hidden; }
+.score-dist-bar { height: 100%; background: var(--primary-green); border-radius: 4px; }
+.score-dist-count { width: 36px; text-align: right; font-weight: 800; color: var(--text-muted); }
+.score-scatter-note { margin-top: 8px; font-size: 0.8rem; color: var(--text-muted); text-align: center; }
+
+/* Cards in grid rows may shrink below their content, so wide tables scroll inside the card instead of widening the page */
+.card-row > .card { min-width: 0; }
+.score-scatter-legend { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px 22px; margin-top: 10px; font-size: 0.85rem; color: var(--text-title); }
+.score-scatter-legend i { display: inline-block; width: 11px; height: 11px; border-radius: 50%; margin-right: 6px; vertical-align: -1px; }
+.score-scatter-desc { color: var(--text-muted); font-weight: 600; }

@@ -18,6 +18,20 @@ const META_YOSCORE = 6;
 // Earliest release year shown in the Game of the Year highlights table
 const GOTY_HIGHLIGHT_START_YEAR = 1985;
 
+// Scores: a score at or above this counts as "high" in the score-vs-hours charts
+const HIGH_SCORE = 8;
+// Averages only compete for the "best average" highlight with at least this many scored games
+const MIN_SCORED_FOR_AVG_HIGHLIGHT = 3;
+
+// A game's score from the Metadata sheet, or null if it isn't scored
+function getGameScore(game) {
+  const score = metaScores.get(game);
+  return typeof score === 'number' ? score : null;
+}
+function formatScore(score) {
+  return Number.isInteger(score) ? String(score) : score.toFixed(1);
+}
+
 // Utilities
 function formatTime(totalSeconds) {
   if (!totalSeconds || totalSeconds === 0) return "0m";
@@ -930,7 +944,7 @@ function buildAnalyticsHub(containerId, dataKey, titleLabel) {
   }
 
   // 4. Determine Global Maximums
-  let maxTime = 0, maxDays = 0, maxGames = 0, maxComp = 0, maxLongestSess = 0, maxMpgTime = 0;
+  let maxTime = 0, maxDays = 0, maxGames = 0, maxComp = 0, maxLongestSess = 0, maxMpgTime = 0, maxAvgScore = 0;
   const sortedItems = Object.values(hubData).sort((a, b) => b.totalSeconds - a.totalSeconds);
   
   sortedItems.forEach(item => {
@@ -947,6 +961,13 @@ function buildAnalyticsHub(containerId, dataKey, titleLabel) {
     item.sessions.forEach(s => { if (s.time > longestSess.time) longestSess = s; });
     item.longestSession = longestSess;
 
+    item.scoredGames = [...item.games]
+      .map(g => ({ name: g, score: getGameScore(g), seconds: item.gamePlaytimes[g].seconds }))
+      .filter(g => g.score !== null);
+    item.avgScore = item.scoredGames.length ? item.scoredGames.reduce((sum, g) => sum + g.score, 0) / item.scoredGames.length : null;
+    item.topRated = [...item.scoredGames].sort((a, b) => b.score - a.score || b.seconds - a.seconds)[0] || null;
+    if (item.avgScore !== null && item.scoredGames.length >= MIN_SCORED_FOR_AVG_HIGHLIGHT && item.avgScore > maxAvgScore) maxAvgScore = item.avgScore;
+
     let runningSec = 0;
     allMonthKeys.forEach(mk => {
       runningSec += (item.monthlyTime[mk] || 0);
@@ -961,6 +982,9 @@ function buildAnalyticsHub(containerId, dataKey, titleLabel) {
     if (item.mostPlayedGame.seconds > maxMpgTime) maxMpgTime = item.mostPlayedGame.seconds;
   });
 
+  const allGameHours = Object.values(rawData.metrics.allTimeGameStats).map(g => g.totalSeconds / 3600).sort((a, b) => a - b);
+  const medianGameHours = allGameHours.length ? allGameHours[Math.floor(allGameHours.length / 2)] : 0;
+
   const mostPlayedItem = sortedItems[0] || { name: "N/A", totalSeconds: 0 };
   const mostDiverseItem = [...sortedItems].sort((a, b) => b.games.size - a.games.size)[0] || { name: "N/A", games: new Set() };
   
@@ -969,6 +993,19 @@ function buildAnalyticsHub(containerId, dataKey, titleLabel) {
     const displayStr = formatFn ? formatFn(val) : val;
     if (val === max && val > 0) return `<span class="stat-highlight">${displayStr}</span>`;
     return displayStr;
+  };
+
+  const avgScoreCell = item => {
+    if (item.avgScore === null) return '-';
+    const avg = item.avgScore.toFixed(1);
+    const best = item.avgScore === maxAvgScore && item.scoredGames.length >= MIN_SCORED_FOR_AVG_HIGHLIGHT;
+    return `${best ? `<span class="stat-highlight">${avg}</span>` : avg}<br><span class="hub-game-sub">${item.scoredGames.length} scored</span>`;
+  };
+  const topRatedCell = item => {
+    const g = item.topRated;
+    if (!g) return '-';
+    return `<span class="hover-trigger hub-game-name" data-game="${escapeHTML(g.name)}">${escapeHTML(g.name)}</span><br>
+          <span class="hub-game-sub">Score ${formatScore(g.score)} &nbsp;|&nbsp; ${formatTimeCompact(g.seconds)}</span>`;
   };
 
   const summaryRowsHtml = sortedItems.map(item => {
@@ -982,12 +1019,14 @@ function buildAnalyticsHub(containerId, dataKey, titleLabel) {
         <td class="text-center">${getHighlightStr(item.days.size, maxDays)}</td>
         <td class="text-center">${getHighlightStr(item.games.size, maxGames)}</td>
         <td class="text-center">${getHighlightStr(item.completions, maxComp)}</td>
+        <td class="text-center hub-two-line">${avgScoreCell(item)}</td>
         <td class="text-left hub-two-line">
           <span class="hover-trigger hub-game-name" data-game="${escapeHTML(mpg.name)}">${escapeHTML(mpg.name)}</span><br>
           <span class="hub-game-sub">
             ${getHighlightStr(mpg.seconds, maxMpgTime, formatTimeCompact)} &nbsp;|&nbsp; (${mpg.minDate ? formatFullDate(mpg.minDate) : "-"}-${mpg.maxDate ? formatFullDate(mpg.maxDate) : "-"})
           </span>
         </td>
+        <td class="text-left hub-two-line">${topRatedCell(item)}</td>
         <td class="text-left hub-two-line">
           <span class="hover-trigger hub-game-name" data-game="${escapeHTML(ls.game)}">${escapeHTML(ls.game)}</span><br>
           <span class="hub-game-sub">
@@ -1243,7 +1282,9 @@ function buildAnalyticsHub(containerId, dataKey, titleLabel) {
                   <th class="hub-col-90">Days Played</th>
                   <th class="hub-col-90">Unique Games</th>
                   <th class="hub-col-90">Completions</th>
+                  <th class="hub-col-90">Avg Score</th>
                   <th class="hub-col-game">Most Played Game</th>
+                  <th class="hub-col-game">Top Rated Game</th>
                   <th class="hub-left">Longest Single Session</th>
                 </tr>
               </thead>
@@ -1406,6 +1447,16 @@ function buildAnalyticsHub(containerId, dataKey, titleLabel) {
     const excTitle = dataKey === 'system' ? "Platform Exclusivity" : "Hardware Loyalty";
     const excSub = dataKey === 'system' ? `${exclusiveCount} of ${item.games.size} games played ONLY on this hardware` : `${exclusiveCount} of ${item.games.size} games played on a single system`;
 
+    // Release Year hub: that year's Game of the Year, from the same scores as the GotY page
+    let gotyHtml = '';
+    if (dataKey === 'releaseYear') {
+      const goty = metaGames.filter(g => g.score !== null && g.releaseYear === valName)
+        .sort((a, b) => b.score - a.score || a.name.localeCompare(b.name))[0];
+      if (goty) {
+        gotyHtml = `<div class="hub-goty">🏆 Game of the Year: <a href="goty.html#year-${encodeURIComponent(valName)}" class="hover-trigger" data-game="${escapeHTML(goty.name)}">${escapeHTML(goty.name)}</a> <span class="hub-goty-score">${formatScore(goty.score)}</span></div>`;
+      }
+    }
+
     let itemHtml = `
       <section class="card-row grid-1 hub-pull-up">
         <div class="card hub-identity-card">
@@ -1425,6 +1476,7 @@ function buildAnalyticsHub(containerId, dataKey, titleLabel) {
               </div>
             </div>
           </div>
+          ${gotyHtml}
         </div>
       </section>
 
@@ -1547,6 +1599,39 @@ function buildAnalyticsHub(containerId, dataKey, titleLabel) {
         </div>
       </section>
 
+      ${item.scoredGames.length ? `
+      <section class="card-row grid-2">
+        <div class="card">
+          <div class="card-header"><h2>Highest Rated Games</h2></div>
+          <div class="card-content">
+            ${[...item.scoredGames].sort((a, b) => b.score - a.score || b.seconds - a.seconds).slice(0, 10).map((g, i) => `
+              <div class="list-item">
+                <div class="item-info">
+                  <span class="item-rank">#${i + 1}</span>
+                  <div class="item-text">
+                    <span class="item-title hover-trigger" data-game="${escapeHTML(g.name)}">${escapeHTML(g.name)}</span>
+                    <span class="item-sub">${formatTime(g.seconds)} logged</span>
+                  </div>
+                </div>
+                <div class="item-badge">${formatScore(g.score)}</div>
+              </div>
+            `).join('')}
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header"><h2>Score Distribution</h2></div>
+          <div class="card-content">${scoreDistributionHtml(item.scoredGames, item.avgScore)}</div>
+        </div>
+      </section>
+
+      <section class="card-row grid-1">
+        <div class="card">
+          <div class="card-header"><h2>Score vs. Hours: ${escapeHTML(valName)}</h2></div>
+          <div class="card-content hub-card-body">${scoreHoursScatterHtml(item.scoredGames, medianGameHours)}</div>
+        </div>
+      </section>` : ''}
+
       <section class="card-row grid-1">
         <div class="card">
           <div class="card-header"><h2>Full Playthrough Archive: ${escapeHTML(valName)}</h2></div>
@@ -1605,6 +1690,78 @@ function buildAnalyticsHub(containerId, dataKey, titleLabel) {
 
   document.getElementById('hub-item-select').addEventListener('change', (e) => renderSelectedItem(e.target.value));
   renderSelectedItem(sortedItems[0].name);
+}
+
+// --- SCORE CHARTS (hub deep dives) ---
+const SCORE_BUCKETS = [
+  { label: '9+', min: 9 }, { label: '8 – 8.9', min: 8 }, { label: '7 – 7.9', min: 7 },
+  { label: '6 – 6.9', min: 6 }, { label: '5 – 5.9', min: 5 }, { label: 'Under 5', min: -Infinity }
+];
+
+function scoreDistributionHtml(scoredGames, avgScore) {
+  const counts = SCORE_BUCKETS.map(() => 0);
+  scoredGames.forEach(g => { counts[SCORE_BUCKETS.findIndex(b => g.score >= b.min)]++; });
+  const max = Math.max(...counts, 1);
+  return `
+    <div class="score-dist-summary">Average <strong>${avgScore.toFixed(1)}</strong> across ${scoredGames.length} scored game${scoredGames.length === 1 ? '' : 's'}</div>
+    ${SCORE_BUCKETS.map((b, i) => `
+      <div class="score-dist-row">
+        <span class="score-dist-label">${b.label}</span>
+        <div class="score-dist-track"><div class="score-dist-bar" style="width: ${(counts[i] / max) * 100}%;"></div></div>
+        <span class="score-dist-count">${counts[i]}</span>
+      </div>
+    `).join('')}
+  `;
+}
+
+// Each scored game by score (x) and hours played (y, square-root scale so small games stay visible)
+function scoreHoursScatterHtml(scoredGames, medianHours) {
+  const width = 1000, height = 440, padL = 70, padR = 30, padT = 30, padB = 50;
+  const innerW = width - padL - padR, innerH = height - padT - padB;
+  const games = scoredGames.map(g => ({ ...g, hours: g.seconds / 3600 }));
+  const minScore = Math.min(Math.floor(Math.min(...games.map(g => g.score))), HIGH_SCORE - 1);
+  const maxHours = Math.max(...games.map(g => g.hours), medianHours * 2, 1) * 1.1;
+  const x = score => padL + ((score - minScore) / (10 - minScore)) * innerW;
+  const y = hours => padT + innerH - (Math.sqrt(hours) / Math.sqrt(maxHours)) * innerH;
+  const quadrant = g => g.score >= HIGH_SCORE ? (g.hours >= medianHours ? 'favorite' : 'gem') : (g.hours >= medianHours ? 'comfort' : 'tried');
+  const QUADRANT_COLORS = { favorite: 'var(--primary-green)', gem: '#00b4d8', comfort: '#ff9f1c', tried: 'var(--text-muted)' };
+  const splitX = x(HIGH_SCORE), splitY = y(medianHours);
+  const text = (tx, ty, str, extra = '') => `<text x="${tx}" y="${ty}" font-family="Inter, sans-serif" ${extra}>${str}</text>`;
+
+  let svg = `<svg class="hub-chart" viewBox="0 0 ${width} ${height}">`;
+  svg += `<rect x="${splitX}" y="${padT}" width="${padL + innerW - splitX}" height="${splitY - padT}" fill="var(--highlight-green-bg)" opacity="0.5" />`;
+  svg += `<line x1="${splitX}" y1="${padT}" x2="${splitX}" y2="${padT + innerH}" stroke="var(--border-table)" stroke-dasharray="4 4" />`;
+  svg += `<line x1="${padL}" y1="${splitY}" x2="${padL + innerW}" y2="${splitY}" stroke="var(--border-table)" stroke-dasharray="4 4" />`;
+  svg += `<line x1="${padL}" y1="${padT + innerH}" x2="${padL + innerW}" y2="${padT + innerH}" stroke="var(--text-muted)" stroke-width="2" />`;
+  svg += `<line x1="${padL}" y1="${padT}" x2="${padL}" y2="${padT + innerH}" stroke="var(--text-muted)" stroke-width="2" />`;
+  for (let s = minScore; s <= 10; s++) svg += text(x(s), padT + innerH + 20, s, 'fill="var(--text-muted)" font-size="12" font-weight="600" text-anchor="middle"');
+  svg += text(padL + innerW / 2, height - 8, 'Score', 'fill="var(--text-muted)" font-size="12" font-weight="800" text-anchor="middle"');
+  [0, maxHours / 16, maxHours / 4, maxHours * 9 / 16, maxHours].forEach(h => {
+    svg += text(padL - 10, y(h) + 4, `${Math.round(h)}h`, 'fill="var(--text-muted)" font-size="12" font-weight="600" text-anchor="end"');
+  });
+  games.forEach(g => {
+    svg += `<circle cx="${x(g.score)}" cy="${y(g.hours)}" r="6" fill="${QUADRANT_COLORS[quadrant(g)]}" stroke="var(--card-bg)" stroke-width="1.5"><title>${escapeHTML(g.name)}: score ${formatScore(g.score)}, ${formatTime(g.seconds)}</title></circle>`;
+  });
+  // Label the most-played games, skipping any label that would overlap one already placed (hover shows the rest)
+  const placed = [];
+  [...games].sort((a, b) => b.hours - a.hours).slice(0, 12).forEach(g => {
+    const lx = x(g.score), ly = y(g.hours) - 10, halfWidth = Math.min(g.name.length, 40) * 3.2;
+    const left = Math.max(padL + halfWidth, Math.min(lx, padL + innerW - halfWidth));
+    if (placed.some(p => Math.abs(p.y - ly) < 14 && Math.abs(p.x - left) < p.halfWidth + halfWidth)) return;
+    placed.push({ x: left, y: ly, halfWidth });
+    svg += text(left, ly, escapeHTML(g.name), 'fill="var(--text-title)" font-size="11" font-weight="800" text-anchor="middle"');
+  });
+  const QUADRANTS = [
+    ['favorite', 'Favorites', 'high score, lots of time'], ['gem', 'Hidden Gems', 'high score, little time'],
+    ['comfort', 'Comfort Picks', 'lower score, lots of time'], ['tried', 'Tried It', 'lower score, little time']
+  ];
+  const counts = {};
+  games.forEach(g => { counts[quadrant(g)] = (counts[quadrant(g)] || 0) + 1; });
+  return svg + `</svg>
+    <div class="score-scatter-legend">
+      ${QUADRANTS.map(([key, name, desc]) => `<span><i style="background: ${QUADRANT_COLORS[key]};"></i><strong>${name}</strong> ${counts[key] || 0} <span class="score-scatter-desc">(${desc})</span></span>`).join('')}
+    </div>
+    <div class="score-scatter-note">Dividing lines: score ${HIGH_SCORE}, and ${medianHours.toFixed(1)}h, the median play time across all your games. Hover a dot for its game.</div>`;
 }
 
 // --- SPOTLIGHT PARSING (Grouped & Bolded) ---
