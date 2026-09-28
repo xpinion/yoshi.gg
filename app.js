@@ -2746,24 +2746,12 @@ function initSpotlightPage() {
     return;
   }
 
-  // 1. Categorize lists for the Table of Contents
-  const categories = {
-    "Playtime & Activity": [],
-    "Co-Op & Multiplayer": [],
-    "Metadata Hubs": [],
-    "Streaks & Habits": [],
-    "Completions & Abandons": []
-  };
+  // 1. Group lists by the category set in Apps Script (sections appear in the order first used)
+  const categories = {};
 
   rawData.metrics.top25Lists.forEach((list, index) => {
-    let category = "Playtime & Activity";
+    const category = list.category || "Other";
     const title = list.titleLeft;
-    
-    // Auto-categorize based on title keywords
-    if (title.includes("Multiplayer") || title.includes("Mallory") || title.includes("Enzo")) category = "Co-Op & Multiplayer";
-    else if (title.includes("Streak")) category = "Streaks & Habits";
-    else if (title.includes("Completion") || title.includes("Abandon")) category = "Completions & Abandons";
-    else if (title.includes("Series") || title.includes("Genre") || title.includes("Developer") || title.includes("Publisher") || title.includes("Release Year")) category = "Metadata Hubs";
 
     // Extract the #1 Record Holder from the first row of the All-Time list
     let recordName = "-", recordContext = "", recordValue = "-", startDate = "-", endDate = "-", subDetail = "";
@@ -2775,18 +2763,10 @@ function initSpotlightPage() {
       recordValue = topRow[3] || "-";   
       startDate = topRow[4] || "-";
       endDate = topRow[5] || "-";
-      
-      if (title.includes("Diverse Days") || title.includes("Completion Days") || title.includes("Completion Months") || title.includes("Completion Weeks")) {
-        if (recordName === "2022-08" || recordName === "Week of 2026/03/10") {
-          subDetail = topRow[6] || "";
-        } else {
-          subDetail = "";
-        }
-      } else {
-        subDetail = topRow[6] || "";      
-      }
+      subDetail = list.hideTocDetail ? "" : (topRow[6] || "");
     }
 
+    if (!categories[category]) categories[category] = [];
     categories[category].push({ index, title, recordName, recordContext, recordValue, startDate, endDate, subDetail });
   });
 
