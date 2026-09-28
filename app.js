@@ -976,21 +976,21 @@ function buildAnalyticsHub(containerId, dataKey, titleLabel) {
     const ls = item.longestSession;
     return `
       <tr>
-        <td class="text-left" style="font-weight: 900; font-size: 1.05rem;">${escapeHTML(item.name)}</td>
-        <td class="text-center" style="font-size: 0.85rem; white-space: nowrap;">${formatFullDate(item.firstEntryDate)}-${formatFullDate(item.lastEntryDate)}</td>
-        <td class="text-center" style="white-space: nowrap;">${getHighlightStr(item.totalSeconds, maxTime, formatTimeCompact)}</td>
+        <td class="text-left hub-row-name">${escapeHTML(item.name)}</td>
+        <td class="text-center hub-period">${formatFullDate(item.firstEntryDate)}-${formatFullDate(item.lastEntryDate)}</td>
+        <td class="text-center hub-nowrap">${getHighlightStr(item.totalSeconds, maxTime, formatTimeCompact)}</td>
         <td class="text-center">${getHighlightStr(item.days.size, maxDays)}</td>
         <td class="text-center">${getHighlightStr(item.games.size, maxGames)}</td>
         <td class="text-center">${getHighlightStr(item.completions, maxComp)}</td>
-        <td class="text-left" style="line-height: 1.5;">
-          <span class="hover-trigger" style="font-weight: 800; font-size: 0.95rem; color: var(--text-title);" data-game="${escapeHTML(mpg.name)}">${escapeHTML(mpg.name)}</span><br>
-          <span style="font-size: 0.8rem; color: var(--text-sub); white-space: nowrap;">
+        <td class="text-left hub-two-line">
+          <span class="hover-trigger hub-game-name" data-game="${escapeHTML(mpg.name)}">${escapeHTML(mpg.name)}</span><br>
+          <span class="hub-game-sub">
             ${getHighlightStr(mpg.seconds, maxMpgTime, formatTimeCompact)} &nbsp;|&nbsp; (${mpg.minDate ? formatFullDate(mpg.minDate) : "-"}-${mpg.maxDate ? formatFullDate(mpg.maxDate) : "-"})
           </span>
         </td>
-        <td class="text-left" style="line-height: 1.5;">
-          <span class="hover-trigger" style="font-weight: 800; font-size: 0.95rem; color: var(--text-title);" data-game="${escapeHTML(ls.game)}">${escapeHTML(ls.game)}</span><br>
-          <span style="font-size: 0.8rem; color: var(--text-sub); white-space: nowrap;">
+        <td class="text-left hub-two-line">
+          <span class="hover-trigger hub-game-name" data-game="${escapeHTML(ls.game)}">${escapeHTML(ls.game)}</span><br>
+          <span class="hub-game-sub">
             ${getHighlightStr(ls.time, maxLongestSess, formatTimeCompact)} &nbsp;|&nbsp; Date: ${ls.date ? formatFullDate(ls.date) : "-"}
           </span>
         </td>
@@ -1050,7 +1050,7 @@ function buildAnalyticsHub(containerId, dataKey, titleLabel) {
         points.push(`${x},${y}`);
         
         if (val > 0) {
-          circlesHtml += `<circle cx="${x}" cy="${y}" r="6" fill="transparent" stroke="transparent" style="cursor: pointer;">
+          circlesHtml += `<circle class="hub-clickable" cx="${x}" cy="${y}" r="6" fill="transparent" stroke="transparent">
                             <title>${escapeHTML(item.name)} - ${mk}: ${formatTime(val)}</title>
                           </circle>`;
         }
@@ -1058,13 +1058,13 @@ function buildAnalyticsHub(containerId, dataKey, titleLabel) {
       linesHtml += `<polyline points="${points.join(' ')}" fill="none" stroke="${color}" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" />`;
     });
 
-    return `<svg viewBox="0 0 ${width} ${height}" style="width: 100%; height: auto; display: block; overflow: visible;">${gridHtml}${linesHtml}${circlesHtml}</svg>`;
+    return `<svg class="hub-chart" viewBox="0 0 ${width} ${height}">${gridHtml}${linesHtml}${circlesHtml}</svg>`;
   };
 
   const legendHtml = `
-    <div style="display: flex; flex-wrap: wrap; gap: 15px; justify-content: center; margin-top: 15px;">
+    <div class="hub-chart-legend">
       ${top10Items.map((item, i) => `
-        <div style="display: flex; align-items: center; gap: 6px; font-size: 0.85rem; font-weight: 800; color: var(--text-title);">
+        <div class="hub-chart-legend-item">
           <div style="width: 12px; height: 12px; background: ${chartColors[i]}; border-radius: 50%;"></div>
           ${escapeHTML(item.name)}
         </div>
@@ -1076,10 +1076,10 @@ function buildAnalyticsHub(containerId, dataKey, titleLabel) {
   let timelineHtml = '';
   if (allMonthKeys.length > 0) {
     timelineHtml += `
-      <div style="width: 100%; display: flex; flex-direction: column; gap: 6px; padding-bottom: 10px;">
-        <div style="display: flex; align-items: center; padding-bottom: 5px; border-bottom: 2px solid var(--border-light);">
-          <div style="width: 140px; min-width: 140px; font-weight: 800; font-size: 0.85rem; padding-right: 15px; text-align: right; color: var(--text-muted); text-transform: uppercase;">${escapeHTML(titleLabel)}</div>
-          <div style="display: flex; flex: 1;">
+      <div class="hub-timeline">
+        <div class="hub-timeline-header">
+          <div class="hub-timeline-header-label">${escapeHTML(titleLabel)}</div>
+          <div class="hub-timeline-years">
     `;
     
     let currentYearStr = allMonthKeys[0].substring(0,4);
@@ -1099,9 +1099,9 @@ function buildAnalyticsHub(containerId, dataKey, titleLabel) {
     sortedItems.forEach(item => {
       const itemMaxMonthlySec = Math.max(...allMonthKeys.map(mk => item.monthlyTime[mk] || 0));
 
-      timelineHtml += `<div style="display: flex; align-items: center;">`;
-      timelineHtml += `<div style="width: 140px; min-width: 140px; font-weight: 800; font-size: 0.85rem; padding-right: 15px; text-align: right; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="${escapeHTML(item.name)}">${escapeHTML(item.name)}</div>`;
-      timelineHtml += `<div style="display: flex; flex: 1; gap: 1px; height: 16px;">`;
+      timelineHtml += `<div class="hub-timeline-row">`;
+      timelineHtml += `<div class="hub-timeline-label" title="${escapeHTML(item.name)}">${escapeHTML(item.name)}</div>`;
+      timelineHtml += `<div class="hub-timeline-cells">`;
       
       allMonthKeys.forEach(mk => {
         const time = item.monthlyTime[mk] || 0;
@@ -1116,14 +1116,14 @@ function buildAnalyticsHub(containerId, dataKey, titleLabel) {
 
   // 7. Session Buckets Visualizer
   const generateSessionBucketsHtml = () => {
-    let bHtml = `<div style="display: flex; flex-direction: column; gap: 15px; padding: 10px;">`;
+    let bHtml = `<div class="hub-buckets">`;
     bHtml += `
-      <div style="display: flex; flex-wrap: wrap; gap: 15px; justify-content: center; margin-bottom: 10px; font-size: 0.85rem; font-weight: 800;">
-        <div style="display:flex; align-items:center; gap:5px;"><div style="width:12px;height:12px;background:#4cc9f0; border-radius: 2px;"></div>Micro (&lt;30m)</div>
-        <div style="display:flex; align-items:center; gap:5px;"><div style="width:12px;height:12px;background:#4361ee; border-radius: 2px;"></div>Standard (30m-2h)</div>
-        <div style="display:flex; align-items:center; gap:5px;"><div style="width:12px;height:12px;background:#7209b7; border-radius: 2px;"></div>Deep (2h-4h)</div>
-        <div style="display:flex; align-items:center; gap:5px;"><div style="width:12px;height:12px;background:#f72585; border-radius: 2px;"></div>Marathon (4h-8h)</div>
-        <div style="display:flex; align-items:center; gap:5px;"><div style="width:12px;height:12px;background:#ff9f1c; border-radius: 2px;"></div>Epic (8h+)</div>
+      <div class="hub-buckets-legend">
+        <div class="hub-legend-item"><div class="hub-swatch-micro"></div>Micro (&lt;30m)</div>
+        <div class="hub-legend-item"><div class="hub-swatch-standard"></div>Standard (30m-2h)</div>
+        <div class="hub-legend-item"><div class="hub-swatch-deep"></div>Deep (2h-4h)</div>
+        <div class="hub-legend-item"><div class="hub-swatch-marathon"></div>Marathon (4h-8h)</div>
+        <div class="hub-legend-item"><div class="hub-swatch-epic"></div>Epic (8h+)</div>
       </div>
     `;
 
@@ -1133,9 +1133,9 @@ function buildAnalyticsHub(containerId, dataKey, titleLabel) {
       const p1 = (b.micro/t)*100, p2 = (b.standard/t)*100, p3 = (b.deep/t)*100, p4 = (b.marathon/t)*100, p5 = (b.epic/t)*100;
       
       bHtml += `
-        <div style="display: flex; align-items: center; gap: 10px;">
-          <div style="width: 130px; text-align: right; font-weight: 800; font-size: 0.9rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="${escapeHTML(item.name)}">${escapeHTML(item.name)}</div>
-          <div style="flex: 1; display: flex; height: 24px; border-radius: 4px; overflow: hidden; background: var(--item-bg);">
+        <div class="hub-bucket-row">
+          <div class="hub-bucket-label" title="${escapeHTML(item.name)}">${escapeHTML(item.name)}</div>
+          <div class="hub-bucket-bar">
             <div style="width: ${p1}%; background: #4cc9f0;" title="Micro (<30m): ${formatTime(b.micro)}"></div>
             <div style="width: ${p2}%; background: #4361ee;" title="Standard (30m-2h): ${formatTime(b.standard)}"></div>
             <div style="width: ${p3}%; background: #7209b7;" title="Deep (2h-4h): ${formatTime(b.deep)}"></div>
@@ -1160,7 +1160,7 @@ function buildAnalyticsHub(containerId, dataKey, titleLabel) {
     if (mxX === 0) mxX = 1; if (mxY === 0) mxY = 1;
     mxX *= 1.1; mxY *= 1.1;
 
-    let svg = `<svg viewBox="0 0 ${width} ${height}" style="width: 100%; height: auto; display: block; overflow: visible;">`;
+    let svg = `<svg class="hub-chart" viewBox="0 0 ${width} ${height}">`;
     
     const midX = padL + innerW / 2, midY = padT + innerH / 2;
     svg += `<rect x="${padL}" y="${padT}" width="${innerW/2}" height="${innerH/2}" fill="var(--item-bg)" opacity="0.6" />`;
@@ -1192,7 +1192,7 @@ function buildAnalyticsHub(containerId, dataKey, titleLabel) {
        const cy = padT + innerH - (item.totalSeconds / mxY) * innerH;
        const color = chartColors[i % chartColors.length];
        
-       svg += `<circle cx="${cx}" cy="${cy}" r="7" fill="${color}" stroke="var(--card-bg)" stroke-width="2" style="cursor: pointer;">
+       svg += `<circle class="hub-clickable" cx="${cx}" cy="${cy}" r="7" fill="${color}" stroke="var(--card-bg)" stroke-width="2">
                  <title>${escapeHTML(item.name)}: ${item.games.size} Games, ${formatTime(item.totalSeconds)}</title>
                </circle>`;
        if (i < 20) {
@@ -1208,23 +1208,23 @@ function buildAnalyticsHub(containerId, dataKey, titleLabel) {
   let html = `
     <!-- Global Ribbon -->
     <section class="card-row grid-4">
-      <div class="card" style="text-align: center; padding: 20px;">
+      <div class="card hub-stat-card">
         <div class="sys-widget-title">Total ${escapeHTML(titleLabel)}s</div>
-        <div class="sys-widget-value" style="color: var(--primary-green);">${sortedItems.length}</div>
+        <div class="sys-widget-value hub-green">${sortedItems.length}</div>
       </div>
-      <div class="card" style="text-align: center; padding: 20px;">
+      <div class="card hub-stat-card">
         <div class="sys-widget-title">Most Played</div>
-        <div class="sys-widget-value" style="font-size: 1.4rem;">${escapeHTML(mostPlayedItem.name)}</div>
+        <div class="sys-widget-value hub-value-md">${escapeHTML(mostPlayedItem.name)}</div>
         <div class="sys-widget-sub">${formatTime(mostPlayedItem.totalSeconds)}</div>
       </div>
-      <div class="card" style="text-align: center; padding: 20px;">
+      <div class="card hub-stat-card">
         <div class="sys-widget-title">Largest Library</div>
-        <div class="sys-widget-value" style="font-size: 1.4rem;">${escapeHTML(mostDiverseItem.name)}</div>
+        <div class="sys-widget-value hub-value-md">${escapeHTML(mostDiverseItem.name)}</div>
         <div class="sys-widget-sub">${mostDiverseItem.games.size} Unique Games</div>
       </div>
-      <div class="card" style="text-align: center; padding: 20px;">
+      <div class="card hub-stat-card">
         <div class="sys-widget-title">Total Logged Time</div>
-        <div class="sys-widget-value" style="font-size: 1.8rem;">${formatTime(totalGlobalTime)}</div>
+        <div class="sys-widget-value hub-value-lg">${formatTime(totalGlobalTime)}</div>
       </div>
     </section>
 
@@ -1232,19 +1232,19 @@ function buildAnalyticsHub(containerId, dataKey, titleLabel) {
     <section class="card-row grid-1">
       <div class="card">
         <div class="card-header"><h2>All-Time ${escapeHTML(titleLabel)} Summary</h2></div>
-        <div class="card-content" style="padding: 0;">
-          <div class="monthly-table-wrapper" style="padding: 20px;">
-            <table class="analysis-table" style="min-width: 1200px; text-align: left;">
+        <div class="card-content hub-flush">
+          <div class="monthly-table-wrapper hub-pad">
+            <table class="analysis-table hub-summary-table">
               <thead>
                 <tr>
-                  <th style="width: 130px; text-align: left;">${escapeHTML(titleLabel)}</th>
-                  <th style="width: 180px;">Active Period</th>
-                  <th style="width: 100px;">Total Playtime</th>
-                  <th style="width: 90px;">Days Played</th>
-                  <th style="width: 90px;">Unique Games</th>
-                  <th style="width: 90px;">Completions</th>
-                  <th style="width: 320px; text-align: left;">Most Played Game</th>
-                  <th style="text-align: left;">Longest Single Session</th>
+                  <th class="hub-col-name">${escapeHTML(titleLabel)}</th>
+                  <th class="hub-col-period">Active Period</th>
+                  <th class="hub-col-100">Total Playtime</th>
+                  <th class="hub-col-90">Days Played</th>
+                  <th class="hub-col-90">Unique Games</th>
+                  <th class="hub-col-90">Completions</th>
+                  <th class="hub-col-game">Most Played Game</th>
+                  <th class="hub-left">Longest Single Session</th>
                 </tr>
               </thead>
               <tbody>${summaryRowsHtml}</tbody>
@@ -1255,37 +1255,37 @@ function buildAnalyticsHub(containerId, dataKey, titleLabel) {
     </section>
 
     <!-- Scatter Plot -->
-    <section class="card-row grid-1" style="margin-top: 20px;">
+    <section class="card-row grid-1 hub-section-gap">
       <div class="card">
         <div class="card-header"><h2>The Deep Dive vs. Tasting Menu Matrix</h2></div>
-        <div class="card-content" style="padding: 10px 20px;">
+        <div class="card-content hub-card-body">
           ${generateScatterPlot()}
         </div>
       </div>
     </section>
 
     <!-- Session Buckets -->
-    <section class="card-row grid-1" style="margin-top: 20px;">
+    <section class="card-row grid-1 hub-section-gap">
       <div class="card">
         <div class="card-header"><h2>Sprint vs. Marathon: Session Length Breakdown</h2></div>
-        <div class="card-content" style="padding: 10px 20px;">
+        <div class="card-content hub-card-body">
           ${generateSessionBucketsHtml()}
         </div>
       </div>
     </section>
 
     <!-- Trend Line Charts -->
-    <section class="card-row grid-1" style="margin-top: 20px;">
+    <section class="card-row grid-1 hub-section-gap">
       <div class="card">
         <div class="card-header"><h2>Top 10 ${escapeHTML(titleLabel)}s: Monthly Playtime</h2></div>
-        <div class="card-content" style="padding: 10px 20px;">
+        <div class="card-content hub-card-body">
           ${generateLineChart(false)}
           ${legendHtml}
         </div>
       </div>
-      <div class="card" style="margin-top: 20px;">
+      <div class="card hub-section-gap">
         <div class="card-header"><h2>Top 10 ${escapeHTML(titleLabel)}s: Cumulative Playtime</h2></div>
-        <div class="card-content" style="padding: 10px 20px;">
+        <div class="card-content hub-card-body">
           ${generateLineChart(true)}
           ${legendHtml}
         </div>
@@ -1293,7 +1293,7 @@ function buildAnalyticsHub(containerId, dataKey, titleLabel) {
     </section>
 
     <!-- Eras Timeline -->
-    <section class="card-row grid-1" style="margin-top: 20px;">
+    <section class="card-row grid-1 hub-section-gap">
       <div class="card">
         <div class="card-header"><h2>Global ${escapeHTML(titleLabel)} Eras Timeline (${allMonthKeys.length > 0 ? allMonthKeys[0].slice(0, 4) : ''} - Present)</h2></div>
         <div class="card-content">
@@ -1303,12 +1303,12 @@ function buildAnalyticsHub(containerId, dataKey, titleLabel) {
     </section>
 
     <!-- Deep Dive Selector -->
-    <section class="card-row grid-1" style="margin-top: 20px;">
+    <section class="card-row grid-1 hub-section-gap">
       <div class="card">
-        <div class="card-header" style="border-bottom: none; margin-bottom: 0; padding-bottom: 0;">
-          <h2 style="font-size: 2rem;">
+        <div class="card-header hub-header-plain">
+          <h2 class="hub-title-lg">
             Deep Dive: 
-            <select id="hub-item-select" class="header-dropdown" style="font-size: 2rem;">
+            <select id="hub-item-select" class="header-dropdown hub-title-lg">
               ${sortedItems.map(s => `<option value="${escapeHTML(s.name)}">${escapeHTML(s.name)}</option>`).join('')}
             </select>
           </h2>
@@ -1393,7 +1393,7 @@ function buildAnalyticsHub(containerId, dataKey, titleLabel) {
     const circleCircumference = 2 * Math.PI * circleRadius;
     const multiDash = (multiPct / 100) * circleCircumference;
     const donutHtml = `
-      <svg viewBox="0 0 100 100" style="width: 100px; height: 100px; transform: rotate(-90deg);">
+      <svg class="hub-donut" viewBox="0 0 100 100">
         <circle cx="50" cy="50" r="${circleRadius}" fill="transparent" stroke="var(--item-bg)" stroke-width="15" />
         <circle cx="50" cy="50" r="${circleRadius}" fill="transparent" stroke="var(--primary-green)" stroke-width="15" stroke-dasharray="${multiDash} ${circleCircumference}" />
       </svg>
@@ -1407,21 +1407,21 @@ function buildAnalyticsHub(containerId, dataKey, titleLabel) {
     const excSub = dataKey === 'system' ? `${exclusiveCount} of ${item.games.size} games played ONLY on this hardware` : `${exclusiveCount} of ${item.games.size} games played on a single system`;
 
     let itemHtml = `
-      <section class="card-row grid-1" style="margin-top: -10px;">
-        <div class="card" style="text-align: center; padding: 25px; background: linear-gradient(135deg, var(--card-bg) 0%, var(--item-bg) 100%);">
-          <div class="sys-widget-title" style="letter-spacing: 2px;">Identity</div>
-          <div style="font-size: 2.2rem; font-weight: 900; color: var(--primary-green); text-transform: uppercase;">${escapeHTML(identityTitle)}</div>
-          <div style="display: flex; justify-content: center; gap: 40px; margin-top: 15px;">
+      <section class="card-row grid-1 hub-pull-up">
+        <div class="card hub-identity-card">
+          <div class="sys-widget-title hub-spaced">Identity</div>
+          <div class="hub-identity-title">${escapeHTML(identityTitle)}</div>
+          <div class="hub-identity-columns">
             <div>
               <div class="sys-widget-title">Top ${escapeHTML(attr1Name)}s</div>
-              <div style="font-size: 0.9rem; font-weight: 700; color: var(--text-title);">
-                ${topAttr1.slice(0,3).map(g => `${g[0]} <span style="color:var(--text-sub)">(${formatTime(g[1])})</span>`).join('<br>')}
+              <div class="hub-identity-list">
+                ${topAttr1.slice(0,3).map(g => `${g[0]} <span class="hub-sub">(${formatTime(g[1])})</span>`).join('<br>')}
               </div>
             </div>
             <div>
               <div class="sys-widget-title">Top ${escapeHTML(attr2Name)}s</div>
-              <div style="font-size: 0.9rem; font-weight: 700; color: var(--text-title);">
-                ${topAttr2.slice(0,3).map(d => `${d[0]} <span style="color:var(--text-sub)">(${formatTime(d[1])})</span>`).join('<br>')}
+              <div class="hub-identity-list">
+                ${topAttr2.slice(0,3).map(d => `${d[0]} <span class="hub-sub">(${formatTime(d[1])})</span>`).join('<br>')}
               </div>
             </div>
           </div>
@@ -1429,64 +1429,64 @@ function buildAnalyticsHub(containerId, dataKey, titleLabel) {
       </section>
 
       <section class="card-row grid-strict-3">
-        <div class="card" style="display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 20px;">
-          <div style="width: 100%; text-align: center; border-bottom: 1px dashed var(--border-light); padding-bottom: 15px; margin-bottom: 15px;">
+        <div class="card hub-sessions-card">
+          <div class="hub-session-first">
             <div class="sys-widget-title">Inaugural Session</div>
-            <div class="sys-widget-value" style="font-size: 1.1rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding: 0 10px;">${escapeHTML(firstEntry.game)}</div>
+            <div class="sys-widget-value hub-session-game">${escapeHTML(firstEntry.game)}</div>
             <div class="sys-widget-sub">${formatFullDate(firstEntry.date)}</div>
           </div>
-          <div style="width: 100%; text-align: center;">
+          <div class="hub-session-last">
             <div class="sys-widget-title">Most Recent Session</div>
-            <div class="sys-widget-value" style="font-size: 1.1rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding: 0 10px;">${escapeHTML(lastEntry.game)}</div>
+            <div class="sys-widget-value hub-session-game">${escapeHTML(lastEntry.game)}</div>
             <div class="sys-widget-sub">${formatFullDate(lastEntry.date)}</div>
           </div>
         </div>
         
-        <div class="card" style="padding: 20px; text-align: center; display: flex; flex-direction: column; justify-content: center;">
-          <div class="sys-widget-title" style="margin-bottom: 12px;">Completion Rate (${compRate}%)</div>
-          <div style="display: flex; height: 16px; border-radius: 8px; overflow: hidden; background: var(--item-bg); margin-bottom: 8px;">
+        <div class="card hub-completion-card">
+          <div class="sys-widget-title hub-mb-12">Completion Rate (${compRate}%)</div>
+          <div class="hub-completion-bar">
             <div style="width: ${compRatePct}%; background: #00FF00;" title="Completed: ${compCount}"></div>
             <div style="width: ${actRatePct}%; background: #FFFF00;" title="Active: ${actCount}"></div>
             <div style="width: ${abanRatePct}%; background: #FFCCCC;" title="Abandoned: ${abanCount}"></div>
-            <div style="flex: 1; background: #00FFFF;" title="Other: ${multiCount}"></div>
+            <div class="hub-bar-other" title="Other: ${multiCount}"></div>
           </div>
-          <div style="display: flex; flex-direction: column; gap: 4px; font-size: 0.8rem; font-weight: 800; color: var(--text-main); align-items: flex-start; margin-top: 10px; margin-left: 10%;">
-            <span><span style="color: #00FF00;">■</span> Completed: ${compCount}</span>
-            <span><span style="color: #FFFF00;">■</span> Active: ${actCount}</span>
-            <span><span style="color: #FFCCCC;">■</span> Abandoned: ${abanCount}</span>
+          <div class="hub-completion-legend">
+            <span><span class="hub-status-completed">■</span> Completed: ${compCount}</span>
+            <span><span class="hub-status-active">■</span> Active: ${actCount}</span>
+            <span><span class="hub-status-abandoned">■</span> Abandoned: ${abanCount}</span>
           </div>
         </div>
 
-        <div class="card" style="padding: 20px; text-align: center; display: flex; flex-direction: column; align-items: center; justify-content: center;">
-          <div class="sys-widget-title" style="margin-bottom: 10px;">The Social Hub Index</div>
-          <div style="position: relative; width: 100px; height: 100px;">
+        <div class="card hub-social-card">
+          <div class="sys-widget-title hub-mb-10">The Social Hub Index</div>
+          <div class="hub-donut-wrap">
             ${donutHtml}
-            <div style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; flex-direction: column;">
-              <span style="font-size: 1.2rem; font-weight: 900; color: var(--text-title);">${multiPct}%</span>
-              <span style="font-size: 0.6rem; font-weight: 800; color: var(--text-muted); text-transform: uppercase;">Multi</span>
+            <div class="hub-donut-center">
+              <span class="hub-donut-value">${multiPct}%</span>
+              <span class="hub-donut-label">Multi</span>
             </div>
           </div>
-          <div style="display: flex; justify-content: space-around; width: 100%; margin-top: 15px; font-size: 0.75rem; font-weight: 800;">
-            <span><span style="color: var(--primary-green);">■</span> Multi (${formatTime(multiSec)})</span>
-            <span><span style="color: var(--item-bg);">■</span> Single (${formatTime(singleSec)})</span>
+          <div class="hub-donut-legend">
+            <span><span class="hub-green">■</span> Multi (${formatTime(multiSec)})</span>
+            <span><span class="hub-swatch-single">■</span> Single (${formatTime(singleSec)})</span>
           </div>
         </div>
       </section>
 
       <section class="card-row grid-strict-3">
-        <div class="card" style="text-align: center; padding: 20px;">
+        <div class="card hub-stat-card">
           <div class="sys-widget-title">${excTitle}</div>
           <div class="sys-widget-value">${exclusivityPct}%</div>
           <div class="sys-widget-sub">${excSub}</div>
         </div>
-        <div class="card" style="text-align: center; padding: 20px;">
+        <div class="card hub-stat-card">
           <div class="sys-widget-title">Golden Era</div>
           <div class="sys-widget-value">${peakYear}</div>
           <div class="sys-widget-sub">${formatTime(peakTime)} (${peakPct}% of total ${escapeHTML(titleLabel)} runtime)</div>
         </div>
-        <div class="card" style="text-align: center; padding: 20px;">
+        <div class="card hub-stat-card">
           <div class="sys-widget-title">Habit Breakdown</div>
-          <div class="sys-widget-value" style="font-size: 1.4rem;">${weekdayPct}% <span style="font-weight: 600; color: var(--text-muted); font-size: 0.9rem;">WK</span> | ${weekendPct}% <span style="font-weight: 600; color: var(--text-muted); font-size: 0.9rem;">WKND</span></div>
+          <div class="sys-widget-value hub-value-md">${weekdayPct}% <span class="hub-unit">WK</span> | ${weekendPct}% <span class="hub-unit">WKND</span></div>
           <div class="sys-widget-sub">${formatTime(weekdaySec)} vs ${formatTime(weekendSec)}</div>
         </div>
       </section>
@@ -1522,7 +1522,7 @@ function buildAnalyticsHub(containerId, dataKey, titleLabel) {
                     <span class="item-sub">${formatTime(g.seconds)} logged</span>
                   </div>
                 </div>
-                <div class="item-badge" style="background: var(--text-main); color: var(--card-bg);">${g.days.size} Days</div>
+                <div class="item-badge hub-badge-dark">${g.days.size} Days</div>
               </div>
             `).join('')}
           </div>
@@ -1540,7 +1540,7 @@ function buildAnalyticsHub(containerId, dataKey, titleLabel) {
                     <span class="item-sub">${formatShortDate(s.date)}/${new Date(s.date).getUTCFullYear()}</span>
                   </div>
                 </div>
-                <div class="item-badge" style="background: var(--text-title); color: var(--card-bg);">${formatTime(s.time)}</div>
+                <div class="item-badge hub-badge-title">${formatTime(s.time)}</div>
               </div>
             `).join('')}
           </div>
@@ -1550,9 +1550,9 @@ function buildAnalyticsHub(containerId, dataKey, titleLabel) {
       <section class="card-row grid-1">
         <div class="card">
           <div class="card-header"><h2>Full Playthrough Archive: ${escapeHTML(valName)}</h2></div>
-          <div class="card-content" style="padding: 0;">
-            <div class="monthly-table-wrapper" style="padding: 20px;">
-              <table class="monthly-table" style="min-width: 1100px;">
+          <div class="card-content hub-flush">
+            <div class="monthly-table-wrapper hub-pad">
+              <table class="monthly-table hub-archive-table">
                 <thead>
                   <tr>
                     <th rowspan="2">Videogame</th>
@@ -1574,7 +1574,7 @@ function buildAnalyticsHub(containerId, dataKey, titleLabel) {
                 <tbody>
                   ${itemPlaythroughs.map(pt => `
                     <tr>
-                      <td class="text-left" style="font-weight: bold;">
+                      <td class="text-left hub-bold">
                         <span class="hover-trigger" data-game="${escapeHTML(pt.gameName)}">${escapeHTML(pt.gameName)}</span>
                       </td>
                       <td class="text-center">${escapeHTML(Array.from(pt.systems).join(', '))}</td>
