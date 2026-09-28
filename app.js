@@ -15,6 +15,9 @@ const META_PUBLISHER = 4;
 const META_SERIES = 5;
 const META_YOSCORE = 6;
 
+// Earliest release year shown in the Game of the Year highlights table
+const GOTY_HIGHLIGHT_START_YEAR = 1985;
+
 // Utilities
 function formatTime(totalSeconds) {
   if (!totalSeconds || totalSeconds === 0) return "0m";
@@ -133,11 +136,10 @@ function renderGlobalHeader() {
 // --- UPDATE: DASHBOARD INIT (Add routing and global parsing) ---
 async function initDashboard() {
   try {
-    const cacheBuster = new Date().getTime(); 
-
+    // 'no-cache' asks GitHub whether the file changed; it's only re-downloaded after a sync
     const [rawResponse, metaResponse] = await Promise.all([
-      fetch(`raw_dashboard_data.json?v=${cacheBuster}`),
-      fetch(`metadata_data.json?v=${cacheBuster}`)
+      fetch('raw_dashboard_data.json', { cache: 'no-cache' }),
+      fetch('metadata_data.json', { cache: 'no-cache' })
     ]);
 
     const rawText = await rawResponse.text();
@@ -703,15 +705,15 @@ function initGotyPage() {
   // 3. Assemble Layout
   let html = '';
 
-  // SECTION 1: GOTY Highlight Table (3 Equal Columns, 1985 - Present)
-  const yearsSince1985 = sortedYears.filter(y => parseInt(y) >= 1985);
-  const totalYears = yearsSince1985.length;
+  // SECTION 1: GOTY Highlight Table (3 Equal Columns, GOTY_HIGHLIGHT_START_YEAR - Present)
+  const highlightYears = sortedYears.filter(y => parseInt(y) >= GOTY_HIGHLIGHT_START_YEAR);
+  const totalYears = highlightYears.length;
   const col1Count = Math.ceil(totalYears / 3);
   const col2Count = Math.ceil((totalYears - col1Count) / 2);
 
-  const col1Years = yearsSince1985.slice(0, col1Count);
-  const col2Years = yearsSince1985.slice(col1Count, col1Count + col2Count);
-  const col3Years = yearsSince1985.slice(col1Count + col2Count);
+  const col1Years = highlightYears.slice(0, col1Count);
+  const col2Years = highlightYears.slice(col1Count, col1Count + col2Count);
+  const col3Years = highlightYears.slice(col1Count + col2Count);
 
   const renderGotyColumnTable = (yearList) => {
     let tHtml = `
@@ -750,7 +752,7 @@ function initGotyPage() {
   <section class="card-row grid-1">
     <div class="card">
       <div class="card-header">
-        <h2>Game of the Year Highlights (1985 - Present)</h2>
+        <h2>Game of the Year Highlights (${GOTY_HIGHLIGHT_START_YEAR} - Present)</h2>
       </div>
       <div class="card-content">
         <div class="goty-highlight-grid">
@@ -1293,7 +1295,7 @@ function buildAnalyticsHub(containerId, dataKey, titleLabel) {
     <!-- Eras Timeline -->
     <section class="card-row grid-1" style="margin-top: 20px;">
       <div class="card">
-        <div class="card-header"><h2>Global ${escapeHTML(titleLabel)} Eras Timeline (2015 - Present)</h2></div>
+        <div class="card-header"><h2>Global ${escapeHTML(titleLabel)} Eras Timeline (${allMonthKeys.length > 0 ? allMonthKeys[0].slice(0, 4) : ''} - Present)</h2></div>
         <div class="card-content">
           ${timelineHtml}
         </div>
@@ -1742,9 +1744,39 @@ function setupDropdowns() {
   }
 }
 
+const TOOLTIP_INITIAL_ENTRIES = 20;
+let _entriesByGame = null;
+function getGameEntriesNewestFirst(gameName) {
+  if (!_entriesByGame) {
+    _entriesByGame = new Map();
+    for (let i = rawData.allEntries.length - 1; i >= 0; i--) {
+      const e = rawData.allEntries[i];
+      if (!_entriesByGame.has(e.game)) _entriesByGame.set(e.game, []);
+      _entriesByGame.get(e.game).push(e);
+    }
+  }
+  return _entriesByGame.get(gameName) || [];
+}
+function tooltipEntryHtml(entry) {
+  return `
+        <div class="tooltip-entry">
+          <div class="tooltip-meta">${formatShortDate(entry.date)} (${entry.date.substring(0,4)}) | ${escapeHTML(entry.system)} | ${entry.time} | <span style="color:${getStatusColor(entry.status)}">${entry.status}</span></div>
+          <div class="tooltip-note">${escapeHTML(entry.note)}</div>
+        </div>
+      `;
+}
+
 function setupHoverHistory() {
   const tooltip = document.getElementById('game-tooltip');
   let tooltipTimeout; // The grace-period timer
+
+  tooltip.addEventListener('click', (e) => {
+    const button = e.target.closest('.tooltip-show-all');
+    if (!button) return;
+    const rest = getGameEntriesNewestFirst(button.getAttribute('data-game')).slice(TOOLTIP_INITIAL_ENTRIES);
+    button.insertAdjacentHTML('beforebegin', rest.map(tooltipEntryHtml).join(''));
+    button.remove();
+  });
 
   document.addEventListener('mouseover', (e) => {
     // If hovering over the game name OR the tooltip itself, cancel the closing timer
@@ -1757,17 +1789,15 @@ function setupHoverHistory() {
       const gameName = e.target.getAttribute('data-game');
       if (!gameName) return;
 
-      // Removed the .slice(0, 15) so you can scroll the FULL history!
-      const entries = rawData.allEntries.filter(entry => entry.game === gameName).slice().reverse();
+      const entries = getGameEntriesNewestFirst(gameName);
       if (entries.length === 0) return;
 
+      // Latest entries first; the full history is one click away
       let html = `<h3>${escapeHTML(gameName)} History</h3>`;
-      html += entries.map(entry => `
-        <div class="tooltip-entry">
-          <div class="tooltip-meta">${formatShortDate(entry.date)} (${entry.date.substring(0,4)}) | ${escapeHTML(entry.system)} | ${entry.time} | <span style="color:${getStatusColor(entry.status)}">${entry.status}</span></div>
-          <div class="tooltip-note">${escapeHTML(entry.note)}</div>
-        </div>
-      `).join('');
+      html += entries.slice(0, TOOLTIP_INITIAL_ENTRIES).map(tooltipEntryHtml).join('');
+      if (entries.length > TOOLTIP_INITIAL_ENTRIES) {
+        html += `<button type="button" class="tooltip-show-all" data-game="${escapeHTML(gameName)}">Show all ${entries.length} entries</button>`;
+      }
 
       tooltip.innerHTML = html;
       tooltip.classList.add('visible');
