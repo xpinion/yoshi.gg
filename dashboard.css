@@ -1217,7 +1217,9 @@ details.toc-category-wrapper:not([open]) > summary .toc-category-title::before {
   body { padding: 16px 12px; }
   .dashboard-header h1 { font-size: 1.6rem; letter-spacing: 1px; margin-bottom: 16px; }
   .theme-btn { position: static; display: block; margin: 0 auto 14px; }
-  .global-nav { gap: 6px 14px; padding: 10px 8px; margin: 0 -12px 20px; }
+  /* One row that scrolls sideways, so the sticky nav stays short */
+  .global-nav { gap: 16px; padding: 10px 12px; margin: 0 -12px 20px; flex-wrap: nowrap; justify-content: flex-start; overflow-x: auto; scrollbar-width: none; }
+  .global-nav a { flex: 0 0 auto; }
   .header-dropdown { max-width: 100%; }
   .global-nav a { font-size: 0.8rem; }
   .dashboard-container { gap: 20px; }
@@ -1253,3 +1255,6 @@ details.toc-category-wrapper:not([open]) > summary .toc-category-title::before {
   }
   .monthly-table.has-cell-labels td[data-label] > * { text-align: right; }
 }
+
+/* The header is only a wrapper: without this the nav could only "stick" inside it, so it scrolled away */
+#global-header { display: contents; }
