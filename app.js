@@ -57,6 +57,34 @@ function getStatusColor(status) {
     default: return '#FFFFFF';
   }
 }
+// Completed playthroughs (optionally for one year), oldest first, with displayDate and entryNum set
+function getSortedCompletions(year) {
+  return Object.values(rawData.playthroughHistory)
+    .filter(pt => (pt.completionDates && pt.completionDates.length > 0) || ['Completed', 'M-Completed', 'Postgame'].includes(pt.finalStatus))
+    .map(pt => {
+      pt.displayDate = new Date((pt.completionDates && pt.completionDates.length > 0) ? pt.completionDates[0] : pt.lastDate);
+      pt.entryNum = getCompletionEntryNum(pt.ptTag);
+      return pt;
+    })
+    .filter(pt => year === 'All-Time' || pt.displayDate.getUTCFullYear().toString() === year)
+    .sort((a, b) => (a.displayDate - b.displayDate) || (a.entryNum - b.entryNum));
+}
+// Other dates this playthrough's game was completed, formatted and without repeats
+let _completionDatesByGame = null;
+function getOtherCompletionDates(pt) {
+  if (!_completionDatesByGame) {
+    _completionDatesByGame = new Map((rawData.metrics.completionStats || []).map(g => [g.gameName, g.completionDates]));
+  }
+  const dates = _completionDatesByGame.get(pt.gameName) || [];
+  if (dates.length < 2) return [];
+  const current = formatFullDate(pt.displayDate);
+  return [...new Set(dates.map(d => formatFullDate(d)).filter(d => d !== current))];
+}
+// Values that may be a Set, an array, or a serialized {data: [...]} as a plain array
+function toList(v) {
+  if (v instanceof Set || Array.isArray(v)) return [...v];
+  return (v && v.data) || [];
+}
 // Entry # of each playthrough's last completion-status entry, used to order same-day completions
 let _completionEntryNums = null;
 function getCompletionEntryNum(ptTag) {
@@ -467,24 +495,8 @@ function initCompletionsPage() {
   const container = document.getElementById('completions-page-container');
   if (!container || !rawData || !rawData.playthroughHistory) return;
 
-  // Filter for completed/postgame states
-  const completions = Object.values(rawData.playthroughHistory).filter(pt => {
-    return (pt.completionDates && pt.completionDates.length > 0) || ['Completed', 'M-Completed', 'Postgame'].includes(pt.finalStatus);
-  });
-
-  // Calculate display dates and entry numbers
-  completions.forEach(pt => {
-    const cDate = (pt.completionDates && pt.completionDates.length > 0) ? new Date(pt.completionDates[0]) : new Date(pt.lastDate);
-    pt.displayDate = cDate;
-    pt.entryNum = getCompletionEntryNum(pt.ptTag);
-  });
-
-  // Sort OLDEST first to calculate running metadata totals accurately
-  completions.sort((a, b) => {
-    const dateDiff = a.displayDate.getTime() - b.displayDate.getTime();
-    if (dateDiff !== 0) return dateDiff;
-    return a.entryNum - b.entryNum;
-  });
+  // OLDEST first to calculate running metadata totals accurately
+  const completions = getSortedCompletions('All-Time');
 
   const genreCounts = {};
   const seriesCounts = {};
@@ -527,20 +539,8 @@ function initCompletionsPage() {
     const formattedTime = formatTime(timeStringToSeconds(pt.finalPtLifetime));
     const statusColor = getStatusColor(pt.finalStatus);
     
-    let pastCompletionsHtml = '';
-    if (rawData.metrics && rawData.metrics.completionStats) {
-      const allTimeGameData = rawData.metrics.completionStats.find(g => g.gameName === pt.gameName);
-      if (allTimeGameData && allTimeGameData.completionDates.length > 1) {
-        const currentCompletionStr = formatFullDate(pt.displayDate);
-        const pastDates = allTimeGameData.completionDates
-          .map(d => formatFullDate(d))
-          .filter(d => d !== currentCompletionStr);
-        if (pastDates.length > 0) {
-          const uniquePastDates = [...new Set(pastDates)];
-          pastCompletionsHtml = `<div class="cc-past"><strong>Also completed on:</strong> ${uniquePastDates.join(', ')}</div>`;
-        }
-      }
-    }
+    const pastDates = getOtherCompletionDates(pt);
+    const pastCompletionsHtml = pastDates.length > 0 ? `<div class="cc-past"><strong>Also completed on:</strong> ${pastDates.join(', ')}</div>` : '';
 
     // Build the metadata rank pills
     let metaRanksHtml = '';
@@ -657,7 +657,7 @@ function initGotyPage() {
       
       const gameStats = rawData && rawData.metrics && rawData.metrics.allTimeGameStats[game.name] ? rawData.metrics.allTimeGameStats[game.name] : null;
       const timeStr = gameStats ? formatTime(gameStats.totalSeconds) : "0m";
-      const daysCount = gameStats && gameStats.days ? (gameStats.days.size || gameStats.days.length || (gameStats.days.data ? gameStats.days.data.length : 0)) : 0;
+      const daysCount = gameStats ? toList(gameStats.days).length : 0;
       const firstStr = (gameStats && gameStats.firstPlayedDate) ? formatFullDate(gameStats.firstPlayedDate) : "-";
       const lastStr = (gameStats && gameStats.lastPlayedDate) ? formatFullDate(gameStats.lastPlayedDate) : "-";
       
@@ -1798,26 +1798,7 @@ function setupHoverHistory() {
 function renderCompletions(year) {
   const container = document.getElementById('completions-list');
 
-  const completions = Object.values(rawData.playthroughHistory).filter(pt => {
-    const isComp = (pt.completionDates && pt.completionDates.length > 0) || ['Completed', 'M-Completed', 'Postgame'].includes(pt.finalStatus);
-    if (!isComp) return false;
-
-    const cDate = (pt.completionDates && pt.completionDates.length > 0) ? new Date(pt.completionDates[0]) : new Date(pt.lastDate);
-    pt.displayDate = cDate;
-
-    if (year === 'All-Time') return true;
-    return cDate.getUTCFullYear().toString() === year;
-  });
-
-  completions.forEach(pt => {
-    pt.entryNum = getCompletionEntryNum(pt.ptTag);
-  });
-
-  completions.sort((a, b) => {
-    const dateDiff = a.displayDate.getTime() - b.displayDate.getTime();
-    if (dateDiff !== 0) return dateDiff;
-    return a.entryNum - b.entryNum;
-  });
+  const completions = getSortedCompletions(year);
 
   completions.forEach((c, index) => c.yearRank = index + 1);
   completions.reverse();
@@ -1828,20 +1809,8 @@ function renderCompletions(year) {
     const score = metaScores.get(pt.gameName) || '-';
     const badgeHTML = score !== '-' ? `<div class="item-badge">${score}</div>` : `<div class="item-badge" style="background: var(--heatmap-empty); color: var(--text-muted);">-</div>`;
 
-    let pastCompletionsHtml = '';
-    if (rawData.metrics && rawData.metrics.completionStats) {
-        const allTimeGameData = rawData.metrics.completionStats.find(g => g.gameName === pt.gameName);
-        if (allTimeGameData && allTimeGameData.completionDates.length > 1) {
-          const currentCompletionStr = formatFullDate(pt.displayDate);
-          const pastDates = allTimeGameData.completionDates
-              .map(d => formatFullDate(d))
-              .filter(d => d !== currentCompletionStr);
-            if (pastDates.length > 0) {
-                const uniquePastDates = [...new Set(pastDates)];
-                pastCompletionsHtml = `<div style="font-size: 0.75rem; font-style: italic; color: var(--text-sub); margin-top: 4px;">Also completed on: ${uniquePastDates.join(', ')}</div>`;
-            }
-        }
-    }
+    const pastDates = getOtherCompletionDates(pt);
+    const pastCompletionsHtml = pastDates.length > 0 ? `<div style="font-size: 0.75rem; font-style: italic; color: var(--text-sub); margin-top: 4px;">Also completed on: ${pastDates.join(', ')}</div>` : '';
 
     // Standardize the time output (turns "13:45" into "13h 45m")
     const formattedTime = formatTime(timeStringToSeconds(pt.finalPtLifetime));
@@ -1881,69 +1850,37 @@ function renderCompletions(year) {
   }).join('');
 }
 
-// Most Played Time
-function renderMostPlayed(year) {
-  const container = document.getElementById('most-played-list');
+// Most Played (time) and Most Days Played share one list renderer
+function renderMostPlayed(year) { renderTopGamesList(year, 'most-played-list', 'seconds'); }
+function renderMostDays(year) { renderTopGamesList(year, 'most-days-list', 'days'); }
+
+function renderTopGamesList(year, containerId, sortBy) {
+  const container = document.getElementById(containerId);
   const statsObj = year === 'All-Time' ? rawData.metrics.allTimeGameStats : rawData.metrics.yearlyGameStats[year];
 
   if (!statsObj) { container.innerHTML = `<div class="loading-text">No playtime logged.</div>`; return; }
 
   const sortedGames = Object.entries(statsObj).map(([name, stats]) => {
-    const sysStr = stats.systems instanceof Set ? Array.from(stats.systems).join(', ') : (Array.isArray(stats.systems) ? stats.systems.join(', ') : (stats.systems && stats.systems.data ? stats.systems.data.join(', ') : ''));
-    const daysSet = stats.days instanceof Set ? Array.from(stats.days) : (Array.isArray(stats.days) ? stats.days : (stats.days && stats.days.data ? stats.days.data : []));
-    const daysArr = daysSet.sort();
+    const daysArr = toList(stats.days).sort();
 
     // Check Date Objects (All-Time) or fallback to String parsing (Yearly)
     const minDate = stats.firstPlayedDate ? formatFullDate(stats.firstPlayedDate) : (daysArr.length > 0 ? daysArr[0].replace(/-/g, '/') : "N/A");
     const maxDate = stats.lastPlayedDate ? formatFullDate(stats.lastPlayedDate) : (daysArr.length > 0 ? daysArr[daysArr.length - 1].replace(/-/g, '/') : "N/A");
 
-    return { name, seconds: stats.totalSeconds, days: daysArr.length, systems: sysStr, minDate, maxDate };
-  }).sort((a, b) => b.seconds - a.seconds).slice(0, 100);
+    return { name, seconds: stats.totalSeconds, days: daysArr.length, systems: toList(stats.systems).join(', '), minDate, maxDate };
+  }).sort((a, b) => b[sortBy] - a[sortBy]).slice(0, 100);
 
+  const byDays = sortBy === 'days';
   container.innerHTML = sortedGames.map((game, index) => `
     <div class="list-item" style="align-items: flex-start; flex-direction: column; padding: 10px 12px;">
       <div style="display: flex; justify-content: space-between; width: 100%; align-items: center;">
         <span class="item-title" style="font-weight: bold;">
           <span style="color: var(--text-muted); margin-right: 5px;">#${index + 1}</span><span class="hover-trigger" data-game="${escapeHTML(game.name)}">${escapeHTML(game.name)}</span> ${game.systems ? `(${escapeHTML(game.systems)})` : ''}
         </span>
-        <div class="item-badge">${formatTime(game.seconds)}</div>
+        <div class="item-badge">${byDays ? `${game.days} Days` : formatTime(game.seconds)}</div>
       </div>
       <div class="item-sub" style="display: flex; justify-content: space-between; width: 100%; margin-top: 4px;">
-        <span><strong>${game.days}</strong> Days Played</span>
-        <span>${game.minDate} - ${game.maxDate}</span>
-      </div>
-    </div>
-  `).join('');
-}
-
-// Most Days Played
-function renderMostDays(year) {
-  const container = document.getElementById('most-days-list');
-  const statsObj = year === 'All-Time' ? rawData.metrics.allTimeGameStats : rawData.metrics.yearlyGameStats[year];
-
-  if (!statsObj) { container.innerHTML = `<div class="loading-text">No playtime logged.</div>`; return; }
-
-  const sortedDays = Object.entries(statsObj).map(([name, stats]) => {
-    const sysStr = stats.systems instanceof Set ? Array.from(stats.systems).join(', ') : (Array.isArray(stats.systems) ? stats.systems.join(', ') : (stats.systems && stats.systems.data ? stats.systems.data.join(', ') : ''));
-    const daysSet = stats.days instanceof Set ? Array.from(stats.days) : (Array.isArray(stats.days) ? stats.days : (stats.days && stats.days.data ? stats.days.data : []));
-    const daysArr = daysSet.sort();
-
-    const minDate = stats.firstPlayedDate ? formatFullDate(stats.firstPlayedDate) : (daysArr.length > 0 ? daysArr[0].replace(/-/g, '/') : "N/A");
-    const maxDate = stats.lastPlayedDate ? formatFullDate(stats.lastPlayedDate) : (daysArr.length > 0 ? daysArr[daysArr.length - 1].replace(/-/g, '/') : "N/A");
-
-    return { name, seconds: stats.totalSeconds, days: daysArr.length, systems: sysStr, minDate, maxDate };
-  }).sort((a, b) => b.days - a.days).slice(0, 100);
-
-  container.innerHTML = sortedDays.map((game, index) => `
-    <div class="list-item" style="align-items: flex-start; flex-direction: column; padding: 10px 12px;">
-      <div style="display: flex; justify-content: space-between; width: 100%; align-items: center;">
-        <span class="item-title" style="font-weight: bold;">
-          <span style="color: var(--text-muted); margin-right: 5px;">#${index + 1}</span><span class="hover-trigger" data-game="${escapeHTML(game.name)}">${escapeHTML(game.name)}</span> ${game.systems ? `(${escapeHTML(game.systems)})` : ''}
-        </span>
-        <div class="item-badge">${game.days} Days</div>
-      </div>
-      <div class="item-sub" style="display: flex; justify-content: space-between; width: 100%; margin-top: 4px;">
-        <span><strong>${formatTime(game.seconds)}</strong> Played</span>
+        ${byDays ? `<span><strong>${formatTime(game.seconds)}</strong> Played</span>` : `<span><strong>${game.days}</strong> Days Played</span>`}
         <span>${game.minDate} - ${game.maxDate}</span>
       </div>
     </div>
@@ -2009,7 +1946,7 @@ function renderRankings(filterType, filterValue, containerId, limit) {
     // Grab the aggregated stats to display playtime next to the score
     const gameStats = rawData.metrics.allTimeGameStats[game.name];
     const timeStr = gameStats ? formatTime(gameStats.totalSeconds) : "0m";
-    const daysCount = gameStats && gameStats.days ? (gameStats.days.size || gameStats.days.length || (gameStats.days.data ? gameStats.days.data.length : 0)) : 0;
+    const daysCount = gameStats ? toList(gameStats.days).length : 0;
 
     return `
     <div class="list-item" style="align-items: flex-start; flex-direction: column; padding: 10px 12px;">
@@ -2191,7 +2128,7 @@ function renderHeatmap(mode, targetContainerId = 'heatmap-content') {
       if (statsForDays) {
         Object.values(statsForDays).forEach(item => {
           if (item.days) {
-            const daysArr = item.days instanceof Set ? Array.from(item.days) : (Array.isArray(item.days) ? item.days : (item.days.data || []));
+            const daysArr = toList(item.days);
             daysArr.forEach(d => totalDaysSet.add(d));
           }
         });
@@ -2206,7 +2143,7 @@ function renderHeatmap(mode, targetContainerId = 'heatmap-content') {
       html += `<tr class="${key === 'All-Time' ? 'all-time-row' : ''}"><td class="text-left" style="white-space: nowrap; font-weight: bold;">${displayKey}</td><td>${formatHHMM(totalTime)}</td><td>${totalDaysSet.size}</td>${[0,1,2,3,4].map(i => {
         if (top5[i]) {
           if (isGame) {
-            const sysStr = top5[i].systems instanceof Set ? Array.from(top5[i].systems).join(', ') : (Array.isArray(top5[i].systems) ? top5[i].systems.join(', ') : (top5[i].systems && top5[i].systems.data ? top5[i].systems.data.join(', ') : ''));
+            const sysStr = toList(top5[i].systems).join(', ');
             return `<td style="font-size: 0.75rem; text-align: left;">[${formatHHMM(top5[i].totalSeconds)}] ${escapeHTML(top5[i].name)} (${escapeHTML(sysStr)})</td>`;
           } else {
             return `<td style="font-size: 0.75rem; text-align: left;">[${formatHHMM(top5[i].totalSeconds)}] ${escapeHTML(top5[i].name)}</td>`;
@@ -2247,7 +2184,7 @@ function renderHeatmap(mode, targetContainerId = 'heatmap-content') {
       }
       const dayData = calData[m][d];
       const poss = possible[m][d];
-      const playedCount = dayData.yearsPlayed ? (Array.isArray(dayData.yearsPlayed) ? dayData.yearsPlayed.length : (dayData.yearsPlayed.data ? dayData.yearsPlayed.data.length : 0)) : 0;
+      const playedCount = toList(dayData.yearsPlayed).length;
       const timeSec = dayData.totalSeconds;
 
       let bgColor = '#f7f7f7', titleText = `${monthNames[m]} ${d}`, innerText = '';
