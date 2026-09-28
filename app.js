@@ -2776,6 +2776,9 @@ function initSpotlightPage() {
     return;
   }
 
+  const lists = rawData.metrics.top25Lists;
+  const slugs = spotlightSlugs(lists);
+
   // 1. Group lists by the category set in Apps Script (sections appear in the order first used)
   const categories = {};
 
@@ -2823,6 +2826,13 @@ function initSpotlightPage() {
   <div class="card-row grid-1">
     <h2 style="font-size: 2.5rem; color: var(--text-header); font-weight: 900; text-align: center; margin-bottom: 15px;">Spotlight Archive Directory</h2>
   </div>
+
+  <div class="spotlight-tools">
+    <input type="search" id="spotlight-filter" class="spotlight-filter" placeholder="Filter lists: try hiatus, Zelda, January…" aria-label="Filter Spotlight lists">
+    <span id="spotlight-filter-count" class="spotlight-filter-count">${lists.length} lists</span>
+    <button type="button" class="spotlight-toggle-all" data-open="true">Expand all</button>
+    <button type="button" class="spotlight-toggle-all" data-open="false">Collapse all</button>
+  </div>
   `;
 
   // Render each category block as a wide table
@@ -2830,8 +2840,8 @@ function initSpotlightPage() {
     if (items.length === 0) continue;
     
     html += `
-    <div class="toc-category-wrapper" style="animation: fadeInUp 0.4s ease forwards;">
-      <h3 class="toc-category-title">${escapeHTML(catName)}</h3>
+    <details class="toc-category-wrapper" open style="animation: fadeInUp 0.4s ease forwards;">
+      <summary><h3 class="toc-category-title">${escapeHTML(catName)} <span class="toc-category-count">${items.length}</span></h3></summary>
       <div style="overflow-x: auto;">
         <table class="toc-table">
           <thead>
@@ -2856,8 +2866,8 @@ function initSpotlightPage() {
       const rowClass = isActive ? 'class="toc-active-row"' : '';
 
       html += `
-        <tr ${rowClass}>
-          <td><a href="#spotlight-list-${item.index}" class="toc-link">▶ ${escapeHTML(item.title)}</a></td>
+        <tr ${rowClass} data-list="${item.index}">
+          <td><a href="#${slugs[item.index]}" class="toc-link">▶ ${escapeHTML(item.title)}</a></td>
           <td style="font-weight: 800; color: var(--text-title);">
             ${escapeHTML(item.recordName)}${contextHtml}
             ${subDetailHtml}
@@ -2869,13 +2879,13 @@ function initSpotlightPage() {
       `;
     });
     
-    html += `</tbody></table></div></div>`;
+    html += `</tbody></table></div></details>`;
   }
 
   // 3. Build the actual spotlight lists underneath, wrapping them in anchor IDs
-  rawData.metrics.top25Lists.forEach((list, index) => {
+  lists.forEach((list, index) => {
     html += `
-    <section id="spotlight-list-${index}" class="card-row grid-1" style="margin-bottom: 30px; scroll-margin-top: 80px;">
+    <section id="${slugs[index]}" data-list="${index}" class="card-row grid-1" style="margin-bottom: 30px; scroll-margin-top: 80px;">
       <div class="card" style="max-height: none; padding: 0;">
         ${generateUniversalDualTableHtml(list)}
       </div>
@@ -2884,6 +2894,54 @@ function initSpotlightPage() {
   });
 
   container.innerHTML = html;
+  setupSpotlightFilter(container, lists);
+
+  // The page is drawn after the data loads, so jump to a linked list ourselves
+  if (location.hash) {
+    const target = document.getElementById(decodeURIComponent(location.hash.slice(1)));
+    if (target) target.scrollIntoView({ behavior: 'instant' });
+  }
+}
+
+// Link-friendly ids from list titles ("Top 25 Series Hiatuses" -> "top-25-series-hiatuses"), unique per page
+function spotlightSlugs(lists) {
+  const used = new Set();
+  return lists.map(list => {
+    const base = String(list.titleLeft).toLowerCase().replace(/&/g, 'and').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'list';
+    let slug = base;
+    for (let n = 2; used.has(slug); n++) slug = `${base}-${n}`;
+    used.add(slug);
+    return slug;
+  });
+}
+
+// Filters the directory and lists by name or any text inside a list; hides sections with no matches
+function setupSpotlightFilter(container, lists) {
+  const input = document.getElementById('spotlight-filter');
+  const count = document.getElementById('spotlight-filter-count');
+  const searchText = lists.map(list => [list.titleLeft, list.titleRight, list.category, ...list.allTime.flat(), ...list.yearly.flat()].join(' ').toLowerCase());
+  const rows = [...container.querySelectorAll('tr[data-list]')];
+  const sections = [...container.querySelectorAll('section[data-list]')];
+  const groups = [...container.querySelectorAll('details.toc-category-wrapper')];
+
+  input.addEventListener('input', () => {
+    const query = input.value.trim().toLowerCase();
+    const matches = searchText.map(text => !query || text.includes(query));
+    rows.forEach(row => { row.hidden = !matches[row.dataset.list]; });
+    sections.forEach(section => { section.hidden = !matches[section.dataset.list]; });
+    groups.forEach(group => {
+      const visible = group.querySelectorAll('tr[data-list]:not([hidden])').length;
+      group.hidden = visible === 0;
+      group.querySelector('.toc-category-count').textContent = visible;
+      if (query && visible > 0) group.open = true;
+    });
+    const shown = matches.filter(Boolean).length;
+    count.textContent = query ? `${shown} of ${lists.length} lists` : `${lists.length} lists`;
+  });
+
+  container.querySelectorAll('.spotlight-toggle-all').forEach(button => {
+    button.addEventListener('click', () => groups.forEach(group => { group.open = button.dataset.open === 'true'; }));
+  });
 }
 
 // Setup for the Index Page Dropdown
