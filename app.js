@@ -811,6 +811,41 @@ function initGotyPage() {
   html += buildRankCard("Top 25: 1980s", decades['1980s'], 25);
   html += `</section>`;
 
+  // SECTION 3B: Games missing a score or missing from the log
+  const playedStats = (rawData && rawData.metrics && rawData.metrics.allTimeGameStats) || {};
+  const unscoredPlayed = Object.entries(playedStats)
+    .filter(([name]) => getGameScore(name) === null)
+    .map(([name, stats]) => ({ name, stats }))
+    .sort((a, b) => b.stats.totalSeconds - a.stats.totalSeconds);
+  const scoredNeverLogged = ratedGames.filter(g => !playedStats[g.name])
+    .sort((a, b) => b.score - a.score || a.name.localeCompare(b.name));
+  const gapListHtml = (title, subtitle, rows) => `
+    <div class="card goty-card">
+      <div class="card-header"><h2>${title} <span class="goty-gap-count">${rows.length}</span></h2></div>
+      <div class="card-content goty-list-container">
+        <div class="goty-gap-subtitle">${subtitle}</div>
+        ${rows.length ? rows.join('') : '<div class="loading-text">None. Everything lines up.</div>'}
+      </div>
+    </div>`;
+  html += `<section class="card-row grid-2">
+    ${gapListHtml('Played but Not Scored', 'Logged games with no score in the Metadata sheet.', unscoredPlayed.map(({ name, stats }) => `
+      <div class="list-item">
+        <div class="item-text">
+          <span class="item-title hover-trigger" data-game="${escapeHTML(name)}">${escapeHTML(name)}</span>
+          <span class="item-sub">${toList(stats.days).length} day${toList(stats.days).length === 1 ? '' : 's'} | last played ${formatFullDate(stats.lastPlayedDate)}</span>
+        </div>
+        <div class="item-badge">${formatTime(stats.totalSeconds)}</div>
+      </div>`))}
+    ${gapListHtml('Scored but Never Logged', 'Scored in the Metadata sheet but with no log entries, like games played before the log began, or a name spelled differently in the two sheets.', scoredNeverLogged.map(g => `
+      <div class="list-item">
+        <div class="item-text">
+          <span class="item-title">${escapeHTML(g.name)}</span>
+          <span class="item-sub">${escapeHTML(g.releaseYear)} | ${escapeHTML(g.developer)}</span>
+        </div>
+        <div class="item-badge">${formatScore(g.score)}</div>
+      </div>`))}
+  </section>`;
+
   // SECTION 4: Yearly Rankings (Strict 3-Column Grid)
   html += `
     <div class="card-row grid-1" style="margin-top: 20px;">

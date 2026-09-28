@@ -1292,3 +1292,7 @@ details.toc-category-wrapper:not([open]) > summary .toc-category-title::before {
   padding: 10px 12px; border: 2px solid var(--border-light); border-radius: 8px;
   background: var(--card-bg); color: var(--text-main); font: inherit; font-weight: 700;
 }
+
+/* GotY: games missing a score or missing from the log */
+.goty-gap-count { margin-left: 6px; font-size: 0.9rem; color: var(--text-muted); }
+.goty-gap-subtitle { margin-bottom: 12px; font-size: 0.85rem; color: var(--text-sub); }
