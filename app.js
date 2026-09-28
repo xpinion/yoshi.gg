@@ -375,7 +375,9 @@ function buildTimeframeFeed(containerId, mode) {
   mainContainer.innerHTML = html;
 
   // 3. Populate each card with its specific data table
+  const widgetData = buildTimeframeWidgetData(mode);
   keys.forEach(key => {
+    renderTimeframeWidgets(key, mode, `${mode}-widgets-${key}`, widgetData);
     renderTimeframeSummary(key, mode, `${mode}-summary-${key}`);
   });
 
@@ -498,6 +500,111 @@ function renderTimeframeSummary(timeframeStr, mode, containerId) {
 
   html += `</tbody></table></div>`;
   container.innerHTML = html;
+}
+
+// --- TIMEFRAME WIDGETS (Monthly / Yearly cards) ---
+const MONTH_NAMES = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+
+// Totals per day, per timeframe key, and completions per key, computed once for the whole feed
+function buildTimeframeWidgetData(mode) {
+  const daySeconds = new Map(), totals = {};
+  rawData.allEntries.forEach(e => {
+    const day = e.date.slice(0, 10);
+    const key = mode === 'monthly' ? day.slice(0, 7) : day.slice(0, 4);
+    const sec = timeStringToSeconds(e.time);
+    daySeconds.set(day, (daySeconds.get(day) || 0) + sec);
+    const t = totals[key] || (totals[key] = { seconds: 0, days: new Set(), games: new Set() });
+    t.seconds += sec; t.days.add(day); t.games.add(e.game);
+  });
+  const completions = {};
+  getSortedCompletions('All-Time').forEach(pt => {
+    const d = pt.displayDate.toISOString().slice(0, 10);
+    const key = mode === 'monthly' ? d.slice(0, 7) : d.slice(0, 4);
+    completions[key] = (completions[key] || 0) + 1;
+  });
+  return { daySeconds, totals, completions };
+}
+
+function renderTimeframeWidgets(key, mode, containerId, data) {
+  const container = document.getElementById(containerId);
+  const t = data.totals[key];
+  if (!container || !t) return;
+  const monthly = mode === 'monthly';
+  const [year, month] = key.split('-').map(Number);
+
+  const genreStats = monthly ? (rawData.metrics.monthlyGenreStats || {})[key] : (rawData.metrics.yearlyGenreStats || {})[key];
+  const topGenre = genreStats ? Object.entries(genreStats).sort((a, b) => b[1].totalSeconds - a[1].totalSeconds)[0] : null;
+
+  // Comparisons: previous period, and (monthly) the same month a year earlier
+  const shiftKey = (months) => {
+    if (!monthly) return String(year + months);
+    const d = new Date(Date.UTC(year, month - 1 + months, 1));
+    return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`;
+  };
+  const labelFor = k => monthly ? `${MONTH_NAMES[Number(k.slice(5)) - 1].slice(0, 3)} ${k.slice(0, 4)}` : k;
+  const today = new Date();
+  const inProgress = monthly ? (year === today.getFullYear() && month === today.getMonth() + 1) : year === today.getFullYear();
+  // Days into the period (1-based) as "MM-DD" or "DD", so a period in progress is compared at the same point
+  const cutoff = inProgress ? (monthly ? String(today.getDate()).padStart(2, '0') : `${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`) : null;
+  const secondsUpTo = (k) => {
+    let sec = 0;
+    data.daySeconds.forEach((v, day) => { if (day.startsWith(k) && day.slice(k.length + 1) <= cutoff) sec += v; });
+    return sec;
+  };
+  const compare = k => {
+    const other = data.totals[k];
+    if (!other) return '';
+    const otherSeconds = inProgress ? secondsUpTo(k) : other.seconds;
+    const diff = t.seconds - otherSeconds;
+    const cls = diff >= 0 ? 'tf-up' : 'tf-down';
+    return `<span class="tf-compare ${cls}">${diff >= 0 ? '▲' : '▼'} ${formatTime(Math.abs(diff))} vs ${labelFor(k)}${inProgress ? ' at this point' : ''}</span>`;
+  };
+  const comparisons = monthly ? [compare(shiftKey(-1)), compare(shiftKey(-12))] : [compare(shiftKey(-1))];
+
+  // Projection for the period that's still in progress
+  let projection = '';
+  if (inProgress) {
+    const start = monthly ? new Date(year, month - 1, 1) : new Date(year, 0, 1);
+    const end = monthly ? new Date(year, month, 1) : new Date(year + 1, 0, 1);
+    const elapsed = Math.max(1, Math.ceil((today - start) / 86400000));
+    const length = Math.round((end - start) / 86400000);
+    projection = `<div class="tf-stat"><span class="sys-widget-title">Projected ${monthly ? 'Month' : 'Year'}-End</span><strong>${formatTime(t.seconds / elapsed * length)}</strong><span class="tf-sub">at the current pace (day ${elapsed} of ${length})</span></div>`;
+  }
+
+  // Calendar strip: each day of the month, or each month of the year
+  let strip = '';
+  if (monthly) {
+    const daysInMonth = new Date(year, month, 0).getDate();
+    const cells = Array.from({ length: daysInMonth }, (_, i) => {
+      const day = `${key}-${String(i + 1).padStart(2, '0')}`;
+      return { label: String(i + 1), title: day.replace(/-/g, '/'), sec: data.daySeconds.get(day) || 0, future: inProgress && i + 1 > today.getDate() };
+    });
+    const max = Math.max(1, ...cells.map(c => c.sec));
+    strip = `<div class="tf-strip tf-strip-days">${cells.map(c => c.future
+      ? `<div class="tf-day tf-future" title="${c.title}: still to come"><span>${c.label}</span></div>`
+      : `<div class="tf-day" title="${c.title}: ${c.sec ? formatTime(c.sec) : 'no play'}" style="opacity: ${c.sec ? 0.25 + 0.75 * (c.sec / max) : 1}; background: ${c.sec ? 'var(--primary-green)' : 'var(--heatmap-empty)'};"><span>${c.label}</span></div>`).join('')}</div>`;
+  } else {
+    const months = MONTH_NAMES.map((name, i) => {
+      const k = `${key}-${String(i + 1).padStart(2, '0')}`;
+      let sec = 0;
+      data.daySeconds.forEach((v, day) => { if (day.startsWith(k)) sec += v; });
+      return { name: name.slice(0, 3), sec };
+    });
+    const max = Math.max(1, ...months.map(m => m.sec));
+    strip = `<div class="tf-strip tf-strip-months">${months.map(m => `<div class="tf-month" title="${m.name} ${key}: ${formatTime(m.sec)}"><div class="tf-month-fill" style="height: ${(m.sec / max) * 100}%;"></div><span>${m.name}</span></div>`).join('')}</div>`;
+  }
+
+  container.innerHTML = `
+    <div class="tf-stats">
+      <div class="tf-stat"><span class="sys-widget-title">Time Played</span><strong>${formatTime(t.seconds)}</strong>${comparisons.join('')}</div>
+      <div class="tf-stat"><span class="sys-widget-title">Days Played</span><strong>${t.days.size}</strong></div>
+      <div class="tf-stat"><span class="sys-widget-title">Games</span><strong>${t.games.size}</strong></div>
+      <div class="tf-stat"><span class="sys-widget-title">Completions</span><strong>${data.completions[key] || 0}</strong></div>
+      <div class="tf-stat"><span class="sys-widget-title">Top Genre</span><strong class="tf-genre">${topGenre ? escapeHTML(topGenre[0]) : '-'}</strong>${topGenre ? `<span class="tf-sub">${formatTime(topGenre[1].totalSeconds)}</span>` : ''}</div>
+      ${projection}
+    </div>
+    ${strip}
+  `;
 }
 
 // Backwards compatibility wrapper for index.html

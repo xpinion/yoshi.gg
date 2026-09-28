@@ -1310,3 +1310,22 @@ details.toc-category-wrapper:not([open]) > summary .toc-category-title::before {
 .completion-year-bar:hover .completion-year-fill, .completion-year-bar.active .completion-year-fill { opacity: 1; }
 .completion-year-count { font-size: 0.7rem; font-weight: 800; color: var(--text-muted); }
 .completion-year-label { font-size: 0.7rem; font-weight: 800; color: var(--text-title); }
+
+/* Monthly / Yearly cards: stat row, comparisons, calendar strip */
+.tf-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin-bottom: 12px; }
+.tf-stat { background: var(--item-bg); border-radius: 10px; padding: 12px; text-align: center; display: flex; flex-direction: column; gap: 3px; }
+.tf-stat strong { font-size: 1.35rem; font-weight: 900; color: var(--text-title); }
+.tf-stat .tf-genre { font-size: 1rem; }
+.tf-sub { font-size: 0.72rem; color: var(--text-muted); }
+.tf-compare { font-size: 0.72rem; font-weight: 800; }
+.tf-up { color: var(--primary-green); }
+.tf-down { color: #d7301f; }
+.tf-strip { display: flex; gap: 3px; margin-bottom: 6px; }
+.tf-day { flex: 1; min-width: 0; height: 26px; border-radius: 4px; display: flex; align-items: center; justify-content: center; }
+.tf-day span { font-size: 0.6rem; font-weight: 800; color: var(--text-title); mix-blend-mode: normal; }
+.tf-strip-months { height: 90px; align-items: flex-end; }
+.tf-month { flex: 1; height: 100%; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; gap: 3px; }
+.tf-month-fill { width: 70%; background: var(--primary-green); border-radius: 4px 4px 0 0; min-height: 2px; }
+.tf-month span { font-size: 0.65rem; font-weight: 800; color: var(--text-muted); }
+.tf-future { border: 1px dashed var(--border-table); background: transparent; }
+.tf-future span { color: var(--text-muted); }
