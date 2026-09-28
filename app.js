@@ -57,6 +57,17 @@ function getStatusColor(status) {
     default: return '#FFFFFF';
   }
 }
+// Entry # of each playthrough's last completion-status entry, used to order same-day completions
+let _completionEntryNums = null;
+function getCompletionEntryNum(ptTag) {
+  if (!_completionEntryNums) {
+    _completionEntryNums = new Map();
+    rawData.allEntries.forEach(e => {
+      if (['Completed', 'M-Completed', 'Postgame'].includes(e.status)) _completionEntryNums.set(e.ptTag, Number(e.entryNum));
+    });
+  }
+  return _completionEntryNums.get(ptTag) || 0;
+}
 function escapeHTML(str) {
   if (typeof str !== 'string') return str;
   return str.replace(/[&<>'"]/g, tag => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[tag] || tag));
@@ -465,8 +476,7 @@ function initCompletionsPage() {
   completions.forEach(pt => {
     const cDate = (pt.completionDates && pt.completionDates.length > 0) ? new Date(pt.completionDates[0]) : new Date(pt.lastDate);
     pt.displayDate = cDate;
-    const finalEntry = rawData.allEntries.slice().reverse().find(e => e.ptTag === pt.ptTag && ['Completed', 'M-Completed', 'Postgame'].includes(e.status));
-    pt.entryNum = finalEntry ? Number(finalEntry.entryNum) : 0;
+    pt.entryNum = getCompletionEntryNum(pt.ptTag);
   });
 
   // Sort OLDEST first to calculate running metadata totals accurately
@@ -1800,8 +1810,7 @@ function renderCompletions(year) {
   });
 
   completions.forEach(pt => {
-    const finalEntry = rawData.allEntries.slice().reverse().find(e => e.ptTag === pt.ptTag && ['Completed', 'M-Completed', 'Postgame'].includes(e.status));
-    pt.entryNum = finalEntry ? Number(finalEntry.entryNum) : 0;
+    pt.entryNum = getCompletionEntryNum(pt.ptTag);
   });
 
   completions.sort((a, b) => {
