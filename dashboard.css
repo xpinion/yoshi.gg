@@ -1296,3 +1296,17 @@ details.toc-category-wrapper:not([open]) > summary .toc-category-title::before {
 /* GotY: games missing a score or missing from the log */
 .goty-gap-count { margin-left: 6px; font-size: 0.9rem; color: var(--text-muted); }
 .goty-gap-subtitle { margin-bottom: 12px; font-size: 0.85rem; color: var(--text-sub); }
+
+/* Completions page: filters and summary strip */
+.completion-filters { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; margin-bottom: 16px; }
+.completion-summary { margin-bottom: 24px; }
+.completion-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; margin-bottom: 16px; }
+.completion-stats > div { background: var(--card-bg); border-radius: 12px; padding: 14px; text-align: center; box-shadow: 0 4px 15px rgba(0,0,0,0.05); display: flex; flex-direction: column; gap: 4px; }
+.completion-stats strong { font-size: 1.6rem; font-weight: 900; color: var(--text-title); }
+.completion-stat-sub { font-size: 0.75rem; color: var(--text-muted); }
+.completion-years { display: flex; gap: 6px; align-items: flex-end; height: 130px; padding: 10px; background: var(--card-bg); border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); overflow-x: auto; }
+.completion-year-bar { flex: 1 0 34px; height: 100%; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; gap: 2px; border: none; background: none; cursor: pointer; font: inherit; padding: 0; }
+.completion-year-fill { width: 70%; background: var(--primary-green); border-radius: 4px 4px 0 0; opacity: 0.55; min-height: 2px; }
+.completion-year-bar:hover .completion-year-fill, .completion-year-bar.active .completion-year-fill { opacity: 1; }
+.completion-year-count { font-size: 0.7rem; font-weight: 800; color: var(--text-muted); }
+.completion-year-label { font-size: 0.7rem; font-weight: 800; color: var(--text-title); }

@@ -545,6 +545,7 @@ function initCompletionsPage() {
       <h2 style="font-size: 2.5rem; color: var(--text-header); font-weight: 900;">All-Time Completions: <span style="color: var(--primary-green);">${totalCompletions}</span></h2>
     </div>
   </div>
+  ${completionFiltersHtml(completions)}
   <div class="completion-grid">
   `;
 
@@ -564,7 +565,7 @@ function initCompletionsPage() {
     if (pt.devRank) metaRanksHtml += `<span class="meta-rank-pill">${escapeHTML(pt.developer)} #${pt.devRank}</span>`;
 
     return `
-    <div class="completion-card card" style="border-top: 6px solid ${statusColor}; animation-delay: ${Math.min(index * 0.03, 1.2)}s;">
+    <div class="completion-card card" data-year="${pt.displayDate.getUTCFullYear()}" data-system="${escapeHTML(pt.system)}" data-genre="${escapeHTML(pt.genre || '')}" style="border-top: 6px solid ${statusColor}; animation-delay: ${Math.min(index * 0.03, 1.2)}s;">
       
       <div class="cc-header">
         <span class="cc-rank">Completion #${pt.overallRank}</span>
@@ -609,6 +610,87 @@ function initCompletionsPage() {
 
   html += `</div>`;
   container.innerHTML = html;
+  setupCompletionFilters(container, completions);
+}
+
+// Year / system / genre pickers for the Completions page
+function completionFiltersHtml(completions) {
+  const options = values => [...new Set(values.filter(Boolean))].sort((a, b) => String(b).localeCompare(String(a), undefined, { numeric: true }));
+  const select = (id, label, values, sortAsc) => `
+    <select id="${id}" class="milestone-year" aria-label="${label}">
+      <option value="all">All ${label.toLowerCase()}s</option>
+      ${(sortAsc ? [...values].reverse() : values).map(v => `<option value="${escapeHTML(String(v))}">${escapeHTML(String(v))}</option>`).join('')}
+    </select>`;
+  return `
+    <div class="completion-filters">
+      ${select('completion-year', 'Year', options(completions.map(pt => pt.displayDate.getUTCFullYear())))}
+      ${select('completion-system', 'System', options(completions.map(pt => pt.system)), true)}
+      ${select('completion-genre', 'Genre', options(completions.map(pt => pt.genre)), true)}
+      <button type="button" id="completion-reset" class="spotlight-toggle-all">Reset</button>
+    </div>
+    <div id="completion-summary" class="completion-summary"></div>`;
+}
+
+// Filters the completion cards and keeps the summary strip in step with them
+function setupCompletionFilters(container, completions) {
+  const pickers = { year: 'completion-year', system: 'completion-system', genre: 'completion-genre' };
+  const get = key => document.getElementById(pickers[key]).value;
+  const cards = [...container.querySelectorAll('.completion-card')];
+  const abandoned = Object.values(rawData.playthroughHistory).filter(pt => pt.finalStatus === 'Abandoned');
+  const matches = (pt, date, ignoreYear) =>
+    (ignoreYear || get('year') === 'all' || String(new Date(date).getUTCFullYear()) === get('year')) &&
+    (get('system') === 'all' || pt.system === get('system')) &&
+    (get('genre') === 'all' || pt.genre === get('genre'));
+
+  const render = () => {
+    cards.forEach(card => {
+      card.hidden = !((get('year') === 'all' || card.dataset.year === get('year')) &&
+        (get('system') === 'all' || card.dataset.system === get('system')) &&
+        (get('genre') === 'all' || card.dataset.genre === get('genre')));
+    });
+    const shown = completions.filter(pt => matches(pt, pt.displayDate));
+    const abandonedShown = abandoned.filter(pt => matches(pt, pt.lastDate)).length;
+    const hours = shown.map(pt => timeStringToSeconds(pt.finalPtLifetime));
+    const avg = arr => arr.length ? arr.reduce((a, b) => a + b, 0) / arr.length : 0;
+    const rate = shown.length + abandonedShown > 0 ? Math.round(shown.length / (shown.length + abandonedShown) * 100) : 0;
+
+    // Completions per year for the chosen system and genre (all years, so the chart doubles as a year picker)
+    const perYear = {};
+    completions.filter(pt => matches(pt, pt.displayDate, true)).forEach(pt => {
+      const y = pt.displayDate.getUTCFullYear();
+      perYear[y] = (perYear[y] || 0) + 1;
+    });
+    const years = Object.keys(perYear).sort();
+    const maxYear = Math.max(1, ...Object.values(perYear));
+
+    document.getElementById('completion-summary').innerHTML = `
+      <div class="completion-stats">
+        <div><span class="sys-widget-title">Completions</span><strong>${shown.length}</strong></div>
+        <div><span class="sys-widget-title">Avg Time to Finish</span><strong>${formatTime(avg(hours))}</strong></div>
+        <div><span class="sys-widget-title">Avg Days Played</span><strong>${avg(shown.map(pt => Number(pt.finalPtLifetimeDays) || 0)).toFixed(1)}</strong></div>
+        <div><span class="sys-widget-title">Completion Rate</span><strong>${rate}%</strong><span class="completion-stat-sub">${shown.length} done vs ${abandonedShown} abandoned</span></div>
+      </div>
+      <div class="completion-years" aria-label="Completions per year">
+        ${years.map(y => `
+          <button type="button" class="completion-year-bar${get('year') === y ? ' active' : ''}" data-year="${y}" title="${y}: ${perYear[y]} completions">
+            <span class="completion-year-count">${perYear[y]}</span>
+            <span class="completion-year-fill" style="height: ${(perYear[y] / maxYear) * 100}%;"></span>
+            <span class="completion-year-label">${y}</span>
+          </button>`).join('')}
+      </div>`;
+    document.querySelectorAll('.completion-year-bar').forEach(bar => bar.addEventListener('click', () => {
+      const picker = document.getElementById(pickers.year);
+      picker.value = picker.value === bar.dataset.year ? 'all' : bar.dataset.year;
+      render();
+    }));
+  };
+
+  Object.values(pickers).forEach(id => document.getElementById(id).addEventListener('change', render));
+  document.getElementById('completion-reset').addEventListener('click', () => {
+    Object.values(pickers).forEach(id => { document.getElementById(id).value = 'all'; });
+    render();
+  });
+  render();
 }
 
 // --- GOTY / RANKINGS PAGE ROUTING ---
