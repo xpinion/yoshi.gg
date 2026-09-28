@@ -2969,5 +2969,43 @@ function renderSpotlightSingle(selectionVal, targetContainerId) {
 }
 
 
+// --- PHONE CARD LAYOUT FOR SUMMARY TABLES ---
+// Gives each cell of a .monthly-table a data-label from its column header(s), e.g. "Active Month · Time",
+// so the phone layout in dashboard.css can show every row as a card of label/value pairs.
+function labelTableCells(table) {
+  const headerRows = [...table.querySelectorAll('thead tr')];
+  const labels = [];
+  const pending = []; // columns whose group header is waiting for a second-row sub-label
+  headerRows.forEach((row, r) => {
+    let col = 0;
+    [...row.children].forEach(th => {
+      const text = th.textContent.trim();
+      if (r === 0) {
+        const span = th.colSpan || 1;
+        for (let k = 0; k < span; k++) {
+          labels.push(text);
+          if (span > 1 || (th.rowSpan || 1) < headerRows.length) pending.push(labels.length - 1);
+        }
+      } else {
+        const idx = pending[col++];
+        if (idx !== undefined) labels[idx] = `${labels[idx]} · ${text}`;
+      }
+    });
+  });
+  table.querySelectorAll('tbody tr').forEach(row => {
+    let col = 0;
+    [...row.children].forEach(td => {
+      const span = td.colSpan || 1;
+      if (span === 1 && labels[col]) td.setAttribute('data-label', labels[col]);
+      col += span;
+    });
+  });
+  table.classList.add('has-cell-labels');
+}
+
+new MutationObserver(() => {
+  document.querySelectorAll('table.monthly-table:not(.has-cell-labels)').forEach(labelTableCells);
+}).observe(document.documentElement, { childList: true, subtree: true });
+
 // Initialize the dashboard
 initDashboard();

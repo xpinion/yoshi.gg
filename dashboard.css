@@ -1211,3 +1211,45 @@ details.toc-category-wrapper:not([open]) > summary .toc-category-title::before {
 .hub-badge-title { background: var(--text-title); color: var(--card-bg); }
 .hub-archive-table { min-width: 1100px; }
 .hub-bold { font-weight: bold; }
+
+/* --- PHONES: keep every page within the screen; wide tables scroll inside their card --- */
+@media (max-width: 700px) {
+  body { padding: 16px 12px; }
+  .dashboard-header h1 { font-size: 1.6rem; letter-spacing: 1px; margin-bottom: 16px; }
+  .theme-btn { position: static; display: block; margin: 0 auto 14px; }
+  .global-nav { gap: 6px 14px; padding: 10px 8px; margin: 0 -12px 20px; }
+  .header-dropdown { max-width: 100%; }
+  .global-nav a { font-size: 0.8rem; }
+  .dashboard-container { gap: 20px; }
+
+  .grid-1, .grid-2, .grid-3, .grid-4, .grid-strict-3, .completion-grid { grid-template-columns: minmax(0, 1fr); }
+  .card { min-width: 0; padding: 16px; }
+  .card-content { overflow-x: auto; }
+  .card-header h2, .card-header { flex-wrap: wrap; }
+  .spotlight-section { min-width: 0; flex-basis: 100%; }
+
+  /* Summary tables become one card per row, each cell labeled from its column header */
+  .monthly-table.has-cell-labels { min-width: 0 !important; }
+  .monthly-table.has-cell-labels thead { display: none; }
+  .monthly-table.has-cell-labels, .monthly-table.has-cell-labels tbody,
+  .monthly-table.has-cell-labels tr, .monthly-table.has-cell-labels td { display: block; width: 100%; }
+  .monthly-table.has-cell-labels tr {
+    margin-bottom: 12px;
+    border: 1px solid var(--border-light);
+    border-radius: 10px;
+    overflow: hidden;
+  }
+  .monthly-table.has-cell-labels td { text-align: left !important; border: none; border-bottom: 1px solid var(--border-light); padding: 6px 10px; }
+  .monthly-table.has-cell-labels td:last-child { border-bottom: none; }
+  .monthly-table.has-cell-labels td:empty { display: none; }
+  .monthly-table.has-cell-labels td[data-label] { display: flex; gap: 12px; justify-content: space-between; align-items: baseline; }
+  .monthly-table.has-cell-labels td[data-label]::before {
+    content: attr(data-label);
+    flex: 0 0 40%;
+    font-size: 0.7rem;
+    font-weight: 800;
+    color: var(--text-muted);
+    text-transform: uppercase;
+  }
+  .monthly-table.has-cell-labels td[data-label] > * { text-align: right; }
+}
