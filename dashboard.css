@@ -1276,3 +1276,19 @@ details.toc-category-wrapper:not([open]) > summary .toc-category-title::before {
 .score-scatter-legend { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px 22px; margin-top: 10px; font-size: 0.85rem; color: var(--text-title); }
 .score-scatter-legend i { display: inline-block; width: 11px; height: 11px; border-radius: 50%; margin-right: 6px; vertical-align: -1px; }
 .score-scatter-desc { color: var(--text-muted); font-weight: 600; }
+
+/* Milestones page filters */
+.milestone-filters { display: flex; flex-direction: column; gap: 12px; margin-bottom: 24px; }
+.milestone-type-buttons { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
+.milestone-type {
+  padding: 7px 12px; border: 1px solid var(--border-light); border-radius: 20px;
+  background: var(--item-bg); color: var(--text-main); font: inherit; font-weight: 800; font-size: 0.85rem; cursor: pointer;
+}
+.milestone-type span { color: var(--text-muted); font-weight: 700; margin-left: 4px; }
+.milestone-type.active { background: var(--primary-green); border-color: var(--primary-green); color: #fff; }
+.milestone-type.active span { color: rgba(255, 255, 255, 0.8); }
+.milestone-filter-row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+.milestone-year {
+  padding: 10px 12px; border: 2px solid var(--border-light); border-radius: 8px;
+  background: var(--card-bg); color: var(--text-main); font: inherit; font-weight: 700;
+}
