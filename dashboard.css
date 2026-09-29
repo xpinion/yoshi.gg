@@ -1427,3 +1427,23 @@ body.dark-theme .cal-l5 { fill: #9be9a8; }
 /* NEW: Active Record Highlighting */
 .toc-active-row { background-color: var(--highlight-green-bg) !important; }
 .toc-active-row td:first-child { border-left: 4px solid var(--primary-green) !important; }
+
+/* --- INDEX: at a glance, Now Playing, tabs --- */
+.glance-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; }
+.glance-stat { background: var(--card-bg); border-radius: 12px; padding: 16px; text-align: center; box-shadow: 0 4px 15px rgba(0,0,0,0.05); display: flex; flex-direction: column; gap: 4px; }
+.glance-stat strong { font-size: 1.5rem; font-weight: 900; color: var(--text-title); }
+.now-playing { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 12px; }
+.now-playing-item { background: var(--item-bg); border-radius: 10px; padding: 14px; border-left: 4px solid var(--status-active); display: flex; flex-direction: column; gap: 6px; }
+.now-playing-top { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+.now-playing-meta { font-size: 0.8rem; color: var(--text-muted); font-weight: 600; }
+.now-playing-note { font-size: 0.85rem; color: var(--text-title); }
+.index-tabs { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; padding: 6px; background: var(--card-bg); border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); }
+.index-tabs button { padding: 9px 16px; border: none; border-radius: 8px; background: none; color: var(--text-main); font: inherit; font-weight: 800; cursor: pointer; }
+.index-tabs button:hover { background: var(--item-bg); }
+.index-tabs button.active { background: var(--primary-green); color: #fff; }
+@media (max-width: 700px) {
+  .index-tabs { flex-wrap: nowrap; overflow-x: auto; justify-content: flex-start; }
+  .index-tabs button { flex: 0 0 auto; }
+  .glance-row { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+.now-playing-idle { opacity: 0.55; border-left-color: var(--border-table); }

@@ -236,10 +236,10 @@ async function initDashboard() {
     setupThemeToggle();
     setupHoverHistory();
 
-    const path = window.location.href.toLowerCase();
-    const page = window.location.pathname.toLowerCase().split('/').pop();
+    // Route on the page's file name only, so a #tab or ?name= in the address can't pick the wrong page
+    const page = window.location.pathname.toLowerCase().split('/').pop() || 'index.html';
+    const path = page;
 
-    // Checked first by exact page name: a game's name in the address could contain another page's name
     if (page === 'game.html') initGamePage();
     else if (path.includes('monthly')) initMonthlyPage();
     else if (path.includes('yearly')) initYearlyPage();
@@ -271,6 +271,9 @@ async function initDashboard() {
 
 // --- UPDATE: INIT INDEX PAGE (Remove redundant parseTop25Data) ---
 function initIndexPage() {
+  renderIndexGlance();
+  renderNowPlaying();
+  setupIndexTabs();
   setupDropdowns();
   setupLiveSearch();
   renderOnThisDay(); // Calls the generalized render function
@@ -281,6 +284,88 @@ function initIndexPage() {
   document.querySelectorAll('.card').forEach((card, index) => {
     card.style.animationDelay = `${index * 0.08}s`;
   });
+}
+
+// --- INDEX: key numbers, Now Playing, and section tabs ---
+function renderIndexGlance() {
+  const container = document.getElementById('index-glance');
+  if (!container) return;
+  const thisYear = String(new Date().getFullYear());
+  const daySeconds = new Map();
+  let yearSeconds = 0, allSeconds = 0;
+  const yearGames = new Set(), yearDays = new Set();
+  rawData.allEntries.forEach(e => {
+    const day = e.date.slice(0, 10), sec = timeStringToSeconds(e.time);
+    daySeconds.set(day, (daySeconds.get(day) || 0) + sec);
+    allSeconds += sec;
+    if (day.startsWith(thisYear)) { yearSeconds += sec; yearGames.add(e.game); yearDays.add(day); }
+  });
+  const completions = getSortedCompletions('All-Time');
+  const yearCompletions = completions.filter(pt => String(pt.displayDate.getUTCFullYear()) === thisYear).length;
+
+  // Current streak: consecutive days played up to today (or yesterday, if today isn't logged yet)
+  let streak = 0;
+  const cursor = new Date();
+  const key = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  if (!daySeconds.has(key(cursor))) cursor.setDate(cursor.getDate() - 1);
+  while (daySeconds.has(key(cursor))) { streak++; cursor.setDate(cursor.getDate() - 1); }
+
+  const stat = (label, value, sub = '') => `<div class="glance-stat"><span class="sys-widget-title">${label}</span><strong>${value}</strong>${sub ? `<span class="tf-sub">${sub}</span>` : ''}</div>`;
+  container.innerHTML = `
+    <div class="glance-row">
+      ${stat(`${thisYear} Time`, formatTime(yearSeconds), `${yearDays.size} days played`)}
+      ${stat(`${thisYear} Games`, yearGames.size)}
+      ${stat(`${thisYear} Completions`, yearCompletions)}
+      ${stat('Current Streak', `${streak} day${streak === 1 ? '' : 's'}`)}
+      ${stat('All-Time', formatTime(allSeconds), `${Object.keys(rawData.metrics.allTimeGameStats).length} games`)}
+      ${stat('All-Time Completions', completions.length)}
+    </div>`;
+}
+
+// Active playthroughs untouched for longer than this are dimmed in Now Playing
+const NOW_PLAYING_IDLE_DAYS = 30;
+
+function renderNowPlaying() {
+  const container = document.getElementById('now-playing-list');
+  if (!container) return;
+  const active = Object.values(rawData.playthroughHistory)
+    .filter(pt => pt.finalStatus === 'Active')
+    .sort((a, b) => new Date(b.lastDate) - new Date(a.lastDate));
+  if (active.length === 0) { container.innerHTML = '<div class="loading-text">Nothing active right now.</div>'; return; }
+  container.innerHTML = `<div class="now-playing">${active.map(pt => {
+    const idleDays = Math.floor((Date.now() - new Date(pt.lastDate)) / 86400000);
+    const score = getGameScore(pt.gameName);
+    return `
+      <div class="now-playing-item${idleDays > NOW_PLAYING_IDLE_DAYS ? ' now-playing-idle' : ''}">
+        <div class="now-playing-top">
+          <span class="item-title hover-trigger" data-game="${escapeHTML(pt.gameName)}">${escapeHTML(pt.gameName)}</span>
+          ${score !== null ? `<span class="item-badge">${formatScore(score)}</span>` : ''}
+        </div>
+        <div class="now-playing-meta">${escapeHTML(toList(pt.systems).join(', '))} · ${formatTime(timeStringToSeconds(pt.finalPtLifetime))} over ${pt.finalPtLifetimeDays} day${pt.finalPtLifetimeDays == 1 ? '' : 's'} · last played ${idleDays === 0 ? 'today' : idleDays === 1 ? 'yesterday' : `${idleDays} days ago`}</div>
+        <div class="note-clamp now-playing-note">${escapeHTML(pt.finalNote)}</div>
+      </div>`;
+  }).join('')}</div>`;
+}
+
+// Tabs show one group of index sections at a time; the choice is remembered and linkable (#rankings)
+function setupIndexTabs() {
+  const buttons = [...document.querySelectorAll('.index-tabs button')];
+  if (buttons.length === 0) return;
+  const sections = [...document.querySelectorAll('section[data-tab]')];
+  const valid = buttons.map(b => b.dataset.tab);
+  const select = tab => {
+    buttons.forEach(b => { b.classList.toggle('active', b.dataset.tab === tab); b.setAttribute('aria-pressed', String(b.dataset.tab === tab)); });
+    sections.forEach(sec => { sec.hidden = sec.dataset.tab !== tab; });
+    try { localStorage.setItem('yoshi-index-tab', tab); } catch (e) { /* storage unavailable */ }
+  };
+  buttons.forEach(b => b.addEventListener('click', () => {
+    select(b.dataset.tab);
+    history.replaceState(null, '', `#${b.dataset.tab}`);
+  }));
+  let saved = null;
+  try { saved = localStorage.getItem('yoshi-index-tab'); } catch (e) { /* storage unavailable */ }
+  const fromHash = location.hash.slice(1);
+  select(valid.includes(fromHash) ? fromHash : valid.includes(saved) ? saved : 'overview');
 }
 
 // --- NEW: ANALYSIS PAGE ROUTING ---

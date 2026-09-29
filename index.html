@@ -11,9 +11,26 @@
 <body>
 <header id="global-header"></header>
   <main class="dashboard-container">
+    <!-- Always visible: key numbers and what's being played now -->
+    <section class="card-row grid-1" id="index-glance"></section>
+    <section class="card-row grid-1">
+      <div class="card">
+        <div class="card-header"><h2>Now Playing</h2></div>
+        <div class="card-content" id="now-playing-list"></div>
+      </div>
+    </section>
+
+    <nav class="index-tabs" aria-label="Index sections">
+      <button type="button" data-tab="overview">Overview</button>
+      <button type="button" data-tab="rankings">Rankings</button>
+      <button type="button" data-tab="scores">Scores</button>
+      <button type="button" data-tab="breakdowns">Breakdowns</button>
+      <button type="button" data-tab="history">History</button>
+      <button type="button" data-tab="spotlight">Spotlight</button>
+    </nav>
+
     
-    <!-- ADD ID FOR NAVIGATION -->
-    <section id="section-summary" class="card-row grid-1">
+    <section data-tab="overview" id="section-summary" class="card-row grid-1">
       <div class="card">
         <div class="card-header">
           <h2>Monthly Summary: <select id="month-select" class="header-dropdown"></select></h2>
@@ -24,8 +41,7 @@
       </div>
     </section>
 
-    <!-- ADD ID FOR NAVIGATION -->
-    <section id="section-rankings" class="card-row grid-4">
+    <section data-tab="rankings" id="section-rankings" class="card-row grid-4">
       <div class="card">
         <div class="card-header">
           <h2><select id="year-select-comp" class="header-dropdown"></select> Completions</h2>
@@ -55,7 +71,7 @@
       </div>
     </section>
 
-    <section class="card-row grid-3">
+    <section data-tab="scores" class="card-row grid-3">
       <div class="card">
         <div class="card-header">
           <h2><select id="top100-year-select" class="header-dropdown"></select> Top 100 Scores</h2>
@@ -78,8 +94,7 @@
       </div>
     </section>
 
-    <!-- ADD ID FOR NAVIGATION -->
-    <section id="section-metrics" class="card-row grid-3">
+    <section data-tab="breakdowns" id="section-metrics" class="card-row grid-3">
       <div class="card">
         <div class="card-header">
           <h2>Most Played Systems <select id="year-select-metrics" class="header-dropdown"></select></h2>
@@ -102,7 +117,7 @@
       </div>
     </section>
 
-    <section class="card-row grid-2">
+    <section data-tab="history" class="card-row grid-2">
       <div class="card">
         <div class="card-header">
           <h2>On This Day in History (<span id="today-date"></span>)</h2>
@@ -118,7 +133,7 @@
       </div>
     </section>
 
-    <section class="card-row grid-1">
+    <section data-tab="spotlight" class="card-row grid-1">
       <div class="card">
         <div class="card-header">
           <h2>Spotlight: <select id="random-top25-select" class="header-dropdown"></select></h2>
@@ -127,7 +142,7 @@
       </div>
     </section>
 
-    <section class="card-row grid-1">
+    <section data-tab="breakdowns" class="card-row grid-1">
       <div class="card">
         <div class="card-header">
           <h2>Data Analysis: 
@@ -145,8 +160,7 @@
       </div>
     </section>
     
-    <!-- ADD ID FOR NAVIGATION -->
-    <section id="section-heatmaps" class="card-row grid-1">
+    <section data-tab="breakdowns" id="section-heatmaps" class="card-row grid-1">
       <div class="card">
         <div class="card-header">
           <h2>Metrics & Heatmaps: 
@@ -163,8 +177,7 @@
       </div>
     </section>
     
-    <!-- ADD ID FOR NAVIGATION AND UPDATE TO LIVE SEARCH -->
-    <section id="section-archives" class="card-row grid-1">
+    <section data-tab="history" id="section-archives" class="card-row grid-1">
       <div class="card">
         <div class="card-header">
           <h2>Full Game Archive: 
@@ -176,8 +189,7 @@
       </div>
     </section>
 
-    <!-- UPDATE TO LIVE SEARCH -->
-    <section class="card-row grid-1">
+    <section data-tab="history" class="card-row grid-1">
       <div class="card">
         <div class="card-header">
           <h2>Series Archive: 
@@ -188,7 +200,7 @@
         <div class="card-content" id="series-archive-content" style="padding: 0;"></div>
       </div>
     </section>
-    
+
     <div id="game-tooltip" class="game-tooltip"></div>
   </main>
 
