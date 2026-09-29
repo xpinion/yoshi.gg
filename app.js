@@ -64,13 +64,14 @@ function formatHHMM(totalSeconds) {
   const m = Math.floor((totalSeconds % 3600) / 60);
   return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`;
 }
+// Status colors live in dashboard.css (--status-*) so light and dark mode can each get a fitting shade
 function getStatusColor(status) {
   switch (status) {
-    case 'Completed': case 'M-Completed': case 'Postgame': return '#00FF00';
-    case 'Active': return '#FFFF00';
-    case 'Multiplayer': return '#00FFFF';
-    case 'Abandoned': return '#FFCCCC';
-    case 'Non-Completable': return '#DDDDDD';
+    case 'Completed': case 'M-Completed': case 'Postgame': return 'var(--status-completed)';
+    case 'Active': return 'var(--status-active)';
+    case 'Multiplayer': return 'var(--status-multiplayer)';
+    case 'Abandoned': return 'var(--status-abandoned)';
+    case 'Non-Completable': return 'var(--status-noncompletable)';
     default: return '#FFFFFF';
   }
 }
@@ -119,32 +120,81 @@ function escapeHTML(str) {
 }
 
 // --- UPDATE: GLOBAL HEADER ---
+const NAV_GROUPS = [
+  { label: 'Index', href: 'index.html' },
+  { label: 'Log', links: [['Monthly', 'monthly.html'], ['Yearly', 'yearly.html'], ['History', 'history.html'], ['Completions', 'completions.html']] },
+  { label: 'Collections', links: [['Systems', 'systems.html'], ['Franchise', 'franchise.html'], ['Genre', 'genre.html'], ['Release Year', 'releaseyear.html']] },
+  { label: 'Records', links: [['Spotlight', 'spotlight.html'], ['Milestones', 'milestones.html'], ['GotY', 'goty.html']] },
+  { label: 'Stats', links: [['Analysis', 'analysis.html'], ['Metrics', 'metrics.html']] }
+];
+
 function renderGlobalHeader() {
   const headerContainer = document.getElementById('global-header');
   if (!headerContainer) return;
 
+  const current = window.location.pathname.split('/').pop() || 'index.html';
+  const link = (label, href) => `<a href="${href}" class="nav-link${href === current ? ' active' : ''}"${href === current ? ' aria-current="page"' : ''}>${label}</a>`;
+  const groupsHtml = NAV_GROUPS.map(group => {
+    if (group.href) return link(group.label, group.href);
+    const active = group.links.some(([, href]) => href === current);
+    return `
+      <div class="nav-group${active ? ' active' : ''}" data-label="${group.label}">
+        <button type="button" class="nav-group-button" aria-expanded="false">${group.label} <span aria-hidden="true">▾</span></button>
+        <div class="nav-menu">${group.links.map(([label, href]) => link(label, href)).join('')}</div>
+      </div>`;
+  }).join('');
+  const games = rawData ? [...new Set(rawData.allEntries.map(e => e.game))].sort((a, b) => a.localeCompare(b)) : [];
+
   headerContainer.innerHTML = `
-  <div class="dashboard-header">
-    <h1>yoshi xcx's videogame dashboard</h1>
-    <button id="theme-toggle" class="theme-btn">🌙 Dark Mode</button>
-  </div>
-  <nav class="global-nav">
-    <a href="index.html">Index</a>
-    <a href="monthly.html">Monthly</a>
-    <a href="yearly.html">Yearly</a>
-    <a href="completions.html">Completions</a>
-    <a href="goty.html">GotY</a>
-    <a href="systems.html">Systems</a>
-    <a href="franchise.html">Franchise</a>
-    <a href="genre.html">Genre</a>
-    <a href="releaseyear.html">Release Year</a>
-    <a href="spotlight.html">Spotlight</a>
-    <a href="analysis.html">Analysis</a>
-    <a href="metrics.html">Metrics</a>
-    <a href="milestones.html">Milestones</a>
-    <a href="history.html">History</a>
-  </nav>
+    <div class="site-bar">
+      <a href="index.html" class="site-brand"><img src="favicon.svg" alt="" width="26" height="26"> <span>yoshi xcx's videogame dashboard</span></a>
+      <button type="button" class="nav-menu-toggle" aria-expanded="false" aria-controls="site-nav-panel">Menu</button>
+      <div class="site-nav-panel" id="site-nav-panel">
+        <nav class="site-nav" aria-label="Site">${groupsHtml}</nav>
+        <div class="site-tools">
+          <input type="search" id="site-search" class="site-search" list="site-search-list" placeholder="Find a game…" aria-label="Find a game">
+          <datalist id="site-search-list">${games.map(g => `<option value="${escapeHTML(g)}">`).join('')}</datalist>
+          <button id="theme-toggle" class="theme-btn" type="button" aria-label="Switch to dark mode">🌙</button>
+        </div>
+      </div>
+    </div>
   `;
+
+  // Menus open on hover (desktop) and on tap/click; tapping elsewhere or Escape closes them
+  const groups = [...headerContainer.querySelectorAll('.nav-group')];
+  const closeAll = except => groups.forEach(g => {
+    if (g === except) return;
+    g.classList.remove('open');
+    g.querySelector('.nav-group-button').setAttribute('aria-expanded', 'false');
+  });
+  groups.forEach(group => {
+    const button = group.querySelector('.nav-group-button');
+    button.addEventListener('click', e => {
+      e.stopPropagation();
+      const open = !group.classList.contains('open');
+      closeAll(group);
+      group.classList.toggle('open', open);
+      button.setAttribute('aria-expanded', String(open));
+    });
+  });
+  document.addEventListener('click', e => { if (!e.target.closest('.nav-group')) closeAll(); });
+  document.addEventListener('keydown', e => {
+    if (e.key !== 'Escape') return;
+    closeAll();
+    if (document.activeElement && document.activeElement.closest('.nav-group')) document.activeElement.blur();
+  });
+
+  // Phone: the Menu button shows the whole panel
+  const toggle = headerContainer.querySelector('.nav-menu-toggle');
+  toggle.addEventListener('click', () => {
+    const open = headerContainer.classList.toggle('menu-open');
+    toggle.setAttribute('aria-expanded', String(open));
+  });
+
+  const search = document.getElementById('site-search');
+  search.addEventListener('change', () => {
+    if (games.includes(search.value)) window.location.href = gameProfileUrl(search.value);
+  });
 }
 
 // --- UPDATE: DASHBOARD INIT (Add routing and global parsing) ---
@@ -1725,9 +1775,9 @@ function buildAnalyticsHub(containerId, dataKey, titleLabel) {
         <div class="card hub-completion-card">
           <div class="sys-widget-title hub-mb-12">Completion Rate (${compRate}%)</div>
           <div class="hub-completion-bar">
-            <div style="width: ${compRatePct}%; background: #00FF00;" title="Completed: ${compCount}"></div>
-            <div style="width: ${actRatePct}%; background: #FFFF00;" title="Active: ${actCount}"></div>
-            <div style="width: ${abanRatePct}%; background: #FFCCCC;" title="Abandoned: ${abanCount}"></div>
+            <div style="width: ${compRatePct}%; background: var(--status-completed);" title="Completed: ${compCount}"></div>
+            <div style="width: ${actRatePct}%; background: var(--status-active);" title="Active: ${actCount}"></div>
+            <div style="width: ${abanRatePct}%; background: var(--status-abandoned);" title="Abandoned: ${abanCount}"></div>
             <div class="hub-bar-other" title="Other: ${multiCount}"></div>
           </div>
           <div class="hub-completion-legend">
@@ -3269,20 +3319,25 @@ function renderSideBySideMetrics(year) {
 // --- THEME TOGGLE LOGIC ---
 function setupThemeToggle() {
   const btn = document.getElementById('theme-toggle');
+  const systemDark = window.matchMedia ? window.matchMedia('(prefers-color-scheme: dark)') : null;
+  const apply = isDark => {
+    document.body.classList.toggle('dark-theme', isDark);
+    btn.textContent = isDark ? '☀️' : '🌙';
+    btn.setAttribute('aria-label', isDark ? 'Switch to light mode' : 'Switch to dark mode');
+    btn.title = btn.getAttribute('aria-label');
+  };
 
-  // Check local storage for user preference
-  const savedTheme = localStorage.getItem('yoshi-theme');
-  if (savedTheme === 'dark') {
-    document.body.classList.add('dark-theme');
-    btn.innerText = '☀️ Light Mode';
+  // A saved choice wins; otherwise follow the device's light/dark setting, including later changes
+  const saved = localStorage.getItem('yoshi-theme');
+  apply(saved ? saved === 'dark' : !!(systemDark && systemDark.matches));
+  if (systemDark && systemDark.addEventListener) {
+    systemDark.addEventListener('change', e => { if (!localStorage.getItem('yoshi-theme')) apply(e.matches); });
   }
 
   btn.addEventListener('click', () => {
-    document.body.classList.toggle('dark-theme');
-    const isDark = document.body.classList.contains('dark-theme');
+    const isDark = !document.body.classList.contains('dark-theme');
     localStorage.setItem('yoshi-theme', isDark ? 'dark' : 'light');
-    btn.innerText = isDark ? '☀️ Light Mode' : '🌙 Dark Mode';
-
+    apply(isDark);
   });
 }
 

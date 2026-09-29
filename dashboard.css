@@ -39,6 +39,13 @@
   /* Nav Colors */
   --nav-bg: #ffffff;
   --nav-shadow: rgba(0,0,0,0.1);
+
+  /* Playthrough status colors (backgrounds for dark text) */
+  --status-completed: #8fd694;
+  --status-active: #ffd54f;
+  --status-multiplayer: #7fd3f0;
+  --status-abandoned: #f4a6a6;
+  --status-noncompletable: #cfcfcf;
 }
 
 body.dark-theme {
@@ -81,6 +88,13 @@ body.dark-theme {
   /* Nav Colors */
   --nav-bg: #1e1e1e;
   --nav-shadow: rgba(0,0,0,0.5);
+
+  /* Playthrough status colors: a little deeper so they don't glare on dark backgrounds */
+  --status-completed: #5fb86a;
+  --status-active: #d9b53a;
+  --status-multiplayer: #4fb3cf;
+  --status-abandoned: #d98c8c;
+  --status-noncompletable: #9e9e9e;
 }
 
 * {
@@ -97,15 +111,6 @@ body {
   transition: background-color 0.3s ease, color 0.3s ease;
 }
 
-.dashboard-header h1 {
-  text-align: center;
-  letter-spacing: 3px;
-  margin-bottom: 40px;
-  font-size: 2.5rem;
-  font-weight: 900;
-  color: var(--text-header);
-}
-
 .dashboard-container {
   max-width: 1600px;
   margin: 0 auto;
@@ -115,52 +120,7 @@ body {
 }
 
 /* --- THEME TOGGLE BUTTON --- */
-.theme-btn {
-  background: var(--card-bg);
-  color: var(--text-main);
-  border: 1px solid var(--border-table);
-  padding: 8px 16px;
-  border-radius: 20px;
-  cursor: pointer;
-  font-weight: bold;
-  transition: all 0.2s;
-  position: absolute;
-  right: 20px;
-  top: 20px;
-  box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-}
-.theme-btn:hover {
-  box-shadow: 0 4px 8px rgba(0,0,0,0.15);
-  transform: translateY(-2px);
-}
-
 /* --- STICKY NAVIGATION --- */
-.global-nav {
-  position: sticky;
-  top: 0;
-  background-color: var(--nav-bg);
-  padding: 15px;
-  text-align: center;
-  z-index: 1000;
-  box-shadow: 0 2px 10px var(--nav-shadow);
-  display: flex;
-  justify-content: center;
-  gap: 20px;
-  flex-wrap: wrap;
-  margin: 0 -20px 30px -20px; /* Adjusted to fit under the new injected header */
-}
-.global-nav a {
-  text-decoration: none;
-  color: var(--text-main);
-  font-weight: 800;
-  font-size: 0.9rem;
-  text-transform: uppercase;
-  transition: color 0.2s;
-}
-.global-nav a:hover {
-  color: var(--primary-green);
-}
-
 /* Grid Layouts */
 .grid-1 { display: grid; grid-template-columns: 1fr; gap: 20px; }
 .grid-2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); gap: 20px; }
@@ -1194,11 +1154,11 @@ details.toc-category-wrapper:not([open]) > summary .toc-category-title::before {
 .hub-completion-card { padding: 20px; text-align: center; display: flex; flex-direction: column; justify-content: center; }
 .hub-mb-12 { margin-bottom: 12px; }
 .hub-completion-bar { display: flex; height: 16px; border-radius: 8px; overflow: hidden; background: var(--item-bg); margin-bottom: 8px; }
-.hub-bar-other { flex: 1; background: #00FFFF; }
+.hub-bar-other { flex: 1; background: var(--status-multiplayer); }
 .hub-completion-legend { display: flex; flex-direction: column; gap: 4px; font-size: 0.8rem; font-weight: 800; color: var(--text-main); align-items: flex-start; margin-top: 10px; margin-left: 10%; }
-.hub-status-completed { color: #00FF00; }
-.hub-status-active { color: #FFFF00; }
-.hub-status-abandoned { color: #FFCCCC; }
+.hub-status-completed { color: var(--status-completed); }
+.hub-status-active { color: var(--status-active); }
+.hub-status-abandoned { color: var(--status-abandoned); }
 .hub-social-card { padding: 20px; text-align: center; display: flex; flex-direction: column; align-items: center; justify-content: center; }
 .hub-mb-10 { margin-bottom: 10px; }
 .hub-donut-wrap { position: relative; width: 100px; height: 100px; }
@@ -1215,13 +1175,7 @@ details.toc-category-wrapper:not([open]) > summary .toc-category-title::before {
 /* --- PHONES: keep every page within the screen; wide tables scroll inside their card --- */
 @media (max-width: 700px) {
   body { padding: 16px 12px; }
-  .dashboard-header h1 { font-size: 1.6rem; letter-spacing: 1px; margin-bottom: 16px; }
-  .theme-btn { position: static; display: block; margin: 0 auto 14px; }
-  /* One row that scrolls sideways, so the sticky nav stays short */
-  .global-nav { gap: 16px; padding: 10px 12px; margin: 0 -12px 20px; flex-wrap: nowrap; justify-content: flex-start; overflow-x: auto; scrollbar-width: none; }
-  .global-nav a { flex: 0 0 auto; }
   .header-dropdown { max-width: 100%; }
-  .global-nav a { font-size: 0.8rem; }
   .dashboard-container { gap: 20px; }
 
   .grid-1, .grid-2, .grid-3, .grid-4, .grid-strict-3, .completion-grid { grid-template-columns: minmax(0, 1fr); }
@@ -1256,8 +1210,6 @@ details.toc-category-wrapper:not([open]) > summary .toc-category-title::before {
   .monthly-table.has-cell-labels td[data-label] > * { text-align: right; }
 }
 
-/* The header is only a wrapper: without this the nav could only "stick" inside it, so it scrolled away */
-#global-header { display: contents; }
 
 /* Hub pages: scores */
 .hub-goty { margin-top: 18px; font-weight: 800; color: var(--text-title); }
@@ -1369,3 +1321,70 @@ body.dark-theme .cal-l5 { fill: #9be9a8; }
 .game-spotlight-item:hover { background: var(--item-bg); }
 .game-spotlight-item strong { color: var(--primary-green); white-space: nowrap; }
 .game-spotlight-rank { display: inline-block; min-width: 38px; color: var(--text-muted); font-weight: 800; }
+
+/* Cards appear quickly and together. The per-card delays set in app.js (up to 1.5s) made long pages feel slow. */
+.card, .completion-card { animation-duration: 0.35s !important; animation-delay: 0s !important; }
+@media (prefers-reduced-motion: reduce) {
+  .card, .completion-card, .toc-category-wrapper { animation: none !important; opacity: 1 !important; }
+  html { scroll-behavior: auto !important; }
+}
+
+/* --- SITE HEADER: one sticky bar with grouped menus, search and theme toggle --- */
+#global-header { position: sticky; top: 0; z-index: 1000; display: block; margin: -30px -20px 30px; }
+.site-bar {
+  display: flex; align-items: center; gap: 18px; padding: 10px 20px;
+  background: var(--nav-bg); box-shadow: 0 2px 10px var(--nav-shadow);
+}
+.site-brand { display: flex; align-items: center; gap: 10px; text-decoration: none; color: var(--text-header); font-weight: 900; font-size: 1.05rem; white-space: nowrap; }
+.site-nav-panel { display: flex; align-items: center; gap: 18px; flex: 1; }
+.site-nav { display: flex; align-items: center; gap: 4px; flex: 1; justify-content: center; }
+.nav-link, .nav-group-button {
+  padding: 8px 12px; border-radius: 8px; border: none; background: none; cursor: pointer;
+  font: inherit; font-size: 0.85rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.5px;
+  color: var(--text-main); text-decoration: none; white-space: nowrap;
+}
+.nav-link:hover, .nav-group-button:hover, .nav-group.open .nav-group-button { background: var(--item-bg); color: var(--primary-green); }
+.nav-link.active, .nav-group.active > .nav-group-button { color: var(--primary-green); box-shadow: inset 0 -3px 0 var(--primary-green); border-radius: 8px 8px 0 0; }
+.nav-group { position: relative; }
+.nav-menu {
+  display: none; position: absolute; top: calc(100% + 6px); left: 0; min-width: 180px; padding: 6px;
+  background: var(--card-bg); border-radius: 10px; box-shadow: 0 8px 24px var(--nav-shadow); z-index: 1001;
+}
+.nav-group:hover .nav-menu, .nav-group:focus-within .nav-menu, .nav-group.open .nav-menu { display: flex; flex-direction: column; }
+.nav-group:hover .nav-menu::before { content: ''; position: absolute; top: -8px; left: 0; right: 0; height: 8px; }
+.nav-menu .nav-link { text-transform: none; font-size: 0.9rem; letter-spacing: 0; }
+.nav-menu .nav-link.active { box-shadow: inset 3px 0 0 var(--primary-green); border-radius: 0 8px 8px 0; background: var(--highlight-green-bg); }
+.site-tools { display: flex; align-items: center; gap: 8px; }
+.site-search {
+  width: 200px; padding: 8px 12px; border-radius: 8px; border: 1px solid var(--border-table);
+  background: var(--card-bg); color: var(--text-main); font: inherit; font-size: 0.85rem; font-weight: 600;
+}
+.site-search:focus { outline: none; border-color: var(--primary-green); }
+.theme-btn {
+  width: 38px; height: 38px; border-radius: 50%; border: 1px solid var(--border-table);
+  background: var(--card-bg); cursor: pointer; font-size: 1.05rem; line-height: 1;
+}
+.theme-btn:hover { border-color: var(--primary-green); }
+.nav-menu-toggle { display: none; }
+
+@media (max-width: 1100px) {
+  .site-brand span { display: none; }
+}
+@media (max-width: 700px) {
+  #global-header { margin: -16px -12px 20px; }
+  .site-bar { flex-wrap: wrap; padding: 8px 12px; gap: 8px; }
+  .site-brand { min-width: 0; flex: 1; }
+  .site-brand span { display: inline; font-size: 0.85rem; overflow: hidden; text-overflow: ellipsis; }
+  .nav-menu-toggle {
+    display: block; margin-left: auto; padding: 8px 14px; border-radius: 8px; border: 1px solid var(--border-table);
+    background: var(--card-bg); color: var(--text-main); font: inherit; font-weight: 800; cursor: pointer;
+  }
+  .site-nav-panel { display: none; flex-basis: 100%; flex-direction: column; align-items: stretch; gap: 10px; padding-bottom: 6px; }
+  #global-header.menu-open .site-nav-panel { display: flex; }
+  .site-nav { flex-direction: column; align-items: stretch; gap: 2px; }
+  .nav-group-button { display: none; }
+  .nav-menu { display: flex !important; flex-direction: row; flex-wrap: wrap; position: static; box-shadow: none; padding: 0; background: none; min-width: 0; }
+  .nav-group::before { content: attr(data-label); display: block; padding: 6px 12px 2px; font-size: 0.7rem; font-weight: 800; letter-spacing: 1px; text-transform: uppercase; color: var(--text-muted); }
+  .site-tools { justify-content: space-between; }
+  .site-search { flex: 1; width: auto; }
+}
