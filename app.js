@@ -272,6 +272,7 @@ function initMetricsPage() {
     { id: 'gameSummary', title: 'Table: Game Timeframe Summary' },
     { id: 'genreSummary', title: 'Table: Genre Timeframe Summary' },
     { id: 'gotySummary', title: 'Table: Game of the Year (Scores)' },
+    { id: 'calendar', title: 'Calendar: Every Day, by Year' },
     { id: 'days', title: 'Heatmap: Days Played' },
     { id: 'time', title: 'Heatmap: Total Time Spent' }
   ];
@@ -291,7 +292,8 @@ function initMetricsPage() {
   container.innerHTML = html;
 
   sections.forEach(sec => {
-    renderHeatmap(sec.id, `metrics-page-${sec.id}`);
+    if (sec.id === 'calendar') renderYearCalendars(`metrics-page-${sec.id}`);
+    else renderHeatmap(sec.id, `metrics-page-${sec.id}`);
   });
 }
 
@@ -2540,6 +2542,56 @@ function milestoneItemHtml(m) {
     <div class="milestone-detail">${escapeHTML(m.details)}</div>
   </div>
   `;
+}
+
+// --- METRICS: GitHub-style calendar, one grid per year, each day shaded by hours played ---
+const CALENDAR_LEVELS = [
+  { max: 0, label: 'No play' }, { max: 3600, label: 'Under 1h' }, { max: 7200, label: '1-2h' },
+  { max: 14400, label: '2-4h' }, { max: 28800, label: '4-8h' }, { max: Infinity, label: '8h+' }
+];
+
+function renderYearCalendars(targetContainerId) {
+  const container = document.getElementById(targetContainerId);
+  if (!container || !rawData || !rawData.allEntries) return;
+
+  const daySeconds = new Map();
+  rawData.allEntries.forEach(e => {
+    const day = e.date.slice(0, 10);
+    daySeconds.set(day, (daySeconds.get(day) || 0) + timeStringToSeconds(e.time));
+  });
+  const years = [...new Set([...daySeconds.keys()].map(d => Number(d.slice(0, 4))))].sort((a, b) => b - a);
+  const level = sec => CALENDAR_LEVELS.findIndex(l => sec <= l.max);
+  const cell = 12, gap = 2, step = cell + gap, left = 30, top = 18;
+  const todayStr = new Date().toISOString().slice(0, 10);
+
+  const yearHtml = year => {
+    const jan1 = new Date(Date.UTC(year, 0, 1));
+    const offset = jan1.getUTCDay(); // weeks start on Sunday
+    let rects = '', monthLabels = '', total = 0, played = 0;
+    for (let d = new Date(jan1); d.getUTCFullYear() === year; d.setUTCDate(d.getUTCDate() + 1)) {
+      const day = d.toISOString().slice(0, 10);
+      const index = Math.round((d - jan1) / 86400000) + offset;
+      const x = left + Math.floor(index / 7) * step, y = top + (index % 7) * step;
+      if (d.getUTCDate() === 1) monthLabels += `<text x="${x}" y="${top - 6}" class="cal-label">${MONTH_NAMES[d.getUTCMonth()].slice(0, 3)}</text>`;
+      if (day > todayStr) continue;
+      const sec = daySeconds.get(day) || 0;
+      total += sec; if (sec) played++;
+      rects += `<rect x="${x}" y="${y}" width="${cell}" height="${cell}" rx="2" class="cal-l${level(sec)}"><title>${day.replace(/-/g, '/')}: ${sec ? formatTime(sec) : 'no play'}</title></rect>`;
+    }
+    const weekdays = ['Mon', 'Wed', 'Fri'].map((name, i) => `<text x="0" y="${top + (2 * i + 1) * step + cell - 2}" class="cal-label">${name}</text>`).join('');
+    const width = left + 54 * step, height = top + 7 * step;
+    return `
+      <div class="cal-year">
+        <div class="cal-year-title"><strong>${year}</strong> ${formatTime(total)} over ${played} day${played === 1 ? '' : 's'}</div>
+        <div class="cal-scroll"><svg class="cal-svg" viewBox="0 0 ${width} ${height}">${monthLabels}${weekdays}${rects}</svg></div>
+      </div>`;
+  };
+
+  container.innerHTML = `
+    <div class="cal-wrap">
+      <div class="cal-legend">${CALENDAR_LEVELS.map((l, i) => `<span><svg width="12" height="12"><rect width="12" height="12" rx="2" class="cal-l${i}"/></svg>${l.label}</span>`).join('')}</div>
+      ${years.map(yearHtml).join('')}
+    </div>`;
 }
 
 // --- UPDATE: RENDER HEATMAP (Add Container ID parameter) ---
