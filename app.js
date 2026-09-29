@@ -704,7 +704,7 @@ function initCompletionsPage() {
   let html = `
   <div class="card-row grid-1">
     <div style="text-align: center; margin-bottom: 10px;">
-      <h2 style="font-size: 2.5rem; color: var(--text-header); font-weight: 900;">All-Time Completions: <span style="color: var(--primary-green);">${totalCompletions}</span></h2>
+      <h2 class="page-title">All-Time Completions: <span class="page-title-accent">${totalCompletions}</span></h2>
     </div>
   </div>
   ${completionFiltersHtml(completions)}
@@ -1093,7 +1093,7 @@ function initGotyPage() {
   // SECTION 4: Yearly Rankings (Strict 3-Column Grid)
   html += `
     <div class="card-row grid-1" style="margin-top: 20px;">
-      <h2 style="font-size: 2rem; color: var(--text-header); font-weight: 900; text-align: center; border-bottom: 2px solid var(--border-light); padding-bottom: 10px;">Top 25 Games by Release Year</h2>
+      <h2 class="page-title page-title-divider">Top 25 Games by Release Year</h2>
     </div>
     <section class="card-row grid-strict-3">
   `;
@@ -3515,8 +3515,8 @@ function generateUniversalDualTableHtml(listObj) {
 
   return `
   <div class="card-header" style="display: flex; justify-content: space-between; border-bottom: 2px solid var(--border-light); padding: 15px 20px;">
-  <h2 style="flex: 1; text-align: center; font-size: 1.2rem; color: var(--primary-green); font-weight: 800;">${escapeHTML(listObj.titleLeft)}</h2>
-  <h2 style="flex: 1; text-align: center; font-size: 1.2rem; color: var(--primary-green); font-weight: 800;">${escapeHTML(listObj.titleRight)}</h2>
+  <h2 class="spotlight-list-title">${escapeHTML(listObj.titleLeft)}</h2>
+  <h2 class="spotlight-list-title">${escapeHTML(listObj.titleRight)}</h2>
   </div>
   <div class="card-content" style="padding: 0;">
   <div class="spotlight-dual-container" style="padding: 20px;">
@@ -3573,24 +3573,9 @@ function initSpotlightPage() {
   const currentYearStr = new Date().getFullYear().toString();
 
   let html = `
-  <style>
-    .toc-category-wrapper { margin-bottom: 40px; }
-    .toc-category-title { font-size: 1.2rem; color: var(--primary-green); margin-bottom: 12px; border-bottom: 2px solid var(--primary-green); padding-bottom: 5px; font-weight: 900; text-transform: uppercase; letter-spacing: 1px; }
-    .toc-table { width: 100%; border-collapse: collapse; font-size: 0.9rem; background: var(--card-bg); box-shadow: 0 4px 15px rgba(0,0,0,0.05); border-radius: 8px; overflow: hidden; }
-    .toc-table th { background-color: var(--primary-green); color: white; padding: 12px 10px; text-align: left; font-weight: 700; border: 1px solid rgba(0,0,0,0.2); }
-    .toc-table td { padding: 12px 10px; border: 1px solid var(--border-table); vertical-align: middle; }
-    .toc-table tr:nth-child(even) { background-color: var(--table-row-even); }
-    .toc-table tr:hover { background-color: var(--table-row-hover); }
-    .toc-link { font-weight: 900; color: var(--primary-green); text-decoration: none; display: flex; align-items: center; gap: 5px; transition: color 0.2s; }
-    .toc-link:hover { color: var(--text-main); text-decoration: underline; }
-    
-    /* NEW: Active Record Highlighting */
-    .toc-active-row { background-color: var(--highlight-green-bg) !important; }
-    .toc-active-row td:first-child { border-left: 4px solid var(--primary-green) !important; }
-  </style>
   
   <div class="card-row grid-1">
-    <h2 style="font-size: 2.5rem; color: var(--text-header); font-weight: 900; text-align: center; margin-bottom: 15px;">Spotlight Archive Directory</h2>
+    <h2 class="page-title">Spotlight Archive Directory</h2>
   </div>
 
   <div class="spotlight-tools">

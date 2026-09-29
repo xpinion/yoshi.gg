@@ -1400,3 +1400,30 @@ body.dark-theme .cal-l5 { fill: #9be9a8; }
   background: rgba(20, 20, 20, 0.92); color: #fff; font-size: 0.8rem; font-weight: 700; line-height: 1.35;
   box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25);
 }
+
+/* --- SHARED HEADINGS --- */
+.page-title { font-size: 2.2rem; font-weight: 900; color: var(--text-header); text-align: center; margin-bottom: 15px; }
+.page-title-accent { color: var(--primary-green); }
+.page-title-divider { border-bottom: 2px solid var(--border-light); padding-bottom: 10px; }
+.card-header h2.card-title-lg, .card-title-lg { font-size: 2rem; }
+.spotlight-list-title { flex: 1; text-align: center; font-size: 1.2rem; color: var(--primary-green); font-weight: 800; }
+@media (max-width: 700px) {
+  .page-title { font-size: 1.6rem; }
+  .card-header h2.card-title-lg, .card-title-lg { font-size: 1.4rem; }
+  .card-header h2.hub-title-lg, .hub-title-lg { font-size: 1.4rem; }
+}
+
+/* --- SPOTLIGHT DIRECTORY (moved out of app.js) --- */
+.toc-category-wrapper { margin-bottom: 40px; }
+.toc-category-title { font-size: 1.2rem; color: var(--primary-green); margin-bottom: 12px; border-bottom: 2px solid var(--primary-green); padding-bottom: 5px; font-weight: 900; text-transform: uppercase; letter-spacing: 1px; }
+.toc-table { width: 100%; border-collapse: collapse; font-size: 0.9rem; background: var(--card-bg); box-shadow: 0 4px 15px rgba(0,0,0,0.05); border-radius: 8px; overflow: hidden; }
+.toc-table th { background-color: var(--primary-green); color: white; padding: 12px 10px; text-align: left; font-weight: 700; border: 1px solid rgba(0,0,0,0.2); }
+.toc-table td { padding: 12px 10px; border: 1px solid var(--border-table); vertical-align: middle; }
+.toc-table tr:nth-child(even) { background-color: var(--table-row-even); }
+.toc-table tr:hover { background-color: var(--table-row-hover); }
+.toc-link { font-weight: 900; color: var(--primary-green); text-decoration: none; display: flex; align-items: center; gap: 5px; transition: color 0.2s; }
+.toc-link:hover { color: var(--text-main); text-decoration: underline; }
+
+/* NEW: Active Record Highlighting */
+.toc-active-row { background-color: var(--highlight-green-bg) !important; }
+.toc-active-row td:first-child { border-left: 4px solid var(--primary-green) !important; }
