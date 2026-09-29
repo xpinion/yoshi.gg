@@ -439,7 +439,7 @@ body {
 
 /* --- Hover History Tooltip --- */
 .hover-trigger { 
-  cursor: help; 
+  cursor: pointer; 
   border-bottom: 1px dotted var(--primary-green); 
 }
 
@@ -1352,3 +1352,20 @@ body.dark-theme .cal-l2 { fill: #006d32; }
 body.dark-theme .cal-l3 { fill: #26a641; }
 body.dark-theme .cal-l4 { fill: #39d353; }
 body.dark-theme .cal-l5 { fill: #9be9a8; }
+
+/* Game profile page */
+.game-search-row { display: flex; justify-content: flex-end; }
+.game-search-row .spotlight-filter { max-width: 360px; }
+.game-hero { text-align: center; }
+.game-hero-top { display: flex; justify-content: center; align-items: center; gap: 16px; flex-wrap: wrap; }
+.game-title { font-size: 2.4rem; font-weight: 900; color: var(--text-header); }
+.game-score { padding: 6px 14px; border-radius: 10px; background: var(--primary-green); color: #fff; font-size: 1.6rem; font-weight: 900; }
+.game-goty { display: inline-block; margin-top: 8px; font-weight: 800; color: var(--primary-green); text-decoration: none; }
+.game-meta { display: flex; flex-wrap: wrap; justify-content: center; gap: 14px 34px; margin-top: 18px; }
+.game-meta > div { display: flex; flex-direction: column; gap: 3px; font-weight: 800; color: var(--text-title); }
+.game-meta a { color: var(--primary-green); text-decoration: none; }
+.game-spotlight-heading { margin: 4px 0 8px; font-size: 0.8rem; font-weight: 800; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px; }
+.game-spotlight-item { display: flex; justify-content: space-between; gap: 12px; padding: 8px 10px; border-radius: 8px; text-decoration: none; color: var(--text-title); font-weight: 700; }
+.game-spotlight-item:hover { background: var(--item-bg); }
+.game-spotlight-item strong { color: var(--primary-green); white-space: nowrap; }
+.game-spotlight-rank { display: inline-block; min-width: 38px; color: var(--text-muted); font-weight: 800; }
