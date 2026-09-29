@@ -3762,16 +3762,83 @@ function labelTableCells(table) {
     let col = 0;
     [...row.children].forEach(td => {
       const span = td.colSpan || 1;
-      if (span === 1 && labels[col]) td.setAttribute('data-label', labels[col]);
+      if (span === 1 && labels[col]) {
+        td.setAttribute('data-label', labels[col]);
+        if (/details/i.test(labels[col])) clampLongNote(td);
+      }
       col += span;
     });
   });
   table.classList.add('has-cell-labels');
 }
 
+// Long playthrough notes show two lines, with a button to expand
+const NOTE_CLAMP_CHARS = 140;
+function clampLongNote(td) {
+  if (td.textContent.trim().length <= NOTE_CLAMP_CHARS) return;
+  td.innerHTML = `<div class="note-clamp">${td.innerHTML}</div><button type="button" class="note-toggle">more</button>`;
+}
+document.addEventListener('click', e => {
+  const button = e.target.closest('.note-toggle');
+  if (!button) return;
+  const expanded = button.previousElementSibling.classList.toggle('expanded');
+  button.textContent = expanded ? 'less' : 'more';
+});
+
+// Chart and grid hover labels: move native title text into data-tip, shown by one styled tooltip
+function convertTitlesToTips(root) {
+  root.querySelectorAll('svg title').forEach(t => {
+    if (t.parentElement) t.parentElement.setAttribute('data-tip', t.textContent.trim());
+    t.remove();
+  });
+  root.querySelectorAll('main [title]').forEach(el => {
+    el.setAttribute('data-tip', el.getAttribute('title'));
+    el.removeAttribute('title');
+  });
+}
+
+function setupChartTips() {
+  const tip = document.createElement('div');
+  tip.className = 'chart-tip';
+  tip.hidden = true;
+  document.body.appendChild(tip);
+  let hideTimer;
+  const place = (x, y) => {
+    const rect = tip.getBoundingClientRect();
+    const left = Math.min(x + 14, window.innerWidth - rect.width - 8);
+    const top = y - rect.height - 12 < 8 ? y + 16 : y - rect.height - 12;
+    tip.style.left = `${Math.max(8, left)}px`;
+    tip.style.top = `${top}px`;
+  };
+  const show = (el, x, y) => {
+    clearTimeout(hideTimer);
+    tip.textContent = el.getAttribute('data-tip');
+    tip.hidden = false;
+    place(x, y);
+  };
+  document.addEventListener('pointerover', e => {
+    const el = e.target.closest('[data-tip]');
+    if (el && e.pointerType !== 'touch') show(el, e.clientX, e.clientY);
+  });
+  document.addEventListener('pointermove', e => { if (!tip.hidden && e.pointerType !== 'touch') place(e.clientX, e.clientY); });
+  document.addEventListener('pointerout', e => { if (e.target.closest('[data-tip]') && e.pointerType !== 'touch') tip.hidden = true; });
+  // Touch: a tap shows the tip for a few seconds
+  document.addEventListener('pointerdown', e => {
+    if (e.pointerType !== 'touch') return;
+    const el = e.target.closest('[data-tip]');
+    if (!el) { tip.hidden = true; return; }
+    show(el, e.clientX, e.clientY);
+    hideTimer = setTimeout(() => { tip.hidden = true; }, 2500);
+  });
+  window.addEventListener('scroll', () => { tip.hidden = true; }, { passive: true });
+}
+
 new MutationObserver(() => {
   document.querySelectorAll('table.monthly-table:not(.has-cell-labels)').forEach(labelTableCells);
+  convertTitlesToTips(document);
 }).observe(document.documentElement, { childList: true, subtree: true });
+document.addEventListener('DOMContentLoaded', setupChartTips);
+if (document.readyState !== 'loading') setupChartTips();
 
 // Initialize the dashboard
 initDashboard();
