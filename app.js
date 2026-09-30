@@ -23,6 +23,23 @@ const HIGH_SCORE = 8;
 // Averages only compete for the "best average" highlight with at least this many scored games
 const MIN_SCORED_FOR_AVG_HIGHLIGHT = 3;
 
+// "Now" for the dashboard: the day of the latest log entry, not today's date. Entries are often
+// added a week at a time, so measuring against today would shorten streaks, lower projections,
+// and make active games look idle.
+let _dataDate = null;
+function getDataDate() {
+  if (!_dataDate) {
+    const last = rawData.allEntries[rawData.allEntries.length - 1];
+    const [y, m, d] = last.date.slice(0, 10).split('-').map(Number);
+    _dataDate = new Date(y, m - 1, d);
+  }
+  return new Date(_dataDate);
+}
+function dataDateKey() {
+  const d = getDataDate();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
 // A game's score from the Metadata sheet, or null if it isn't scored
 function getGameScore(game) {
   const score = metaScores.get(game);
@@ -290,7 +307,7 @@ function initIndexPage() {
 function renderIndexGlance() {
   const container = document.getElementById('index-glance');
   if (!container) return;
-  const thisYear = String(new Date().getFullYear());
+  const thisYear = String(getDataDate().getFullYear());
   const daySeconds = new Map();
   let yearSeconds = 0, allSeconds = 0;
   const yearGames = new Set(), yearDays = new Set();
@@ -303,11 +320,10 @@ function renderIndexGlance() {
   const completions = getSortedCompletions('All-Time');
   const yearCompletions = completions.filter(pt => String(pt.displayDate.getUTCFullYear()) === thisYear).length;
 
-  // Current streak: consecutive days played up to today (or yesterday, if today isn't logged yet)
+  // Current streak: consecutive days played, ending on the latest logged day
   let streak = 0;
-  const cursor = new Date();
+  const cursor = getDataDate();
   const key = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-  if (!daySeconds.has(key(cursor))) cursor.setDate(cursor.getDate() - 1);
   while (daySeconds.has(key(cursor))) { streak++; cursor.setDate(cursor.getDate() - 1); }
 
   const stat = (label, value, sub = '') => `<div class="glance-stat"><span class="sys-widget-title">${label}</span><strong>${value}</strong>${sub ? `<span class="tf-sub">${sub}</span>` : ''}</div>`;
@@ -316,7 +332,7 @@ function renderIndexGlance() {
       ${stat(`${thisYear} Time`, formatTime(yearSeconds), `${yearDays.size} days played`)}
       ${stat(`${thisYear} Games`, yearGames.size)}
       ${stat(`${thisYear} Completions`, yearCompletions)}
-      ${stat('Current Streak', `${streak} day${streak === 1 ? '' : 's'}`)}
+      ${stat('Current Streak', `${streak} day${streak === 1 ? '' : 's'}`, `through ${formatFullDate(dataDateKey())}`)}
       ${stat('All-Time', formatTime(allSeconds), `${Object.keys(rawData.metrics.allTimeGameStats).length} games`)}
       ${stat('All-Time Completions', completions.length)}
     </div>`;
@@ -333,7 +349,7 @@ function renderNowPlaying() {
     .sort((a, b) => new Date(b.lastDate) - new Date(a.lastDate));
   if (active.length === 0) { container.innerHTML = '<div class="loading-text">Nothing active right now.</div>'; return; }
   container.innerHTML = `<div class="now-playing">${active.map(pt => {
-    const idleDays = Math.floor((Date.now() - new Date(pt.lastDate)) / 86400000);
+    const idleDays = Math.round((new Date(dataDateKey()) - new Date(String(pt.lastDate).slice(0, 10))) / 86400000);
     const score = getGameScore(pt.gameName);
     return `
       <div class="now-playing-item${idleDays > NOW_PLAYING_IDLE_DAYS ? ' now-playing-idle' : ''}">
@@ -341,7 +357,7 @@ function renderNowPlaying() {
           <span class="item-title hover-trigger" data-game="${escapeHTML(pt.gameName)}">${escapeHTML(pt.gameName)}</span>
           ${score !== null ? `<span class="item-badge">${formatScore(score)}</span>` : ''}
         </div>
-        <div class="now-playing-meta">${escapeHTML(toList(pt.systems).join(', '))} · ${formatTime(timeStringToSeconds(pt.finalPtLifetime))} over ${pt.finalPtLifetimeDays} day${pt.finalPtLifetimeDays == 1 ? '' : 's'} · last played ${idleDays === 0 ? 'today' : idleDays === 1 ? 'yesterday' : `${idleDays} days ago`}</div>
+        <div class="now-playing-meta">${escapeHTML(toList(pt.systems).join(', '))} · ${formatTime(timeStringToSeconds(pt.finalPtLifetime))} over ${pt.finalPtLifetimeDays} day${pt.finalPtLifetimeDays == 1 ? '' : 's'} · last played ${formatFullDate(pt.lastDate)}${idleDays > 0 ? ` (${idleDays} day${idleDays === 1 ? '' : 's'} before the latest entry)` : ''}</div>
         <div class="note-clamp now-playing-note">${escapeHTML(pt.finalNote)}</div>
       </div>`;
   }).join('')}</div>`;
@@ -682,7 +698,7 @@ function renderTimeframeWidgets(key, mode, containerId, data) {
     return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`;
   };
   const labelFor = k => monthly ? `${MONTH_NAMES[Number(k.slice(5)) - 1].slice(0, 3)} ${k.slice(0, 4)}` : k;
-  const today = new Date();
+  const today = getDataDate(); // the latest logged day stands in for today
   const inProgress = monthly ? (year === today.getFullYear() && month === today.getMonth() + 1) : year === today.getFullYear();
   // Days into the period (1-based) as "MM-DD" or "DD", so a period in progress is compared at the same point
   const cutoff = inProgress ? (monthly ? String(today.getDate()).padStart(2, '0') : `${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`) : null;
@@ -706,7 +722,7 @@ function renderTimeframeWidgets(key, mode, containerId, data) {
   if (inProgress) {
     const start = monthly ? new Date(year, month - 1, 1) : new Date(year, 0, 1);
     const end = monthly ? new Date(year, month, 1) : new Date(year + 1, 0, 1);
-    const elapsed = Math.max(1, Math.ceil((today - start) / 86400000));
+    const elapsed = Math.round((today - start) / 86400000) + 1; // days so far, counting the latest logged day
     const length = Math.round((end - start) / 86400000);
     projection = `<div class="tf-stat"><span class="sys-widget-title">Projected ${monthly ? 'Month' : 'Year'}-End</span><strong>${formatTime(t.seconds / elapsed * length)}</strong><span class="tf-sub">at the current pace (day ${elapsed} of ${length})</span></div>`;
   }
@@ -721,7 +737,7 @@ function renderTimeframeWidgets(key, mode, containerId, data) {
     });
     const max = Math.max(1, ...cells.map(c => c.sec));
     strip = `<div class="tf-strip tf-strip-days">${cells.map(c => c.future
-      ? `<div class="tf-day tf-future" title="${c.title}: still to come"><span>${c.label}</span></div>`
+      ? `<div class="tf-day tf-future" title="${c.title}: not logged yet"><span>${c.label}</span></div>`
       : `<div class="tf-day" title="${c.title}: ${c.sec ? formatTime(c.sec) : 'no play'}" style="opacity: ${c.sec ? 0.25 + 0.75 * (c.sec / max) : 1}; background: ${c.sec ? 'var(--primary-green)' : 'var(--heatmap-empty)'};"><span>${c.label}</span></div>`).join('')}</div>`;
   } else {
     const months = MONTH_NAMES.map((name, i) => {
@@ -2138,7 +2154,7 @@ function scoreHoursScatterHtml(scoredGames, medianHours) {
 // --- DROPDOWN SETUP ---
 function setupDropdowns() {
   if (!rawData || !rawData.metrics) return;
-  const currentYear = new Date().getFullYear().toString();
+  const currentYear = getDataDate().getFullYear().toString();
 
   // 1. Sync Logic for the "By Year" Dropdowns (Now 7 total)
   const compSelect = document.getElementById('year-select-comp');
@@ -2908,7 +2924,7 @@ function renderYearCalendars(targetContainerId) {
   const years = [...new Set([...daySeconds.keys()].map(d => Number(d.slice(0, 4))))].sort((a, b) => b - a);
   const level = sec => CALENDAR_LEVELS.findIndex(l => sec <= l.max);
   const cell = 12, gap = 2, step = cell + gap, left = 30, top = 18;
-  const todayStr = new Date().toISOString().slice(0, 10);
+  const todayStr = dataDateKey(); // grids stop at the latest logged day
 
   const yearHtml = year => {
     const jan1 = new Date(Date.UTC(year, 0, 1));
@@ -3560,7 +3576,7 @@ function generateUniversalDualTableHtml(listObj) {
       const end = row[5] || '';
       const detailSub = row[6] || ''; 
 
-      const currentYear = new Date().getFullYear().toString();
+      const currentYear = getDataDate().getFullYear().toString();
       const isBold = (end && end.toString().startsWith(currentYear)) || (col1 && col1.toString() === currentYear);
       // Ensure we keep your custom active class or bold styling here
       const boldStyle = isBold ? 'style="font-weight: 800; color: #000; background-color: #f0fff4;"' : '';
@@ -3655,7 +3671,7 @@ function initSpotlightPage() {
   });
 
   // 2. Build the TOC HTML with inline table styling
-  const currentYearStr = new Date().getFullYear().toString();
+  const currentYearStr = getDataDate().getFullYear().toString();
 
   let html = `
   
