@@ -29,8 +29,7 @@ const MIN_SCORED_FOR_AVG_HIGHLIGHT = 3;
 let _dataDate = null;
 function getDataDate() {
   if (!_dataDate) {
-    const last = rawData.allEntries[rawData.allEntries.length - 1];
-    const [y, m, d] = last.date.slice(0, 10).split('-').map(Number);
+    const [y, m, d] = rawData.latestEntryDate.slice(0, 10).split('-').map(Number);
     _dataDate = new Date(y, m - 1, d);
   }
   return new Date(_dataDate);
@@ -160,7 +159,7 @@ function renderGlobalHeader() {
         <div class="nav-menu">${group.links.map(([label, href]) => link(label, href)).join('')}</div>
       </div>`;
   }).join('');
-  const games = rawData ? [...new Set(rawData.allEntries.map(e => e.game))].sort((a, b) => a.localeCompare(b)) : [];
+  const games = rawData ? [...rawData.gameNames].sort((a, b) => a.localeCompare(b)) : [];
 
   headerContainer.innerHTML = `
     <div class="site-bar">
@@ -214,22 +213,69 @@ function renderGlobalHeader() {
   });
 }
 
+// --- DATA LOADING ---
+// The data is split into one file per group in data/ (built by buildWebDataFiles in Integration.gs),
+// so a page only downloads the groups it shows.
+const DATA_GROUPS = ['core', 'entries', 'playthroughs', 'games', 'genres', 'analysis', 'lists', 'milestones', 'sessions'];
+// Groups each page needs, counting everything its dropdowns can show. A page not listed loads them all.
+// If a page starts reading something new, add its group here (tools/usage.js lists what a page reads).
+const PAGE_DATA = {
+  'index.html': ['entries', 'playthroughs', 'games', 'genres'], // its other tabs load theirs: see INDEX_TAB_DATA
+  'analysis.html': ['analysis'],
+  'completions.html': ['entries', 'playthroughs'],
+  'franchise.html': ['entries', 'playthroughs', 'games'],
+  'game.html': ['entries', 'playthroughs', 'games', 'milestones', 'lists'],
+  'genre.html': ['entries', 'playthroughs', 'games'],
+  'goty.html': ['games'],
+  'history.html': ['entries'],
+  'metrics.html': ['entries', 'games', 'genres'],
+  'milestones.html': ['milestones'],
+  'monthly.html': ['entries', 'playthroughs', 'games', 'genres'],
+  'releaseyear.html': ['entries', 'playthroughs', 'games'],
+  'spotlight.html': ['lists'],
+  'systems.html': ['entries', 'playthroughs', 'games'],
+  'yearly.html': ['entries', 'playthroughs', 'games', 'genres']
+};
+
+// Downloads the named groups (once each) and adds them to rawData. core is always included.
+const _dataLoads = {};
+function loadData(groups) {
+  if (!rawData) rawData = { metrics: {} };
+  return Promise.all(['core', ...groups].map(group => {
+    if (!_dataLoads[group]) {
+      _dataLoads[group] = fetch(`data/${group}.json`, { cache: 'no-cache' })
+        .then(response => {
+          if (!response.ok) throw new Error(`Could not load data/${group}.json (${response.status})`);
+          return response.text();
+        })
+        .then(text => {
+          const part = JSON.parse(text, (key, value) => {
+            if (value && typeof value === 'object' && value._dataType === 'Set') {
+              return new Set(value.value || value.data || []);
+            }
+            return value;
+          });
+          const { metrics, ...rest } = part;
+          Object.assign(rawData.metrics, metrics);
+          Object.assign(rawData, rest);
+        });
+    }
+    return _dataLoads[group];
+  }));
+}
+
 // --- UPDATE: DASHBOARD INIT (Add routing and global parsing) ---
 async function initDashboard() {
   try {
+    // Route on the page's file name only, so a #tab or ?name= in the address can't pick the wrong page
+    const page = window.location.pathname.toLowerCase().split('/').pop() || 'index.html';
+    const path = page;
+
     // 'no-cache' asks GitHub whether the file changed; it's only re-downloaded after a sync
-    const [rawResponse, metaResponse] = await Promise.all([
-      fetch('raw_dashboard_data.json', { cache: 'no-cache' }),
+    const [, metaResponse] = await Promise.all([
+      loadData(PAGE_DATA[page] || DATA_GROUPS),
       fetch('metadata_data.json', { cache: 'no-cache' })
     ]);
-
-    const rawText = await rawResponse.text();
-    rawData = JSON.parse(rawText, (key, value) => {
-      if (value && typeof value === 'object' && value._dataType === 'Set') {
-        return new Set(value.value || value.data || []);
-      }
-      return value;
-    });
 
     const metaData = await metaResponse.json();
 
@@ -247,15 +293,9 @@ async function initDashboard() {
       }
     }
 
-    setupSpotlightDropdown(); // NEW: Wires up the Index page dropdown!
-
     renderGlobalHeader();
     setupThemeToggle();
     setupHoverHistory();
-
-    // Route on the page's file name only, so a #tab or ?name= in the address can't pick the wrong page
-    const page = window.location.pathname.toLowerCase().split('/').pop() || 'index.html';
-    const path = page;
 
     if (page === 'game.html') initGamePage();
     else if (path.includes('monthly')) initMonthlyPage();
@@ -294,8 +334,6 @@ function initIndexPage() {
   setupDropdowns();
   setupLiveSearch();
   renderOnThisDay(); // Calls the generalized render function
-  renderMilestones('milestones-list'); // Passes explicit ID
-  renderAnalysis('playthrough', 'analysis-content');
   renderHeatmap('gameSummary', 'heatmap-content');
 
   document.querySelectorAll('.card').forEach((card, index) => {
@@ -364,6 +402,26 @@ function renderNowPlaying() {
 }
 
 // Tabs show one group of index sections at a time; the choice is remembered and linkable (#rankings)
+// Data only one Index tab shows is downloaded the first time that tab opens, then its cards are drawn
+const INDEX_TAB_DATA = {
+  rankings: { groups: ['sessions'], cards: ['longest-session-list'], render: () => renderLongestSession(document.getElementById('year-select-session').value) },
+  breakdowns: { groups: ['analysis'], cards: ['analysis-content'], render: () => renderAnalysis(document.getElementById('analysis-select').value, 'analysis-content') },
+  history: { groups: ['milestones'], cards: ['milestones-list'], render: () => renderMilestones('milestones-list') },
+  spotlight: { groups: ['lists'], cards: ['random-top25-content'], render: setupSpotlightDropdown }
+};
+function loadIndexTab(tab) {
+  const extra = INDEX_TAB_DATA[tab];
+  if (!extra || extra.requested) return;
+  extra.requested = true;
+  const setCards = html => extra.cards.forEach(id => { document.getElementById(id).innerHTML = html; });
+  setCards('<div class="loading-text">Loading Data...</div>');
+  loadData(extra.groups).then(extra.render).catch(error => {
+    console.error("Dashboard Error:", error);
+    extra.requested = false; // opening the tab again retries
+    setCards(`<div class="loading-text" style="color: red;">${escapeHTML(error.message)}</div>`);
+  });
+}
+
 function setupIndexTabs() {
   const buttons = [...document.querySelectorAll('.index-tabs button')];
   if (buttons.length === 0) return;
@@ -372,6 +430,7 @@ function setupIndexTabs() {
   const select = tab => {
     buttons.forEach(b => { b.classList.toggle('active', b.dataset.tab === tab); b.setAttribute('aria-pressed', String(b.dataset.tab === tab)); });
     sections.forEach(sec => { sec.hidden = sec.dataset.tab !== tab; });
+    loadIndexTab(tab);
     try { localStorage.setItem('yoshi-index-tab', tab); } catch (e) { /* storage unavailable */ }
   };
   buttons.forEach(b => b.addEventListener('click', () => {
@@ -2321,7 +2380,7 @@ function setupHoverHistory() {
     const trigger = e.target.closest('.hover-trigger');
     if (!trigger || trigger.closest('a') || e.defaultPrevented) return;
     const gameName = trigger.getAttribute('data-game');
-    if (gameName && getGameEntriesNewestFirst(gameName).length > 0) window.location.href = gameProfileUrl(gameName);
+    if (gameName && rawData.gameNames.includes(gameName)) window.location.href = gameProfileUrl(gameName);
   });
 
   tooltip.addEventListener('click', (e) => {
@@ -2342,6 +2401,15 @@ function setupHoverHistory() {
     if (e.target.classList.contains('hover-trigger')) {
       const gameName = e.target.getAttribute('data-game');
       if (!gameName) return;
+
+      // Pages that don't show the log fetch it the first time a game name is hovered
+      if (!rawData.allEntries) {
+        const target = e.target;
+        loadData(['entries']).then(() => {
+          if (target.matches(':hover')) target.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }));
+        }).catch(() => {});
+        return;
+      }
 
       const entries = getGameEntriesNewestFirst(gameName);
       if (entries.length === 0) return;
@@ -2474,6 +2542,7 @@ function renderTopGamesList(year, containerId, sortBy) {
 // Longest Single Session
 function renderLongestSession(year) {
   const container = document.getElementById('longest-session-list');
+  if (!rawData.metrics.singleDaySessions) return; // drawn once the Rankings tab has loaded its data
 
   const sessions = year === 'All-Time'
     ? rawData.metrics.singleDaySessions
@@ -2593,7 +2662,7 @@ function renderOnThisDay(monthIndex = new Date().getMonth(), dayIndex = new Date
 // --- UPDATE: RENDER ANALYSIS (Add Container ID parameter) ---
 function renderAnalysis(type, targetContainerId = 'analysis-content') {
   const container = document.getElementById(targetContainerId);
-  if (!container || !rawData || !rawData.metrics) return;
+  if (!container || !rawData || !rawData.metrics || !rawData.metrics.playthroughAnalysis) return;
 
   let html = `<div style="overflow-x: auto;"><table class="analysis-table"><thead><tr>`;
 
@@ -3534,11 +3603,14 @@ function generateWRPTrackerHtml(wrpData, isGameList = true) {
       ? `<div class="wrp-step-title hover-trigger" data-game="${escapeHTML(event.champion)}">${escapeHTML(event.champion)}</div>`
       : `<div class="wrp-step-title" style="font-weight: 800; color: var(--text-title);">${escapeHTML(event.champion)}</div>`;
 
+    // A past holder that kept beating its own record: show how far it got
+    const peakHtml = (i < wrpData.timeline.length - 1 && event.peakValue) ? ` &rarr; ${escapeHTML(event.peakValue)}` : '';
+
     blocks.push(`
     <div class="wrp-step">
     <div class="wrp-step-date">${formatFullDate(event.date)}</div>
     ${eventChampHtml}
-    <div class="wrp-step-sub">${isFirst ? 'Inaugural Record' : `Dethroned ${escapeHTML(event.dethroned)}`} &bull; <strong style="color: var(--text-title);">${escapeHTML(event.takeoverValue)}</strong></div>
+    <div class="wrp-step-sub">${isFirst ? 'Inaugural Record' : `Dethroned ${escapeHTML(event.dethroned)}`} &bull; <strong style="color: var(--text-title);">${escapeHTML(event.takeoverValue)}</strong>${peakHtml}</div>
     </div>
     `);
   }
