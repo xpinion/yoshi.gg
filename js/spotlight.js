@@ -70,13 +70,16 @@ function generateUniversalDualTableHtml(listObj) {
       const start = row[4] || '';
       const end = row[5] || '';
       const detailSub = row[6] || ''; 
+      const isEmptyYear = row[7] === true; // A year with nothing to show (by-year tables list every year of the log)
 
       const currentYear = getDataDate().getFullYear().toString();
-      const isBold = (end && end.toString().startsWith(currentYear)) || (col1 && col1.toString() === currentYear);
+      const isBold = !isEmptyYear && ((end && end.toString().startsWith(currentYear)) || (col1 && col1.toString() === currentYear));
       // Ensure we keep your custom active class or bold styling here
       const boldStyle = isBold ? 'style="font-weight: 800; color: #000; background-color: #f0fff4;"' : '';
 
-      const detailMainHtml = isGameList
+      const detailMainHtml = isEmptyYear
+        ? `<span style="font-style: italic; color: var(--text-muted);">${escapeHTML(String(detail))}</span>`
+        : isGameList
         ? `<span class="hover-trigger" data-game="${escapeHTML(String(detail))}">${escapeHTML(String(detail))}</span>`
         : `<span style="font-weight: 800; color: var(--text-title);">${escapeHTML(String(detail))}</span>`;
 
@@ -93,7 +96,7 @@ function generateUniversalDualTableHtml(listObj) {
         ${sysStr ? `<span style="color: var(--text-muted); font-size: 0.85rem; font-weight: 600; margin-left: 4px;">(${escapeHTML(String(sysStr))})</span>` : ''}
         ${detailSubHtml}
       </td>
-      <td class="text-center" style="background: var(--highlight-green-bg); color: var(--primary-green); font-weight: 900; white-space: nowrap;">${escapeHTML(String(val))}</td>
+      <td class="text-center" style="${isEmptyYear ? 'color: var(--text-muted);' : 'background: var(--highlight-green-bg); color: var(--primary-green); font-weight: 900;'} white-space: nowrap;">${escapeHTML(String(val))}</td>
       <td class="text-center" style="font-size: 0.85rem; white-space: nowrap;">${escapeHTML(String(start))}</td>
       <td class="text-center" style="font-size: 0.85rem; white-space: nowrap;">${escapeHTML(String(end))}</td>
       </tr>
