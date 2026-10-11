@@ -1091,7 +1091,7 @@ details.toc-category-wrapper:not([open]) > summary .toc-category-title::before {
   letter-spacing: 0;
 }
 
-/* Hub pages (Systems, Franchise, Genre, Release Year): styles moved out of app.js.
+/* Hub pages (Systems, Franchise, Genre, Release Year): styles moved out of the page script.
    A few selectors are more specific so they still win over .analysis-table th and .card-header h2. */
 .hub-stat-card { text-align: center; padding: 20px; }
 .hub-section-gap { margin-top: 20px; }
@@ -1322,7 +1322,7 @@ body.dark-theme .cal-l5 { fill: #9be9a8; }
 .game-spotlight-item strong { color: var(--primary-green); white-space: nowrap; }
 .game-spotlight-rank { display: inline-block; min-width: 38px; color: var(--text-muted); font-weight: 800; }
 
-/* Cards appear quickly and together. The per-card delays set in app.js (up to 1.5s) made long pages feel slow. */
+/* Cards appear quickly and together. The per-card delays set in the page scripts (up to 1.5s) made long pages feel slow. */
 .card, .completion-card { animation-duration: 0.35s !important; animation-delay: 0s !important; }
 @media (prefers-reduced-motion: reduce) {
   .card, .completion-card, .toc-category-wrapper { animation: none !important; opacity: 1 !important; }
@@ -1413,7 +1413,7 @@ body.dark-theme .cal-l5 { fill: #9be9a8; }
   .card-header h2.hub-title-lg, .hub-title-lg { font-size: 1.4rem; }
 }
 
-/* --- SPOTLIGHT DIRECTORY (moved out of app.js) --- */
+/* --- SPOTLIGHT DIRECTORY (moved out of the page script) --- */
 .toc-category-wrapper { margin-bottom: 40px; }
 .toc-category-title { font-size: 1.2rem; color: var(--primary-green); margin-bottom: 12px; border-bottom: 2px solid var(--primary-green); padding-bottom: 5px; font-weight: 900; text-transform: uppercase; letter-spacing: 1px; }
 .toc-table { width: 100%; border-collapse: collapse; font-size: 0.9rem; background: var(--card-bg); box-shadow: 0 4px 15px rgba(0,0,0,0.05); border-radius: 8px; overflow: hidden; }
