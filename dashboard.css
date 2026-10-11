@@ -1478,3 +1478,62 @@ section[data-tab][hidden] { display: none; }
   .compare-name { font-size: 1.05rem; }
 }
 .page-stack { display: flex; flex-direction: column; gap: 30px; width: 100%; }
+
+/* --- SHARE CARDS --- */
+.share-row { display: flex; justify-content: center; margin-top: 12px; }
+.share-btn {
+  display: inline-block; padding: 6px 12px; border: 1px solid var(--border-table); border-radius: 20px; background: var(--item-bg);
+  color: var(--text-main); font: inherit; font-size: 0.78rem; font-weight: 800; cursor: pointer; text-decoration: none; white-space: nowrap; vertical-align: middle;
+}
+.share-btn:hover { border-color: var(--primary-green); color: var(--primary-green); }
+.share-primary { background: var(--primary-green); border-color: var(--primary-green); color: #fff; }
+.share-primary:hover { color: #fff; opacity: 0.9; }
+.spotlight-list-title .share-btn { margin-left: 8px; font-size: 0.7rem; padding: 3px 9px; }
+.share-modal { position: fixed; inset: 0; z-index: 3000; background: rgba(0, 0, 0, 0.7); display: flex; align-items: center; justify-content: center; padding: 16px; }
+.share-dialog { background: var(--card-bg); border-radius: 14px; padding: 16px; max-width: min(900px, 100%); box-shadow: 0 10px 40px rgba(0, 0, 0, 0.4); }
+.share-dialog img { display: block; width: 100%; height: auto; border-radius: 8px; border: 1px solid var(--border-table); }
+.share-actions { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; margin-top: 14px; }
+.share-actions .share-btn { font-size: 0.9rem; padding: 9px 16px; }
+
+/* --- INDEX HIGHLIGHT --- */
+.index-highlight { display: flex; align-items: center; gap: 12px; background: var(--card-bg); border-radius: 12px; padding: 14px 16px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); border-left: 6px solid var(--primary-green); }
+.highlight-body { flex: 1; min-width: 0; text-align: center; }
+.highlight-text { font-size: 1.05rem; font-weight: 700; color: var(--text-title); }
+.highlight-count { font-weight: 600; text-transform: none; margin-left: 6px; }
+.highlight-nav { flex: 0 0 auto; width: 36px; height: 36px; border-radius: 50%; border: 1px solid var(--border-table); background: var(--item-bg); color: var(--text-main); font-size: 1.3rem; font-weight: 800; line-height: 1; cursor: pointer; }
+.highlight-nav:hover { border-color: var(--primary-green); color: var(--primary-green); }
+
+/* --- TIMELINE --- */
+.tl-scroll { overflow-x: auto; padding-bottom: 10px; --tl-col: 54px; --tl-label: 104px; }
+.tl-grid { display: grid; grid-template-rows: 30px 20px 130px repeat(4, 34px) 28px; gap: 4px 2px; width: max-content; }
+.tl-label { position: sticky; left: 0; z-index: 3; background: var(--card-bg); display: flex; align-items: center; font-size: 0.72rem; font-weight: 800; text-transform: uppercase; color: var(--text-muted); padding-right: 8px; }
+.tl-year { display: flex; align-items: center; justify-content: center; background: var(--primary-green); color: #fff; font-weight: 900; border-radius: 6px; text-decoration: none; }
+.tl-month { text-align: center; font-size: 0.68rem; font-weight: 800; color: var(--text-muted); }
+.tl-bar-cell { display: flex; flex-direction: column; justify-content: flex-end; align-items: center; gap: 2px; height: 100%; }
+.tl-bar { width: 72%; background: var(--primary-green); border-radius: 4px 4px 0 0; min-height: 1px; flex: 0 0 auto; max-height: calc(100% - 16px); }
+.tl-bar-cell span { order: -1; font-size: 0.65rem; font-weight: 800; color: var(--text-muted); }
+.tl-band { display: flex; align-items: center; padding: 0 6px; border-radius: 6px; color: #fff; font-size: 0.72rem; font-weight: 800; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-decoration: none; min-width: 0; }
+a.tl-band:hover { filter: brightness(1.15); }
+.tl-count { display: flex; align-items: center; justify-content: center; font-size: 0.75rem; font-weight: 900; color: var(--primary-green); background: var(--highlight-green-bg); border-radius: 6px; }
+.tl-count-zero { background: transparent; }
+
+/* --- PATTERNS: seasonality heatmap --- */
+.season-table { border-collapse: separate; border-spacing: 3px; margin: 0 auto; font-size: 0.82rem; }
+.season-table thead th { font-size: 0.72rem; font-weight: 800; text-transform: uppercase; color: var(--text-muted); padding: 4px 6px; }
+.season-table td { min-width: 50px; height: 34px; text-align: center; font-weight: 800; border-radius: 6px; }
+.season-table .season-name { text-align: right; padding-right: 10px; white-space: nowrap; font-weight: 800; }
+.season-table .season-name a { color: var(--text-title); text-decoration: none; }
+.season-table .season-name a:hover { color: var(--primary-green); }
+.season-table td.season-total { background: none; color: var(--text-title); padding: 0 8px; white-space: nowrap; }
+
+/* --- DATA CHECKS --- */
+.check { border: 1px solid var(--border-light); border-radius: 10px; margin-bottom: 10px; padding: 10px 14px; background: var(--item-bg); }
+.check > summary { cursor: pointer; display: flex; align-items: center; gap: 12px; font-weight: 800; color: var(--text-title); list-style: none; }
+.check > summary::-webkit-details-marker { display: none; }
+.check-count { flex: 0 0 auto; min-width: 46px; text-align: center; padding: 3px 8px; border-radius: 20px; font-size: 0.85rem; font-weight: 900; color: #fff; }
+.check-fix { background: #d7301f; }
+.check-info { background: #f08c00; }
+.check-ok { background: var(--primary-green); }
+.check-clear { opacity: 0.7; }
+.check-why { margin: 8px 0 10px 58px; font-size: 0.85rem; color: var(--text-muted); }
+.monthly-table.check-table { min-width: 0; }

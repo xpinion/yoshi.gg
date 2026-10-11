@@ -4,6 +4,7 @@
 // --- INIT INDEX PAGE ---
 function initIndexPage() {
   renderIndexGlance();
+  renderIndexHighlights();
   renderNowPlaying();
   renderYearPace();
   setupIndexTabs();
@@ -50,6 +51,110 @@ function renderIndexGlance() {
       ${stat('All-Time', formatTime(allSeconds), `${Object.keys(rawData.metrics.allTimeGameStats).length} games`)}
       ${stat('All-Time Completions', completions.length)}
     </div>`;
+}
+
+// --- INDEX: highlights. One fact at a time, starting from a different one each day ---
+// Each highlight is { label, html, link: [text, href] }. "On this day" facts use today's real date, like On This Day does.
+function buildIndexHighlights() {
+  const highlights = [];
+  const add = (label, html, link) => highlights.push({ label, html, link });
+  const game = name => `<span class="hover-trigger" data-game="${escapeHTML(name)}">${escapeHTML(name)}</span>`;
+  const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;
+  const today = dataDateKey(), thisYear = today.slice(0, 4), lastYear = String(Number(thisYear) - 1);
+  const now = new Date(), monthDay = `${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+
+  const firstPlayed = {}, lastPlayed = {}, dayTotals = {}, yearGames = {}, monthGames = {};
+  const yearToDate = {};
+  let allSeconds = 0;
+  rawData.allEntries.forEach(e => {
+    const day = e.date.slice(0, 10), y = day.slice(0, 4), sec = timeStringToSeconds(e.time);
+    if (!firstPlayed[e.game]) firstPlayed[e.game] = e;
+    lastPlayed[e.game] = e;
+    dayTotals[day] = (dayTotals[day] || 0) + sec;
+    allSeconds += sec;
+    if (day.slice(5) <= today.slice(5)) yearToDate[y] = (yearToDate[y] || 0) + sec;
+    if (y === thisYear) yearGames[e.game] = (yearGames[e.game] || 0) + sec;
+    if (day.startsWith(today.slice(0, 7))) monthGames[e.game] = (monthGames[e.game] || 0) + sec;
+  });
+
+  // On this day in earlier years: games first played, games completed, and big sessions
+  const yearsAgo = date => now.getFullYear() - Number(String(date).slice(0, 4));
+  const ago = n => `${plural(n, 'year')} ago today`;
+  Object.values(firstPlayed).filter(e => e.date.slice(5, 10) === monthDay && yearsAgo(e.date) > 0)
+    .forEach(e => add('On this day', `${ago(yearsAgo(e.date))} you first played ${game(e.game)} (${escapeHTML(e.system)}).`, ['History', 'history.html']));
+  getSortedCompletions('All-Time').filter(pt => pt.displayDate.toISOString().slice(5, 10) === monthDay && yearsAgo(pt.displayDate.toISOString()) > 0)
+    .forEach(pt => add('On this day', `${ago(yearsAgo(pt.displayDate.toISOString()))} you completed ${game(pt.gameName)} after ${pt.finalPtLifetime}.`, ['Completions', 'completions.html']));
+  rawData.allEntries.filter(e => e.date.slice(5, 10) === monthDay && yearsAgo(e.date) > 0 && timeStringToSeconds(e.time) >= 6 * 3600)
+    .forEach(e => add('On this day', `${ago(yearsAgo(e.date))} you played ${game(e.game)} for ${formatTime(timeStringToSeconds(e.time))}.`, ['History', 'history.html']));
+
+  // The year so far against last year at the same point
+  if (yearToDate[lastYear]) {
+    const diff = (yearToDate[thisYear] || 0) - yearToDate[lastYear];
+    add('Year pace', `${thisYear} is ${formatTime(Math.abs(diff))} ${diff >= 0 ? 'ahead of' : 'behind'} ${lastYear} at this point of the year.`, ['Year in Review', 'review.html']);
+  }
+  const topOf = totals => Object.entries(totals).sort((a, b) => b[1] - a[1])[0];
+  const yearTop = topOf(yearGames), monthTop = topOf(monthGames);
+  if (yearTop) add(`${thisYear} so far`, `${game(yearTop[0])} is the most played game of ${thisYear} with ${formatTime(yearTop[1])}.`, ['Year in Review', 'review.html']);
+  if (monthTop) add(MONTH_NAMES[Number(today.slice(5, 7)) - 1], `${game(monthTop[0])} leads this month with ${formatTime(monthTop[1])}.`, ['Monthly', 'monthly.html']);
+
+  // Streak, against the best run of the year
+  let streak = 0;
+  for (let t = Date.parse(today + 'T12:00:00Z'); dayTotals[new Date(t).toISOString().slice(0, 10)] !== undefined; t -= 86400000) streak++;
+  const yearBest = longestDayStreak(Object.keys(dayTotals).filter(d => d.startsWith(thisYear)));
+  add('Streak', streak >= yearBest.length
+    ? `The current streak of ${plural(streak, 'day')} is the longest of ${thisYear}.`
+    : `The current streak is ${plural(streak, 'day')}. The longest of ${thisYear} is ${plural(yearBest.length, 'day')}.`, ['Within Reach', 'reach.html']);
+
+  // Round numbers coming up
+  const nextTotal = (Math.floor(allSeconds / 3600 / 500) + 1) * 500;
+  add('Coming up', `${formatTime(nextTotal * 3600 - allSeconds)} to go until ${nextTotal.toLocaleString()} total hours played.`, ['Within Reach', 'reach.html']);
+  Object.keys(lastPlayed).filter(g => (Date.parse(today) - Date.parse(lastPlayed[g].date.slice(0, 10))) / 86400000 <= 30).forEach(g => {
+    const stats = rawData.metrics.allTimeGameStats[g];
+    if (!stats) return;
+    const hours = stats.totalSeconds / 3600, mark = [25, 50].find(m => hours < m) || (Math.floor(hours / 100) + 1) * 100;
+    if (mark - hours <= 5) add('Coming up', `${game(g)} is ${formatTime(mark * 3600 - stats.totalSeconds)} away from ${mark} hours played.`, ['Within Reach', 'reach.html']);
+  });
+
+  // The latest completion, and the active game left alone the longest
+  const completions = getSortedCompletions('All-Time');
+  if (completions.length) {
+    const latest = completions[completions.length - 1];
+    const days = Math.round((Date.parse(today) - Date.parse(latest.displayDate.toISOString().slice(0, 10))) / 86400000);
+    add('Latest completion', `${game(latest.gameName)}, ${days === 0 ? 'today' : `${plural(days, 'day')} ago`}. That makes ${completions.length.toLocaleString()} in all.`, ['Completions', 'completions.html']);
+  }
+  const idle = Object.values(rawData.playthroughHistory).filter(pt => pt.finalStatus === 'Active').sort((a, b) => String(a.lastDate).localeCompare(String(b.lastDate)))[0];
+  if (idle) {
+    const days = Math.round((Date.parse(today) - Date.parse(String(idle.lastDate).slice(0, 10))) / 86400000);
+    if (days > NOW_PLAYING_IDLE_DAYS) add('Waiting', `${game(idle.gameName)} is still marked Active but hasn't been played in ${plural(days, 'day')}.`);
+  }
+  return highlights;
+}
+
+function renderIndexHighlights() {
+  const container = document.getElementById('index-highlight');
+  if (!container) return;
+  const highlights = buildIndexHighlights();
+  if (highlights.length === 0) return;
+  let index = dayOfYear(dataDateKey()) % highlights.length;
+  const draw = () => {
+    const h = highlights[index];
+    container.innerHTML = `
+      <div class="index-highlight">
+        <button type="button" class="highlight-nav" data-step="-1" aria-label="Previous highlight">‹</button>
+        <div class="highlight-body">
+          <span class="sys-widget-title">${escapeHTML(h.label)} <span class="highlight-count">${index + 1} of ${highlights.length}</span></span>
+          <div class="highlight-text">${h.html}${h.link ? ` <a href="${h.link[1]}" class="reach-link">${h.link[0]} →</a>` : ''}</div>
+        </div>
+        <button type="button" class="highlight-nav" data-step="1" aria-label="Next highlight">›</button>
+      </div>`;
+  };
+  container.addEventListener('click', e => {
+    const button = e.target.closest('.highlight-nav');
+    if (!button) return;
+    index = (index + Number(button.dataset.step) + highlights.length) % highlights.length;
+    draw();
+  });
+  draw();
 }
 
 // Active playthroughs untouched for longer than this are dimmed in Now Playing

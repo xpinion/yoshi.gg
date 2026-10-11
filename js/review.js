@@ -12,6 +12,7 @@ function initReviewPage() {
         <select id="review-year" class="header-dropdown card-title-lg">${years.map(y => `<option value="${y}">${y}</option>`).join('')}</select>
         in Review
       </h2>
+      ${typeof openShareCard === 'function' ? `<div class="share-row">${shareButtonHtml('id="review-share"')}</div>` : ''}
     </div>
     <div id="review-body" class="page-stack"></div>
   `;
@@ -23,6 +24,22 @@ function initReviewPage() {
   };
   select.addEventListener('change', () => { history.replaceState(null, '', `?year=${select.value}`); render(); });
   render();
+
+  const shareButton = document.getElementById('review-share');
+  if (shareButton) shareButton.addEventListener('click', () => {
+    const year = select.value;
+    const sum = summarizeEntries(rawData.allEntries.filter(e => e.date.startsWith(year)));
+    const inProgress = dataDateKey().startsWith(year);
+    openShareCard({
+      kicker: 'Year in Review', title: `${year} in Review`,
+      subtitle: inProgress ? `So far, through ${formatFullDate(dataDateKey())}` : `${sum.sessions.toLocaleString()} sessions across ${sum.systems.size} systems`,
+      stats: [
+        { label: 'Time Played', value: formatTime(sum.seconds) }, { label: 'Days Played', value: sum.days.size },
+        { label: 'Games', value: sum.games.size }, { label: 'Completions', value: getSortedCompletions(year).length }
+      ],
+      rows: topOfMap(sum.games, 6).map(([game, sec], i) => ({ left: `#${i + 1} ${game}`, right: formatTime(sec) }))
+    });
+  });
 }
 
 function reviewBodyHtml(year) {

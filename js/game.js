@@ -78,6 +78,7 @@ function initGamePage() {
           ${score !== null ? `<div class="game-score">${formatScore(score)}</div>` : ''}
         </div>
         ${gotyHtml}
+        ${typeof openShareCard === 'function' ? `<div class="share-row">${shareButtonHtml('id="game-share"')}</div>` : ''}
         <div class="game-meta">
           ${plainMeta('Release Year', meta.releaseYear)}
           ${metaLink('Genre', meta.genre, 'genre.html')}
@@ -162,6 +163,21 @@ function initGamePage() {
   `;
   renderGameHistory(gameName);
   setupGameProfileSearch(allGames);
+
+  const shareButton = document.getElementById('game-share');
+  if (shareButton) shareButton.addEventListener('click', () => openShareCard({
+    kicker: 'Game Profile', title: gameName,
+    subtitle: [systems.join(', '), meta.releaseYear, meta.genre].filter(v => v && v !== 'Unknown').join(' · '),
+    stats: [
+      { label: 'Total Time', value: formatTime(totalSeconds) }, { label: 'Days Played', value: days.size },
+      { label: 'Longest Session', value: formatTime(longest.sec) },
+      score !== null ? { label: 'Score', value: formatScore(score) } : { label: 'Sessions', value: sessions.length }
+    ],
+    // Spotlight records first; a game without any shows its playthroughs
+    rows: leads.length || appearsIn.length
+      ? [...leads, ...appearsIn].map(e => ({ left: `${e.rank} in ${e.title}`, right: String(e.value) }))
+      : playthroughs.map(pt => ({ left: `${pt.finalStatus} · ${formatFullDate(pt.startDate)} to ${formatFullDate(pt.lastDate)}`, right: pt.finalPtLifetime }))
+  }));
 }
 
 function setupGameProfileSearch(allGames) {

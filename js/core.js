@@ -6,6 +6,8 @@
 //   timeframe.js  Monthly and Yearly        hubs.js        Systems, Franchise, Genre, Release Year
 //   completions.js, goty.js, game.js, spotlight.js, metrics.js, milestones.js, analysis.js, history.js
 //   reach.js (Within Reach), review.js (Year in Review), partner.js, compare.js, ratings.js (also uses hubs)
+//   timeline.js, patterns.js (Seasonality, System Lifecycles), checks.js (Data Checks)
+//   share.js      Share cards, loaded by the pages that offer them (game, review, spotlight)
 
 // Global State
 let rawData = null;
@@ -136,10 +138,10 @@ function escapeHTML(str) {
 // --- UPDATE: GLOBAL HEADER ---
 const NAV_GROUPS = [
   { label: 'Index', href: 'index.html' },
-  { label: 'Log', links: [['Monthly', 'monthly.html'], ['Yearly', 'yearly.html'], ['Year in Review', 'review.html'], ['History', 'history.html'], ['Completions', 'completions.html']] },
+  { label: 'Log', links: [['Monthly', 'monthly.html'], ['Yearly', 'yearly.html'], ['Year in Review', 'review.html'], ['Timeline', 'timeline.html'], ['History', 'history.html'], ['Completions', 'completions.html']] },
   { label: 'Collections', links: [['Systems', 'systems.html'], ['Franchise', 'franchise.html'], ['Genre', 'genre.html'], ['Release Year', 'releaseyear.html'], ['Partners', 'partner.html']] },
   { label: 'Records', links: [['Spotlight', 'spotlight.html'], ['Milestones', 'milestones.html'], ['Within Reach', 'reach.html'], ['GotY', 'goty.html']] },
-  { label: 'Stats', links: [['Analysis', 'analysis.html'], ['Metrics', 'metrics.html'], ['Ratings', 'ratings.html'], ['Compare', 'compare.html']] }
+  { label: 'Stats', links: [['Analysis', 'analysis.html'], ['Metrics', 'metrics.html'], ['Ratings', 'ratings.html'], ['Patterns', 'patterns.html'], ['Compare', 'compare.html'], ['Data Checks', 'checks.html']] }
 ];
 
 function renderGlobalHeader() {
@@ -221,6 +223,7 @@ const DATA_GROUPS = ['core', 'entries', 'playthroughs', 'games', 'genres', 'anal
 const PAGE_DATA = {
   'index.html': ['entries', 'playthroughs', 'games', 'genres'], // its other tabs load theirs: see INDEX_TAB_DATA
   'analysis.html': ['analysis'],
+  'checks.html': ['entries', 'playthroughs'],
   'compare.html': ['entries', 'playthroughs'],
   'completions.html': ['entries', 'playthroughs'],
   'franchise.html': ['entries', 'playthroughs', 'games'],
@@ -232,12 +235,14 @@ const PAGE_DATA = {
   'milestones.html': ['milestones'],
   'monthly.html': ['entries', 'playthroughs', 'games', 'genres'],
   'partner.html': ['entries'],
+  'patterns.html': ['entries'],
   'ratings.html': ['games'],
   'reach.html': ['entries', 'playthroughs', 'games', 'lists'],
   'releaseyear.html': ['entries', 'playthroughs', 'games'],
   'review.html': ['entries', 'playthroughs', 'milestones'],
   'spotlight.html': ['lists'],
   'systems.html': ['entries', 'playthroughs', 'games'],
+  'timeline.html': ['entries', 'playthroughs'],
   'yearly.html': ['entries', 'playthroughs', 'games', 'genres']
 };
 
@@ -245,6 +250,7 @@ const PAGE_DATA = {
 const PAGE_INIT = {
   'index.html': () => initIndexPage(),
   'analysis.html': () => initAnalysisPage(),
+  'checks.html': () => initChecksPage(),
   'compare.html': () => initComparePage(),
   'completions.html': () => initCompletionsPage(),
   'franchise.html': () => initFranchisePage(),
@@ -256,12 +262,14 @@ const PAGE_INIT = {
   'milestones.html': () => initMilestonesPage(),
   'monthly.html': () => initMonthlyPage(),
   'partner.html': () => initPartnerPage(),
+  'patterns.html': () => initPatternsPage(),
   'ratings.html': () => initRatingsPage(),
   'reach.html': () => initReachPage(),
   'releaseyear.html': () => initReleaseYearPage(),
   'review.html': () => initReviewPage(),
   'spotlight.html': () => initSpotlightPage(),
   'systems.html': () => initSystemsPage(),
+  'timeline.html': () => initTimelinePage(),
   'yearly.html': () => initYearlyPage()
 };
 

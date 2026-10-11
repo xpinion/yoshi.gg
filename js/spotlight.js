@@ -114,7 +114,7 @@ function generateUniversalDualTableHtml(listObj) {
 
   return `
   <div class="card-header" style="display: flex; justify-content: space-between; border-bottom: 2px solid var(--border-light); padding: 15px 20px;">
-  <h2 class="spotlight-list-title">${escapeHTML(listObj.titleLeft)}</h2>
+  <h2 class="spotlight-list-title">${escapeHTML(listObj.titleLeft)}${typeof openShareCard === 'function' ? ` ${shareButtonHtml(`data-share-list="${rawData.metrics.top25Lists.indexOf(listObj)}"`)}` : ''}</h2>
   <h2 class="spotlight-list-title">${escapeHTML(listObj.titleRight)}</h2>
   </div>
   <div class="card-content" style="padding: 0;">
@@ -130,6 +130,22 @@ function generateUniversalDualTableHtml(listObj) {
   </div>
   `;
 }
+
+// Share card for a list: its top rows, with ranks filled in where ties left them blank
+document.addEventListener('click', e => {
+  const button = e.target.closest('.share-btn[data-share-list]');
+  if (!button) return;
+  const list = rawData.metrics.top25Lists[Number(button.dataset.shareList)];
+  if (!list) return;
+  let rank = '';
+  openShareCard({
+    kicker: `Spotlight · ${list.category}`, title: list.titleLeft,
+    rows: list.allTime.slice(0, 9).map(row => {
+      rank = row[0] || rank;
+      return { left: `${rank} ${row[1]}${row[2] ? ` (${row[2]})` : ''}`, right: String(row[3]) };
+    })
+  });
+});
 
 // Routes to spotlight.html
 function initSpotlightPage() {
