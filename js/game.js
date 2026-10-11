@@ -105,6 +105,17 @@ function initGamePage() {
 
     <section class="card-row grid-2">
       <div class="card">
+        <div class="card-header"><h2>Hours Over Time</h2></div>
+        <div class="card-content hub-card-body">${gamePaceChartHtml(sessions)}</div>
+      </div>
+      <div class="card">
+        <div class="card-header"><h2>Session Lengths</h2></div>
+        <div class="card-content">${gameSessionLengthsHtml(sessions)}</div>
+      </div>
+    </section>
+
+    <section class="card-row grid-2">
+      <div class="card">
         <div class="card-header"><h2>Spotlight Records</h2></div>
         <div class="card-content">
           ${leads.length ? `<div class="game-spotlight-heading">Holds #1 in ${leads.length} list${leads.length === 1 ? '' : 's'}</div>${leads.map(spotlightRow).join('')}` : '<div class="game-spotlight-heading">Not #1 in any Spotlight list</div>'}
@@ -188,6 +199,48 @@ function gameMonthlyChartHtml(sessions) {
     }
   });
   return svg + `</svg>`;
+}
+
+// Running total of hours, by days since the first session. Long breaks show as flat stretches.
+function gamePaceChartHtml(sessions) {
+  const start = Date.parse(sessions[0].date.slice(0, 10));
+  const span = Math.max(1, (Date.parse(sessions[sessions.length - 1].date.slice(0, 10)) - start) / 86400000);
+  let total = 0;
+  const points = [[0, 0]];
+  sessions.forEach(s => { total += s.sec / 3600; points.push([(Date.parse(s.date.slice(0, 10)) - start) / 86400000, total]); });
+  // Label the first and last day, and each January 1 in between
+  const xTicks = [[0, formatFullDate(sessions[0].date)]];
+  const firstYear = Number(sessions[0].date.slice(0, 4)), lastYear = Number(sessions[sessions.length - 1].date.slice(0, 4));
+  for (let y = firstYear + 1; y <= lastYear; y++) {
+    const x = (Date.parse(`${y}-01-01`) - start) / 86400000;
+    if (x > span * 0.12 && x < span * 0.88) xTicks.push([x, y]);
+  }
+  if (span > 1) xTicks.push([span, formatFullDate(sessions[sessions.length - 1].date)]);
+  const yFormat = v => total < 10 ? `${v.toFixed(1)}h` : `${Math.round(v)}h`;
+  return lineChartSvg([{ label: 'Total', color: 'var(--primary-green)', points, width: 3 }], { xMax: span, xTicks, yFormat, width: 640, height: 300 });
+}
+
+// How many sessions fall in each length, and the time they add up to
+const SESSION_LENGTH_BUCKETS = [
+  { label: 'Under 30m', max: 1800 }, { label: '30m – 2h', max: 7200 }, { label: '2h – 4h', max: 14400 },
+  { label: '4h – 8h', max: 28800 }, { label: '8h+', max: Infinity }
+];
+function gameSessionLengthsHtml(sessions) {
+  const buckets = SESSION_LENGTH_BUCKETS.map(b => ({ ...b, count: 0, seconds: 0 }));
+  sessions.forEach(s => { const bucket = buckets.find(b => s.sec < b.max); bucket.count++; bucket.seconds += s.sec; });
+  const max = Math.max(...buckets.map(b => b.count), 1);
+  const total = sessions.reduce((sum, s) => sum + s.sec, 0);
+  const sorted = sessions.map(s => s.sec).sort((a, b) => a - b);
+  return `
+    <div class="score-dist-summary">Average <strong>${formatTime(total / sessions.length)}</strong>, median <strong>${formatTime(sorted[Math.floor(sorted.length / 2)])}</strong> across ${sessions.length} session${sessions.length === 1 ? '' : 's'}</div>
+    ${buckets.map(b => `
+      <div class="score-dist-row">
+        <span class="score-dist-label session-length-label">${b.label}</span>
+        <div class="score-dist-track"><div class="score-dist-bar" style="width: ${(b.count / max) * 100}%;"></div></div>
+        <span class="score-dist-count session-length-count">${b.count} · ${formatTime(b.seconds)}</span>
+      </div>
+    `).join('')}
+  `;
 }
 
 // --- FULL GAME ARCHIVE ---

@@ -1449,3 +1449,32 @@ section[data-tab][hidden] { display: none; }
   .glance-row { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 .now-playing-idle { opacity: 0.55; border-left-color: var(--border-table); }
+
+/* --- NEW PAGES: Within Reach, Year in Review, Partners, Compare, Ratings --- */
+.chart-legend { display: flex; flex-wrap: wrap; gap: 6px 18px; justify-content: center; margin-top: 12px; font-size: 0.85rem; font-weight: 800; color: var(--text-title); }
+.chart-legend span { display: flex; align-items: center; gap: 6px; }
+.chart-legend i { width: 14px; height: 4px; border-radius: 2px; display: inline-block; }
+.reach-intro { text-align: center; color: var(--text-muted); font-weight: 600; font-size: 0.9rem; }
+.reach-link { color: var(--primary-green); font-weight: 800; text-decoration: none; white-space: nowrap; }
+.reach-link:hover { text-decoration: underline; }
+.reach-done { border-left-color: var(--status-completed); opacity: 0.75; }
+.review-more { margin-top: 10px; justify-content: center; }
+.partner-bars { height: 150px; }
+.compare-controls { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: center; margin-bottom: 20px; }
+.compare-controls .spotlight-filter { flex: 1 1 240px; max-width: 420px; }
+.compare-vs { font-weight: 900; color: var(--text-muted); text-transform: uppercase; }
+.compare-name { font-size: 1.4rem; font-weight: 900; }
+.compare-sub { font-size: 0.8rem; font-weight: 600; color: var(--text-muted); margin-top: 2px; }
+.compare-chart-title { margin-top: 24px; border-bottom: none; margin-bottom: 6px; }
+.session-length-label { width: 86px; white-space: nowrap; }
+.session-length-count { width: auto; min-width: 110px; white-space: nowrap; }
+.milestone-kind-buttons { padding-top: 4px; }
+.milestone-kind-buttons[hidden] { display: none; }
+.milestone-kind { font-size: 0.78rem; padding: 5px 10px; }
+.log-search-table { margin-top: 16px; }
+@media (max-width: 700px) {
+  .h2h-table { font-size: 0.9rem; }
+  .h2h-table td { padding: 12px 4px; }
+  .compare-name { font-size: 1.05rem; }
+}
+.page-stack { display: flex; flex-direction: column; gap: 30px; width: 100%; }

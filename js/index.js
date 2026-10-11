@@ -5,6 +5,7 @@
 function initIndexPage() {
   renderIndexGlance();
   renderNowPlaying();
+  renderYearPace();
   setupIndexTabs();
   setupDropdowns();
   setupLiveSearch();
@@ -76,9 +77,67 @@ function renderNowPlaying() {
   }).join('')}</div>`;
 }
 
+// --- INDEX: year pace and recent records ---
+// Running total of hours through each year, with this year projected to December 31 at its pace so far
+function renderYearPace() {
+  const container = document.getElementById('year-pace-content');
+  if (!container) return;
+  const today = dataDateKey();
+  const thisYear = today.slice(0, 4), lastYear = String(Number(thisYear) - 1);
+  const todayIndex = dayOfYear(today);
+  const lines = {}, totals = {}, atThisPoint = {};
+  rawData.allEntries.forEach(e => {
+    const y = e.date.slice(0, 4), x = dayOfYear(e.date), h = timeStringToSeconds(e.time) / 3600;
+    totals[y] = (totals[y] || 0) + h;
+    if (x <= todayIndex) atThisPoint[y] = totals[y];
+    const line = lines[y] = lines[y] || [[0, 0]];
+    if (line[line.length - 1][0] === x) line[line.length - 1][1] = totals[y]; else line.push([x, totals[y]]);
+  });
+  const now = totals[thisYear] || 0;
+  const yearLength = Number(thisYear) % 4 === 0 ? 366 : 365;
+  const projected = now / (todayIndex + 1) * yearLength;
+  const best = Object.entries(totals).filter(([y]) => y !== thisYear).sort((a, b) => b[1] - a[1])[0];
+  const OTHER = 'var(--text-muted)', LAST = '#00b4d8', THIS = 'var(--primary-green)';
+  const series = Object.keys(lines).sort().map(y => ({
+    label: y, points: lines[y], color: y === thisYear ? THIS : y === lastYear ? LAST : OTHER,
+    width: y === thisYear ? 3.5 : y === lastYear ? 2.5 : 1.5, opacity: y === thisYear || y === lastYear ? 1 : 0.4
+  }));
+  // Draw this year last so it sits on top, with its projection
+  series.sort((a, b) => a.width - b.width);
+  series.push({ label: `${thisYear} projected`, points: [[todayIndex, now], [yearLength - 1, projected]], color: THIS, width: 2.5, dashed: true });
+  const xTicks = MONTH_NAMES.map((name, m) => [dayOfYear(`2001-${String(m + 1).padStart(2, '0')}-15`), name.slice(0, 3)]);
+  const hoursText = h => `${Math.round(h).toLocaleString()}h`;
+  const diff = (a, b, label) => `<span class="tf-compare ${a >= b ? 'tf-up' : 'tf-down'}">${a >= b ? '▲' : '▼'} ${hoursText(Math.abs(a - b))} vs ${label}</span>`;
+  const stat = (label, value, extra = '') => `<div class="tf-stat"><span class="sys-widget-title">${label}</span><strong>${value}</strong>${extra}</div>`;
+  container.innerHTML = `
+    <div class="tf-stats">
+      ${stat(`${thisYear} So Far`, hoursText(now), `<span class="tf-sub">through ${formatFullDate(today)}</span>`)}
+      ${atThisPoint[lastYear] !== undefined ? stat(`${lastYear} at This Point`, hoursText(atThisPoint[lastYear]), diff(now, atThisPoint[lastYear], lastYear)) : ''}
+      ${stat('Projected Year-End', hoursText(projected), totals[lastYear] ? diff(projected, totals[lastYear], `${lastYear}'s ${hoursText(totals[lastYear])}`) : '')}
+      ${best ? stat('Busiest Year', hoursText(best[1]), `<span class="tf-sub">${best[0]}</span>`) : ''}
+    </div>
+    ${lineChartSvg(series, { xMax: 365, xTicks, width: 640, height: 300 })}
+    ${chartLegendHtml([{ label: thisYear, color: THIS }, { label: lastYear, color: LAST }, { label: 'Earlier years', color: OTHER }])}
+  `;
+}
+
+// Spotlight records that changed hands (or were extended) in the last RECENT_RECORD_DAYS days of the log
+const RECENT_RECORD_DAYS = 30;
+function renderRecentRecords() {
+  const container = document.getElementById('recent-records-list');
+  if (!container || !rawData.metrics.milestones) return;
+  const cutoff = Date.parse(dataDateKey()) - RECENT_RECORD_DAYS * 86400000;
+  const recent = rawData.metrics.milestones.filter(m => m.type === 'record' && Date.parse(String(m.date).slice(0, 10)) >= cutoff)
+    .sort((a, b) => new Date(b.date) - new Date(a.date));
+  container.innerHTML = recent.length
+    ? `<div class="goty-gap-subtitle">${recent.length} Spotlight record${recent.length === 1 ? '' : 's'} set in the last ${RECENT_RECORD_DAYS} days. <a href="milestones.html" class="reach-link">All milestones</a> · <a href="reach.html" class="reach-link">What's within reach</a></div>${recent.map(milestoneItemHtml).join('')}`
+    : `<div class="loading-text">No Spotlight records changed in the last ${RECENT_RECORD_DAYS} days.</div>`;
+}
+
 // Tabs show one group of index sections at a time; the choice is remembered and linkable (#rankings)
 // Data only one Index tab shows is downloaded the first time that tab opens, then its cards are drawn
 const INDEX_TAB_DATA = {
+  overview: { groups: ['milestones'], cards: ['recent-records-list'], render: renderRecentRecords },
   rankings: { groups: ['sessions'], cards: ['longest-session-list'], render: () => renderLongestSession(document.getElementById('year-select-session').value) },
   breakdowns: { groups: ['analysis'], cards: ['analysis-content'], render: () => renderAnalysis(document.getElementById('analysis-select').value, 'analysis-content') },
   history: { groups: ['milestones'], cards: ['milestones-list'], render: () => renderMilestones('milestones-list') },

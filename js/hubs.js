@@ -653,6 +653,13 @@ function buildAnalyticsHub(containerId, dataKey, titleLabel) {
         </div>
       </section>
 
+      <section class="card-row grid-1">
+        <div class="card">
+          <div class="card-header"><h2>Spotlight Records: ${escapeHTML(valName)}</h2></div>
+          <div class="card-content" id="hub-spotlight-records"><div class="loading-text">Loading Spotlight records...</div></div>
+        </div>
+      </section>
+
       <section class="card-row grid-strict-3">
         <div class="card hub-sessions-card">
           <div class="hub-session-first">
@@ -855,6 +862,7 @@ function buildAnalyticsHub(containerId, dataKey, titleLabel) {
     `;
     
     dynamicContainer.innerHTML = itemHtml;
+    renderHubSpotlightRecords(dataKey, valName);
 
     dynamicContainer.querySelectorAll('.card').forEach((card, index) => {
       card.style.animationDelay = `${Math.min(index * 0.05, 0.5)}s`;
@@ -869,6 +877,45 @@ function buildAnalyticsHub(containerId, dataKey, titleLabel) {
   hubSelect.value = initial;
   renderSelectedItem(initial);
   if (requested && hubData[requested]) hubSelect.scrollIntoView({ behavior: 'instant', block: 'start' });
+}
+
+// --- SPOTLIGHT RECORDS HELD BY A HUB ITEM ---
+// The Spotlight column heading that ranks each kind of hub item
+const HUB_SPOTLIGHT_HEADERS = { system: 'System', series: 'Series', genre: 'Genre', releaseYear: 'Release Year' };
+
+// Lists this system, franchise, genre or release year leads or appears in. The lists are downloaded only when needed.
+let _hubShownItem = null;
+function renderHubSpotlightRecords(dataKey, valName) {
+  _hubShownItem = valName;
+  const target = () => document.getElementById('hub-spotlight-records');
+  loadData(['lists']).then(() => {
+    // Another item may have been picked while the lists were loading
+    if (!target() || _hubShownItem !== valName) return;
+    const lists = rawData.metrics.top25Lists || [];
+    const slugs = spotlightSlugs(lists);
+    const leads = [], appearsIn = [];
+    let ownList = null;
+    lists.forEach((list, i) => {
+      if (/^Top Games by /.test(list.category) && (list.titleLeft === `Top 25 ${valName} Games` || list.titleLeft === `Top 25 ${valName}s Games`)) ownList = { title: list.titleLeft, slug: slugs[i] };
+      if (list.headersLeft[1] !== HUB_SPOTLIGHT_HEADERS[dataKey]) return;
+      const rowIndex = list.allTime.findIndex(row => String(row[1]) === valName);
+      if (rowIndex === -1) return;
+      // Tied rows leave the rank blank, so use the nearest rank above
+      let rank = '';
+      for (let r = rowIndex; r >= 0 && !rank; r--) rank = list.allTime[r][0] || '';
+      const entry = { title: list.titleLeft, slug: slugs[i], value: list.allTime[rowIndex][3], rank };
+      if (rowIndex === 0) leads.push(entry); else appearsIn.push(entry);
+    });
+    const row = e => `<a class="game-spotlight-item" href="spotlight.html#${e.slug}"><span><span class="game-spotlight-rank">${escapeHTML(String(e.rank))}</span>${escapeHTML(e.title)}</span><strong>${escapeHTML(String(e.value))}</strong></a>`;
+    target().innerHTML = `
+      ${ownList ? `<a class="game-spotlight-item" href="spotlight.html#${ownList.slug}"><span><span class="game-spotlight-rank">▶</span>${escapeHTML(ownList.title)}</span><strong>Open list</strong></a>` : ''}
+      ${leads.length ? `<div class="game-spotlight-heading">Holds #1 in ${leads.length} list${leads.length === 1 ? '' : 's'}</div>${leads.map(row).join('')}` : '<div class="game-spotlight-heading">Not #1 in any Spotlight list</div>'}
+      ${appearsIn.length ? `<div class="game-spotlight-heading">Also ranked in ${appearsIn.length} list${appearsIn.length === 1 ? '' : 's'}</div>${appearsIn.map(row).join('')}` : ''}
+    `;
+  }).catch(error => {
+    console.error("Dashboard Error:", error);
+    if (target()) target().innerHTML = `<div class="loading-text">Spotlight records could not be loaded.</div>`;
+  });
 }
 
 // --- SCORE CHARTS (hub deep dives) ---

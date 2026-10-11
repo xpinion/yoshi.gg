@@ -5,6 +5,7 @@
 //   index.js      Index widgets; also uses timeframe, game, spotlight, metrics, analysis and history
 //   timeframe.js  Monthly and Yearly        hubs.js        Systems, Franchise, Genre, Release Year
 //   completions.js, goty.js, game.js, spotlight.js, metrics.js, milestones.js, analysis.js, history.js
+//   reach.js (Within Reach), review.js (Year in Review), partner.js, compare.js, ratings.js (also uses hubs)
 
 // Global State
 let rawData = null;
@@ -135,10 +136,10 @@ function escapeHTML(str) {
 // --- UPDATE: GLOBAL HEADER ---
 const NAV_GROUPS = [
   { label: 'Index', href: 'index.html' },
-  { label: 'Log', links: [['Monthly', 'monthly.html'], ['Yearly', 'yearly.html'], ['History', 'history.html'], ['Completions', 'completions.html']] },
-  { label: 'Collections', links: [['Systems', 'systems.html'], ['Franchise', 'franchise.html'], ['Genre', 'genre.html'], ['Release Year', 'releaseyear.html']] },
-  { label: 'Records', links: [['Spotlight', 'spotlight.html'], ['Milestones', 'milestones.html'], ['GotY', 'goty.html']] },
-  { label: 'Stats', links: [['Analysis', 'analysis.html'], ['Metrics', 'metrics.html']] }
+  { label: 'Log', links: [['Monthly', 'monthly.html'], ['Yearly', 'yearly.html'], ['Year in Review', 'review.html'], ['History', 'history.html'], ['Completions', 'completions.html']] },
+  { label: 'Collections', links: [['Systems', 'systems.html'], ['Franchise', 'franchise.html'], ['Genre', 'genre.html'], ['Release Year', 'releaseyear.html'], ['Partners', 'partner.html']] },
+  { label: 'Records', links: [['Spotlight', 'spotlight.html'], ['Milestones', 'milestones.html'], ['Within Reach', 'reach.html'], ['GotY', 'goty.html']] },
+  { label: 'Stats', links: [['Analysis', 'analysis.html'], ['Metrics', 'metrics.html'], ['Ratings', 'ratings.html'], ['Compare', 'compare.html']] }
 ];
 
 function renderGlobalHeader() {
@@ -216,9 +217,11 @@ function renderGlobalHeader() {
 const DATA_GROUPS = ['core', 'entries', 'playthroughs', 'games', 'genres', 'analysis', 'lists', 'milestones', 'sessions'];
 // Groups each page needs, counting everything its dropdowns can show. A page not listed loads them all.
 // If a page starts reading something new, add its group here (tools/usage.js lists what a page reads).
+// The hub pages (Systems, Franchise, Genre, Release Year) also fetch 'lists' after drawing, for their Spotlight records card.
 const PAGE_DATA = {
   'index.html': ['entries', 'playthroughs', 'games', 'genres'], // its other tabs load theirs: see INDEX_TAB_DATA
   'analysis.html': ['analysis'],
+  'compare.html': ['entries', 'playthroughs'],
   'completions.html': ['entries', 'playthroughs'],
   'franchise.html': ['entries', 'playthroughs', 'games'],
   'game.html': ['entries', 'playthroughs', 'games', 'milestones', 'lists'],
@@ -228,7 +231,11 @@ const PAGE_DATA = {
   'metrics.html': ['entries', 'games', 'genres'],
   'milestones.html': ['milestones'],
   'monthly.html': ['entries', 'playthroughs', 'games', 'genres'],
+  'partner.html': ['entries'],
+  'ratings.html': ['games'],
+  'reach.html': ['entries', 'playthroughs', 'games', 'lists'],
   'releaseyear.html': ['entries', 'playthroughs', 'games'],
+  'review.html': ['entries', 'playthroughs', 'milestones'],
   'spotlight.html': ['lists'],
   'systems.html': ['entries', 'playthroughs', 'games'],
   'yearly.html': ['entries', 'playthroughs', 'games', 'genres']
@@ -238,6 +245,7 @@ const PAGE_DATA = {
 const PAGE_INIT = {
   'index.html': () => initIndexPage(),
   'analysis.html': () => initAnalysisPage(),
+  'compare.html': () => initComparePage(),
   'completions.html': () => initCompletionsPage(),
   'franchise.html': () => initFranchisePage(),
   'game.html': () => initGamePage(),
@@ -247,7 +255,11 @@ const PAGE_INIT = {
   'metrics.html': () => initMetricsPage(),
   'milestones.html': () => initMilestonesPage(),
   'monthly.html': () => initMonthlyPage(),
+  'partner.html': () => initPartnerPage(),
+  'ratings.html': () => initRatingsPage(),
+  'reach.html': () => initReachPage(),
   'releaseyear.html': () => initReleaseYearPage(),
+  'review.html': () => initReviewPage(),
   'spotlight.html': () => initSpotlightPage(),
   'systems.html': () => initSystemsPage(),
   'yearly.html': () => initYearlyPage()
@@ -503,6 +515,95 @@ function spotlightSlugs(lists) {
   });
 }
 
+
+// --- MULTIPLAYER PARTNERS ---
+// The people with their own multiplayer lists, as set in the Apps Script config: [{ name, noteNames }]
+function getPartners() { return rawData.partners || []; }
+function isMultiplayerEntry(e) { return e.status === 'Multiplayer' || e.status === 'M-Completed'; }
+// Multiplayer sessions whose note mentions the partner (any spelling in noteNames)
+function partnerEntries(partner) {
+  return rawData.allEntries.filter(e => isMultiplayerEntry(e) && partner.noteNames.some(n => (e.note || '').toUpperCase().includes(n)));
+}
+
+// --- SHARED SUMMARIES AND CHARTS ---
+// Totals for any set of log entries (oldest first), used by the Compare, Partner and Year in Review pages
+function summarizeEntries(entries) {
+  const sum = {
+    entries, seconds: 0, multiplayerSeconds: 0, sessions: entries.length, days: new Set(), games: new Map(), systems: new Map(),
+    genres: new Map(), series: new Map(), byYear: {}, byMonth: {}, byWeekday: [0, 0, 0, 0, 0, 0, 0], longest: null,
+    first: entries.length ? entries[0] : null, last: entries.length ? entries[entries.length - 1] : null
+  };
+  const add = (map, key, sec) => { if (key && key !== 'N/A' && key !== 'ZZNONE') map.set(key, (map.get(key) || 0) + sec); };
+  entries.forEach(e => {
+    const sec = timeStringToSeconds(e.time), day = e.date.slice(0, 10);
+    sum.seconds += sec;
+    if (isMultiplayerEntry(e)) sum.multiplayerSeconds += sec;
+    sum.days.add(day);
+    add(sum.games, e.game, sec); add(sum.systems, e.system, sec); add(sum.genres, e.genre, sec); add(sum.series, e.series, sec);
+    sum.byYear[day.slice(0, 4)] = (sum.byYear[day.slice(0, 4)] || 0) + sec;
+    sum.byMonth[day.slice(0, 7)] = (sum.byMonth[day.slice(0, 7)] || 0) + sec;
+    sum.byWeekday[new Date(e.date).getUTCDay()] += sec;
+    if (!sum.longest || sec > sum.longest.sec) sum.longest = { sec, entry: e };
+  });
+  return sum;
+}
+// Days since January 1 of the date's own year (0 for January 1), from a "YYYY-MM-DD..." string
+function dayOfYear(date) {
+  return Math.round((Date.parse(date.slice(0, 10)) - Date.parse(date.slice(0, 4) + '-01-01')) / 86400000);
+}
+// [[name, seconds], ...] from one of a summary's maps, longest first
+function topOfMap(map, limit = 10) { return [...map.entries()].sort((a, b) => b[1] - a[1]).slice(0, limit); }
+// The longest run of back-to-back days in a set of "YYYY-MM-DD" days: { length, start, end }
+function longestDayStreak(days) {
+  let best = { length: 0, start: null, end: null }, run = null;
+  [...days].sort().forEach(day => {
+    const t = Date.parse(day + 'T12:00:00Z');
+    run = run && Math.round((t - run.endTime) / 86400000) === 1 ? { ...run, length: run.length + 1, end: day, endTime: t } : { length: 1, start: day, end: day, endTime: t };
+    if (run.length > best.length) best = run;
+  });
+  return best;
+}
+// A ranked list in the site's list-item style. rows: [{ title, sub, badge, game }]; game makes the title a profile link
+function rankedListHtml(rows, emptyText = 'Nothing to show.') {
+  if (rows.length === 0) return `<div class="loading-text">${emptyText}</div>`;
+  return rows.map((row, i) => `
+    <div class="list-item">
+      <div class="item-info">
+        <span class="item-rank">${row.rank !== undefined ? escapeHTML(String(row.rank)) : `#${i + 1}`}</span>
+        <div class="item-text">
+          <span class="item-title${row.game ? ' hover-trigger' : ''}"${row.game ? ` data-game="${escapeHTML(row.game)}"` : ''}>${escapeHTML(row.title)}</span>
+          ${row.sub ? `<span class="item-sub">${escapeHTML(row.sub)}</span>` : ''}
+        </div>
+      </div>
+      ${row.badge !== undefined ? `<div class="item-badge">${escapeHTML(String(row.badge))}</div>` : ''}
+    </div>`).join('');
+}
+// Line chart. series: [{ label, color, points: [[x, y], ...], width, dashed, opacity }]; xTicks: [[x, label], ...]
+// width is the drawing's own width: pass about 600 for a chart in a half-width card so its labels stay readable
+function lineChartSvg(series, { xMin = 0, xMax, xTicks = [], yFormat = v => `${Math.round(v)}h`, width = 1000, height = 320 } = {}) {
+  const padL = 60, padR = 20, padT = 16, padB = 34;
+  const innerW = width - padL - padR, innerH = height - padT - padB;
+  const yMax = Math.max(1, ...series.flatMap(s => s.points.map(p => p[1]))) * 1.05;
+  const x = v => padL + ((v - xMin) / Math.max(1e-9, xMax - xMin)) * innerW;
+  const y = v => padT + innerH - (v / yMax) * innerH;
+  let svg = `<svg class="hub-chart" viewBox="0 0 ${width} ${height}">`;
+  [0, 0.25, 0.5, 0.75, 1].forEach(f => {
+    svg += `<line x1="${padL}" y1="${y(f * yMax)}" x2="${width - padR}" y2="${y(f * yMax)}" stroke="var(--border-table)" />`;
+    svg += `<text x="${padL - 8}" y="${y(f * yMax) + 4}" font-family="Inter, sans-serif" font-size="11" font-weight="600" fill="var(--text-muted)" text-anchor="end">${yFormat(f * yMax)}</text>`;
+  });
+  xTicks.forEach(([v, label]) => {
+    svg += `<text x="${x(v)}" y="${height - 10}" font-family="Inter, sans-serif" font-size="11" font-weight="700" fill="var(--text-muted)" text-anchor="middle">${escapeHTML(String(label))}</text>`;
+  });
+  series.forEach(s => {
+    if (s.points.length === 0) return;
+    const path = s.points.map((p, i) => `${i ? 'L' : 'M'}${x(p[0]).toFixed(1)},${y(p[1]).toFixed(1)}`).join(' ');
+    svg += `<path d="${path}" fill="none" stroke="${s.color}" stroke-width="${s.width || 2}" stroke-linejoin="round" opacity="${s.opacity || 1}"${s.dashed ? ' stroke-dasharray="6 5"' : ''}><title>${escapeHTML(s.label)}: ${yFormat(s.points[s.points.length - 1][1])}</title></path>`;
+  });
+  return svg + `</svg>`;
+}
+function chartLegendHtml(items) {
+  return `<div class="chart-legend">${items.map(i => `<span><i style="background: ${i.color};"></i>${escapeHTML(i.label)}</span>`).join('')}</div>`;
+}
 
 // --- PHONE CARD LAYOUT FOR SUMMARY TABLES ---
 // Gives each cell of a .monthly-table a data-label from its column header(s), e.g. "Active Month · Time",
