@@ -165,19 +165,7 @@ function initGamePage() {
   setupGameProfileSearch(allGames);
 
   const shareButton = document.getElementById('game-share');
-  if (shareButton) shareButton.addEventListener('click', () => openShareCard({
-    kicker: 'Game Profile', title: gameName,
-    subtitle: [systems.join(', '), meta.releaseYear, meta.genre].filter(v => v && v !== 'Unknown').join(' · '),
-    stats: [
-      { label: 'Total Time', value: formatTime(totalSeconds) }, { label: 'Days Played', value: days.size },
-      { label: 'Longest Session', value: formatTime(longest.sec) },
-      score !== null ? { label: 'Score', value: formatScore(score) } : { label: 'Sessions', value: sessions.length }
-    ],
-    // Spotlight records first; a game without any shows its playthroughs
-    rows: leads.length || appearsIn.length
-      ? [...leads, ...appearsIn].map(e => ({ left: `${e.rank} in ${e.title}`, right: String(e.value) }))
-      : playthroughs.map(pt => ({ left: `${pt.finalStatus} · ${formatFullDate(pt.startDate)} to ${formatFullDate(pt.lastDate)}`, right: pt.finalPtLifetime }))
-  }));
+  if (shareButton) shareButton.addEventListener('click', () => openShareCard(buildGameCard(gameName)));
 }
 
 function setupGameProfileSearch(allGames) {

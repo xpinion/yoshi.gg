@@ -1502,6 +1502,10 @@ section[data-tab][hidden] { display: none; }
 /* The buttons stay in view while a tall card scrolls */
 .share-actions { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; position: sticky; bottom: 0; padding: 14px 0 16px; background: var(--card-bg); }
 .share-actions .share-btn { font-size: 0.9rem; padding: 9px 16px; }
+/* Share Cards page: the buttons sit above the card */
+.card-page-actions { position: static; padding: 6px 0 14px; }
+.card-preview img { display: block; width: 100%; height: auto; border-radius: 8px; border: 1px solid var(--border-table); }
+#hub-share-link { margin-left: 10px; font-size: 0.8rem; }
 
 /* --- INDEX HIGHLIGHT --- */
 .index-highlight { display: flex; align-items: center; gap: 12px; background: var(--card-bg); border-radius: 12px; padding: 14px 16px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); border-left: 6px solid var(--primary-green); }

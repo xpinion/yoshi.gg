@@ -141,7 +141,7 @@ const NAV_GROUPS = [
   { label: 'Log', links: [['Monthly', 'monthly.html'], ['Yearly', 'yearly.html'], ['Year in Review', 'review.html'], ['Timeline', 'timeline.html'], ['History', 'history.html'], ['Completions', 'completions.html']] },
   { label: 'Collections', links: [['Systems', 'systems.html'], ['Franchise', 'franchise.html'], ['Genre', 'genre.html'], ['Release Year', 'releaseyear.html'], ['Partners', 'partner.html']] },
   { label: 'Records', links: [['Spotlight', 'spotlight.html'], ['Milestones', 'milestones.html'], ['Within Reach', 'reach.html'], ['GotY', 'goty.html']] },
-  { label: 'Stats', links: [['Analysis', 'analysis.html'], ['Metrics', 'metrics.html'], ['Ratings', 'ratings.html'], ['Patterns', 'patterns.html'], ['Compare', 'compare.html'], ['Data Checks', 'checks.html']] }
+  { label: 'Stats', links: [['Analysis', 'analysis.html'], ['Metrics', 'metrics.html'], ['Ratings', 'ratings.html'], ['Patterns', 'patterns.html'], ['Compare', 'compare.html'], ['Share Cards', 'card.html'], ['Data Checks', 'checks.html']] }
 ];
 
 function renderGlobalHeader() {
@@ -224,6 +224,7 @@ const DATA_GROUPS = ['core', 'entries', 'playthroughs', 'games', 'genres', 'anal
 const PAGE_DATA = {
   'index.html': ['entries', 'playthroughs', 'games', 'genres'], // its other tabs load theirs: see INDEX_TAB_DATA
   'analysis.html': ['analysis'],
+  'card.html': ['entries', 'playthroughs', 'games', 'milestones', 'lists'],
   'checks.html': ['entries', 'playthroughs'],
   'compare.html': ['entries', 'playthroughs'],
   'completions.html': ['entries', 'playthroughs'],
@@ -251,6 +252,7 @@ const PAGE_DATA = {
 const PAGE_INIT = {
   'index.html': () => initIndexPage(),
   'analysis.html': () => initAnalysisPage(),
+  'card.html': () => initCardPage(),
   'checks.html': () => initChecksPage(),
   'compare.html': () => initComparePage(),
   'completions.html': () => initCompletionsPage(),
