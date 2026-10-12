@@ -2,7 +2,6 @@
 
 // How many rows a check shows before it says how many more there are
 const CHECK_MAX_ROWS = 100;
-const CHECK_LONG_SESSION_HOURS = 12;
 const CHECK_STALE_ACTIVE_DAYS = 365;
 
 function initChecksPage() {
@@ -87,23 +86,15 @@ function initChecksPage() {
   entries.forEach(e => { (sameDay[`${e.date.slice(0, 10)}|${e.ptTag}`] = sameDay[`${e.date.slice(0, 10)}|${e.ptTag}`] || []).push(e); });
   add('info', 'The same playthrough logged twice on one day', 'Fine if it really was two sittings, but it can also be a pasted row.',
     [...ENTRY_HEADERS, 'Tag'], Object.values(sameDay).filter(list => list.length > 1).flat().map(e => [...entryCells(e), escapeHTML(e.ptTag)]).reverse());
-  add('info', `Sessions over ${CHECK_LONG_SESSION_HOURS} hours`, 'Real marathons, or an extra digit.',
-    ENTRY_HEADERS, entries.filter(e => timeStringToSeconds(e.time) > CHECK_LONG_SESSION_HOURS * 3600).sort((a, b) => timeStringToSeconds(b.time) - timeStringToSeconds(a.time)).map(entryCells));
   add('info', `Active playthroughs untouched for over ${CHECK_STALE_ACTIVE_DAYS} days`, 'They still count as being played. Mark them Abandoned if they\'re done with.',
     ['Videogame', 'Tag', 'Last Played', 'Days Ago', 'Time'], playthroughs.filter(pt => pt.finalStatus === 'Active' && (today - Date.parse(String(pt.lastDate).slice(0, 10))) / 86400000 > CHECK_STALE_ACTIVE_DAYS)
       .sort((a, b) => String(a.lastDate).localeCompare(String(b.lastDate)))
       .map(pt => [game(pt.gameName), escapeHTML(pt.ptTag || ''), formatFullDate(pt.lastDate), Math.round((today - Date.parse(String(pt.lastDate).slice(0, 10))) / 86400000), pt.finalPtLifetime]));
-  const systemCounts = {};
-  entries.forEach(e => { (systemCounts[e.system] = systemCounts[e.system] || []).push(e); });
-  add('info', 'Systems with a single entry', 'A real one-off, or a typo of another system\'s name.',
-    ['System', ...ENTRY_HEADERS.filter(h => h !== 'System')], Object.entries(systemCounts).filter(([, list]) => list.length === 1).map(([system, [e]]) => [escapeHTML(system), e.entryNum, formatFullDate(e.date), game(e.game), e.time]));
   if (getPartners().length) {
     const names = getPartners().flatMap(p => p.noteNames);
     add('info', 'Multiplayer sessions that name nobody', `The note mentions none of ${getPartners().map(p => p.name).join(' or ')}, so the session is in no partner's lists. Fine for online play with others.`,
       [...ENTRY_HEADERS, 'Note'], entries.filter(e => isMultiplayerEntry(e) && !names.some(n => (e.note || '').toUpperCase().includes(n))).reverse().map(e => [...entryCells(e), escapeHTML(e.note)]));
   }
-  add('info', 'On the Metadata sheet but never played', 'Scored or listed games with no log entry. Expected for a wishlist; otherwise check the spelling against the log.',
-    ['Videogame', 'Release Year', 'Score'], metaGames.filter(g => !lastPlayed[g.name]).sort((a, b) => a.name.localeCompare(b.name)).map(g => [escapeHTML(g.name), escapeHTML(g.releaseYear), g.score === null ? '-' : formatScore(g.score)]));
 
   const problems = checks.filter(c => c.level === 'fix' && c.rows.length);
   const checkHtml = c => `
