@@ -191,6 +191,7 @@ function renderGlobalHeader() {
       closeAll(group);
       group.classList.toggle('open', open);
       button.setAttribute('aria-expanded', String(open));
+      if (!open) button.blur(); // or the focused button would hold the menu open
     });
   });
   document.addEventListener('click', e => { if (!e.target.closest('.nav-group')) closeAll(); });

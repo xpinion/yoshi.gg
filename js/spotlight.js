@@ -46,7 +46,8 @@ function generateWRPTrackerHtml(wrpData, isGameList = true) {
   `;
 }
 
-function generateUniversalDualTableHtml(listObj) {
+// directoryRowId: on the Spotlight page, the id of this list's row in the directory, for the "Directory" button
+function generateUniversalDualTableHtml(listObj, directoryRowId = '') {
   const renderTable = (rows, headers) => {
     let html = `<table class="top25-table">
     <thead>
@@ -114,7 +115,7 @@ function generateUniversalDualTableHtml(listObj) {
 
   return `
   <div class="card-header" style="display: flex; justify-content: space-between; border-bottom: 2px solid var(--border-light); padding: 15px 20px;">
-  <h2 class="spotlight-list-title">${escapeHTML(listObj.titleLeft)}${typeof openShareCard === 'function' ? ` ${shareButtonHtml(`data-share-list="${rawData.metrics.top25Lists.indexOf(listObj)}"`)}` : ''}</h2>
+  <h2 class="spotlight-list-title">${escapeHTML(listObj.titleLeft)}${typeof openShareCard === 'function' ? ` ${shareButtonHtml(`data-share-list="${rawData.metrics.top25Lists.indexOf(listObj)}"`)}` : ''}${directoryRowId ? ` <a href="#${directoryRowId}" class="share-btn spotlight-back" title="Back to this list's row in the directory">↑ Directory</a>` : ''}</h2>
   <h2 class="spotlight-list-title">${escapeHTML(listObj.titleRight)}</h2>
   </div>
   <div class="card-content" style="padding: 0;">
@@ -131,20 +132,37 @@ function generateUniversalDualTableHtml(listObj) {
   `;
 }
 
-// Share card for a list: its top rows, with ranks filled in where ties left them blank
+// Share card for a list: both tables in full, with every column the page shows
 document.addEventListener('click', e => {
   const button = e.target.closest('.share-btn[data-share-list]');
   if (!button) return;
   const list = rawData.metrics.top25Lists[Number(button.dataset.shareList)];
   if (!list) return;
-  let rank = '';
+  const table = (title, headers, rows) => ({
+    title, headers: [headers[0], headers[1], headers[3], headers[4], headers[5]],
+    rows: rows.map(row => ({
+      key: String(row[0] || ''), name: String(row[1] || ''), context: String(row[2] || ''), value: String(row[3] || ''),
+      start: String(row[4] || ''), end: String(row[5] || ''), sub: String(row[6] || ''), empty: row[7] === true
+    }))
+  });
   openShareCard({
     kicker: `Spotlight · ${list.category}`, title: list.titleLeft,
-    rows: list.allTime.slice(0, 9).map(row => {
-      rank = row[0] || rank;
-      return { left: `${rank} ${row[1]}${row[2] ? ` (${row[2]})` : ''}`, right: String(row[3]) };
-    })
+    tables: [table(list.titleLeft, list.headersLeft, list.allTime), table(list.titleRight, list.headersRight, list.yearly)]
   });
+});
+
+// "Directory" button on a list: back to its row in the directory, opening that section if it was collapsed
+document.addEventListener('click', e => {
+  const link = e.target.closest('.spotlight-back');
+  if (!link) return;
+  const row = document.getElementById(link.getAttribute('href').slice(1));
+  if (!row) return;
+  e.preventDefault();
+  row.closest('details').open = true;
+  row.scrollIntoView({ behavior: 'instant', block: 'center' }); // instant: the page is too long for a smooth scroll to land
+  row.classList.remove('toc-flash');
+  void row.offsetWidth; // restarts the highlight if the same row is jumped to twice
+  row.classList.add('toc-flash');
 });
 
 // Routes to spotlight.html
@@ -232,7 +250,7 @@ function initSpotlightPage() {
       const rowClass = isActive ? 'class="toc-active-row"' : '';
 
       html += `
-        <tr ${rowClass} data-list="${item.index}">
+        <tr ${rowClass} data-list="${item.index}" id="toc-${slugs[item.index]}">
           <td><a href="#${slugs[item.index]}" class="toc-link">▶ ${escapeHTML(item.title)}</a></td>
           <td style="font-weight: 800; color: var(--text-title);">
             ${escapeHTML(item.recordName)}${contextHtml}
@@ -253,7 +271,7 @@ function initSpotlightPage() {
     html += `
     <section id="${slugs[index]}" data-list="${index}" class="card-row grid-1" style="margin-bottom: 30px; scroll-margin-top: 80px;">
       <div class="card" style="max-height: none; padding: 0;">
-        ${generateUniversalDualTableHtml(list)}
+        ${generateUniversalDualTableHtml(list, `toc-${slugs[index]}`)}
       </div>
     </section>
     `;

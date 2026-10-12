@@ -1350,8 +1350,12 @@ body.dark-theme .cal-l5 { fill: #9be9a8; }
   display: none; position: absolute; top: calc(100% + 6px); left: 0; min-width: 180px; padding: 6px;
   background: var(--card-bg); border-radius: 10px; box-shadow: 0 8px 24px var(--nav-shadow); z-index: 1001;
 }
-.nav-group:hover .nav-menu, .nav-group:focus-within .nav-menu, .nav-group.open .nav-menu { display: flex; flex-direction: column; }
-.nav-group:hover .nav-menu::before { content: ''; position: absolute; top: -8px; left: 0; right: 0; height: 8px; }
+.nav-group:focus-within .nav-menu, .nav-group.open .nav-menu { display: flex; flex-direction: column; }
+/* Hover opens the menus only with a mouse: on a touch screen the hover starts mid-tap and would move the links */
+@media (hover: hover) {
+  .nav-group:hover .nav-menu { display: flex; flex-direction: column; }
+  .nav-group:hover .nav-menu::before { content: ''; position: absolute; top: -8px; left: 0; right: 0; height: 8px; }
+}
 .nav-menu .nav-link { text-transform: none; font-size: 0.9rem; letter-spacing: 0; }
 .nav-menu .nav-link.active { box-shadow: inset 3px 0 0 var(--primary-green); border-radius: 0 8px 8px 0; background: var(--highlight-green-bg); }
 .site-tools { display: flex; align-items: center; gap: 8px; }
@@ -1383,7 +1387,7 @@ body.dark-theme .cal-l5 { fill: #9be9a8; }
   #global-header.menu-open .site-nav-panel { display: flex; }
   .site-nav { flex-direction: column; align-items: stretch; gap: 2px; }
   .nav-group-button { display: none; }
-  .nav-menu { display: flex !important; flex-direction: row; flex-wrap: wrap; position: static; box-shadow: none; padding: 0; background: none; min-width: 0; }
+  .nav-menu { display: flex !important; flex-direction: row !important; flex-wrap: wrap; position: static; box-shadow: none; padding: 0; background: none; min-width: 0; }
   .nav-group::before { content: attr(data-label); display: block; padding: 6px 12px 2px; font-size: 0.7rem; font-weight: 800; letter-spacing: 1px; text-transform: uppercase; color: var(--text-muted); }
   .site-tools { justify-content: space-between; }
   .site-search { flex: 1; width: auto; }
@@ -1489,10 +1493,14 @@ section[data-tab][hidden] { display: none; }
 .share-primary { background: var(--primary-green); border-color: var(--primary-green); color: #fff; }
 .share-primary:hover { color: #fff; opacity: 0.9; }
 .spotlight-list-title .share-btn { margin-left: 8px; font-size: 0.7rem; padding: 3px 9px; }
+.toc-flash td { animation: tocFlash 1.6s ease-out; }
+@keyframes tocFlash { from { box-shadow: inset 0 0 0 999px var(--highlight-green-bg), inset 0 3px 0 var(--primary-green), inset 0 -3px 0 var(--primary-green); } to { box-shadow: none; } }
 .share-modal { position: fixed; inset: 0; z-index: 3000; background: rgba(0, 0, 0, 0.7); display: flex; align-items: center; justify-content: center; padding: 16px; }
-.share-dialog { background: var(--card-bg); border-radius: 14px; padding: 16px; max-width: min(900px, 100%); box-shadow: 0 10px 40px rgba(0, 0, 0, 0.4); }
+.share-dialog { background: var(--card-bg); border-radius: 14px; padding: 16px 16px 0; max-width: min(900px, 100%); max-height: 100%; overflow-y: auto; box-shadow: 0 10px 40px rgba(0, 0, 0, 0.4); }
+.share-dialog.share-wide { max-width: min(1300px, 100%); }
 .share-dialog img { display: block; width: 100%; height: auto; border-radius: 8px; border: 1px solid var(--border-table); }
-.share-actions { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; margin-top: 14px; }
+/* The buttons stay in view while a tall card scrolls */
+.share-actions { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; position: sticky; bottom: 0; padding: 14px 0 16px; background: var(--card-bg); }
 .share-actions .share-btn { font-size: 0.9rem; padding: 9px 16px; }
 
 /* --- INDEX HIGHLIGHT --- */

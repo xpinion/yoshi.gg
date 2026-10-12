@@ -41,6 +41,17 @@ function renderIndexGlance() {
   const key = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
   while (daySeconds.has(key(cursor))) { streak++; cursor.setDate(cursor.getDate() - 1); }
 
+  // Current completions streak: playthroughs finished in a row since the last one abandoned (same rule as
+  // Spotlight's Top 25 Completion Streaks)
+  let completionStreak = 0, bestCompletionStreak = 0;
+  Object.values(rawData.playthroughHistory)
+    .filter(pt => ['Completed', 'M-Completed', 'Postgame', 'Abandoned'].includes(pt.finalStatus))
+    .sort((a, b) => new Date(a.lastDate) - new Date(b.lastDate))
+    .forEach(pt => {
+      completionStreak = pt.finalStatus === 'Abandoned' ? 0 : completionStreak + 1;
+      bestCompletionStreak = Math.max(bestCompletionStreak, completionStreak);
+    });
+
   const stat = (label, value, sub = '') => `<div class="glance-stat"><span class="sys-widget-title">${label}</span><strong>${value}</strong>${sub ? `<span class="tf-sub">${sub}</span>` : ''}</div>`;
   container.innerHTML = `
     <div class="glance-row">
@@ -48,6 +59,7 @@ function renderIndexGlance() {
       ${stat(`${thisYear} Games`, yearGames.size)}
       ${stat(`${thisYear} Completions`, yearCompletions)}
       ${stat('Current Streak', `${streak} day${streak === 1 ? '' : 's'}`, `through ${formatFullDate(dataDateKey())}`)}
+      ${stat('Current Completions Streak', completionStreak, completionStreak >= bestCompletionStreak ? 'the longest so far' : `longest: ${bestCompletionStreak}`)}
       ${stat('All-Time', formatTime(allSeconds), `${Object.keys(rawData.metrics.allTimeGameStats).length} games`)}
       ${stat('All-Time Completions', completions.length)}
     </div>`;
