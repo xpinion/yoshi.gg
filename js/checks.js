@@ -35,7 +35,7 @@ function initChecksPage() {
       .map(g => [game(g), formatFullDate(lastPlayed[g]), formatTime(entries.filter(e => e.game === g).reduce((sum, e) => sum + timeStringToSeconds(e.time), 0))]));
   const byLooseName = {};
   [...new Set([...played, ...metaGames.map(g => g.name)])].forEach(name => {
-    const key = name.toLowerCase().replace(/[^a-z0-9]/g, '');
+    const key = name.toLowerCase().replace(/[^a-z0-9+]/g, ''); // plus signs count: N+ and N++ are different games
     (byLooseName[key] = byLooseName[key] || []).push(name);
   });
   add('fix', 'Names that differ only by spacing, case or punctuation', 'Probably the same game typed two ways, which splits its time in two.',
