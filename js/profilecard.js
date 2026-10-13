@@ -337,6 +337,17 @@ function buildGroupCard(kind, name) {
   const releaseYears = gameNames.map(g => (metaOf.get(g) || {}).releaseYear).filter(y => /^\d{4}$/.test(y)).sort();
   const allSeconds = [...cache.daySeconds.values()].reduce((t, games) => t + [...games.values()].reduce((a, b) => a + b, 0), 0);
 
+  // A year's own releases: the scored games that came out that year, best first, whenever they were played
+  const everPlayed = new Set(rawData.gameNames || []);
+  const yearReleases = isYear ? metaGames.filter(g => g.releaseYear === name && g.score !== null && everPlayed.has(g.name))
+    .sort((a, b) => b.score - a.score || a.name.localeCompare(b.name)) : [];
+  const releasesTable = yearReleases.length ? {
+    type: 'table', title: `Best ${name} Releases: ${Math.min(10, yearReleases.length)} of ${yearReleases.length} scored`,
+    columns: [{ label: '#', width: 50, align: 'center', weight: 900, color: SHARE_COLORS.green }, { label: 'Game', flex: 1, weight: 800 }, { label: 'Score', width: 80, align: 'center', weight: 900, color: SHARE_COLORS.green },
+      { label: `Time in ${name}`, width: 140, align: 'right', weight: 800 }, { label: 'Genre', width: 230, align: 'right', size: 17 }],
+    rows: yearReleases.slice(0, 10).map((g, i) => [i + 1, g.name, formatScore(g.score), sum.games.has(g.name) ? formatTime(sum.games.get(g.name)) : 'Played later', g.genre === 'Unknown' ? '' : g.genre])
+  } : null;
+
   const ratings = [];
   if (average !== null) {
     ratings.push({ label: 'Average Yoshi score', value: `${average.toFixed(2)} across ${pluralCount(scoredGames.length, 'scored game')}` });
@@ -349,7 +360,8 @@ function buildGroupCard(kind, name) {
       });
       if (averages[name] !== undefined) ratings.push({ label: `Average score, ${info.plural} with 3+ scored games`, value: rankText(profileRank(averages, name)) });
     }
-    ratings.push({ label: 'Highest rated', value: `${scoredGames[0].name} (${formatScore(scoredGames[0].score)})` });
+    if (yearReleases.length) ratings.push({ label: `Best ${name} release`, value: `${yearReleases[0].name} (${formatScore(yearReleases[0].score)})` });
+    ratings.push({ label: isYear ? 'Highest rated game played, any release year' : 'Highest rated', value: `${scoredGames[0].name} (${formatScore(scoredGames[0].score)})` });
     if (scoredGames.length > 1) ratings.push({ label: 'Lowest rated', value: `${scoredGames[scoredGames.length - 1].name} (${formatScore(scoredGames[scoredGames.length - 1].score)})` });
     ratings.push({ label: 'Games scored 9 or higher', value: String(scoredGames.filter(g => g.score >= 9).length) });
     // Games that top their release year
@@ -466,7 +478,7 @@ function buildGroupCard(kind, name) {
       [{ type: 'facts', title: 'Ratings and Rankings', items: ratings }, { type: 'facts', title: 'Records and Habits', items: play.facts }],
       play.chart ? [play.chart] : [],
       [gamesTable],
-      [periodTable, months].filter(Boolean),
+      [periodTable, months, releasesTable].filter(Boolean),
       completionTable,
       ...(info.spotlight ? profileSpotlight(name, info.spotlight) : []),
       milestoneTable ? [milestoneTable] : []
