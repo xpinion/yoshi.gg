@@ -90,11 +90,6 @@ function initChecksPage() {
     ['Videogame', 'Tag', 'Last Played', 'Days Ago', 'Time'], playthroughs.filter(pt => pt.finalStatus === 'Active' && (today - Date.parse(String(pt.lastDate).slice(0, 10))) / 86400000 > CHECK_STALE_ACTIVE_DAYS)
       .sort((a, b) => String(a.lastDate).localeCompare(String(b.lastDate)))
       .map(pt => [game(pt.gameName), escapeHTML(pt.ptTag || ''), formatFullDate(pt.lastDate), Math.round((today - Date.parse(String(pt.lastDate).slice(0, 10))) / 86400000), pt.finalPtLifetime]));
-  if (getPartners().length) {
-    const names = getPartners().flatMap(p => p.noteNames);
-    add('info', 'Multiplayer sessions that name nobody', `The note mentions none of ${getPartners().map(p => p.name).join(' or ')}, so the session is in no partner's lists. Fine for online play with others.`,
-      [...ENTRY_HEADERS, 'Note'], entries.filter(e => isMultiplayerEntry(e) && !names.some(n => (e.note || '').toUpperCase().includes(n))).reverse().map(e => [...entryCells(e), escapeHTML(e.note)]));
-  }
 
   const problems = checks.filter(c => c.level === 'fix' && c.rows.length);
   const checkHtml = c => `
