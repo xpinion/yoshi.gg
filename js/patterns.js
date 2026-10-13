@@ -1,4 +1,5 @@
-// patterns.js - The Patterns page: what gets played at which time of year, and how each system rose and faded.
+// patterns.js - The Patterns page: what gets played at which time of year, how each system rose and faded, and
+// when playthroughs get abandoned.
 
 const SEASONALITY_KINDS = [
   { id: 'genre', label: 'Genres', valueOf: e => e.genre },
@@ -31,6 +32,7 @@ function initPatternsPage() {
         <div class="card-content">${systemLifecyclesHtml()}</div>
       </div>
     </section>
+    ${abandonPatternsHtml()}
   `;
   const select = document.getElementById('seasonality-kind');
   const render = () => { document.getElementById('seasonality-content').innerHTML = seasonalityHtml(SEASONALITY_KINDS.find(k => k.id === select.value)); };
@@ -156,4 +158,99 @@ function timelineSystemColor(name) {
   let hash = 0;
   for (let i = 0; i < name.length; i++) hash = (hash * 31 + name.charCodeAt(i)) >>> 0;
   return `hsl(${hash % 360} 55% 45%)`;
+}
+
+// --- ABANDONMENT PATTERNS ---
+// How far in playthroughs are when they're dropped, by genre, and what that says about the ones still going.
+const ABANDON_BUCKETS = [
+  { label: 'Under 1h', max: 3600 }, { label: '1h – 2h', max: 7200 }, { label: '2h – 5h', max: 18000 },
+  { label: '5h – 10h', max: 36000 }, { label: '10h – 20h', max: 72000 }, { label: '20h+', max: Infinity }
+];
+// A genre needs this many abandoned playthroughs for its own row, and finish odds need this many to go on
+const ABANDON_MIN_PER_GENRE = 3, ABANDON_MIN_FOR_ODDS = 5;
+
+function abandonPatternsHtml() {
+  if (!rawData.playthroughHistory) return '';
+  const median = list => { const sorted = [...list].sort((a, b) => a - b); return sorted.length ? sorted[Math.floor(sorted.length / 2)] : 0; };
+  const playthroughs = Object.values(rawData.playthroughHistory).map(pt => ({ ...pt, sec: timeStringToSeconds(pt.finalPtLifetime) }));
+  const finished = playthroughs.filter(pt => ['Completed', 'Postgame'].includes(pt.finalStatus));
+  const abandoned = playthroughs.filter(pt => pt.finalStatus === 'Abandoned');
+  if (abandoned.length === 0) return '';
+  const decided = [...finished, ...abandoned];
+
+  const buckets = ABANDON_BUCKETS.map(b => ({ ...b, count: 0 }));
+  abandoned.forEach(pt => buckets.find(b => pt.sec < b.max).count++);
+  const maxCount = Math.max(...buckets.map(b => b.count), 1);
+
+  const byGenre = {};
+  decided.forEach(pt => {
+    if (!pt.genre || pt.genre === 'N/A') return;
+    const g = byGenre[pt.genre] = byGenre[pt.genre] || { name: pt.genre, abandoned: [], finished: [] };
+    (pt.finalStatus === 'Abandoned' ? g.abandoned : g.finished).push(pt);
+  });
+  const genres = Object.values(byGenre).filter(g => g.abandoned.length >= ABANDON_MIN_PER_GENRE)
+    .map(g => ({ ...g, rate: g.abandoned.length / (g.abandoned.length + g.finished.length), longest: g.abandoned.reduce((a, b) => b.sec > a.sec ? b : a) }))
+    .sort((a, b) => b.rate - a.rate);
+
+  // For a playthrough still going: of the decided ones that got at least this far, how many were finished.
+  // Its own genre is used when there are enough to go on, otherwise every genre.
+  const active = playthroughs.filter(pt => pt.finalStatus === 'Active').sort((a, b) => b.sec - a.sec).map(pt => {
+    const reached = list => list.filter(other => other.sec >= pt.sec);
+    const own = byGenre[pt.genre] ? reached([...byGenre[pt.genre].abandoned, ...byGenre[pt.genre].finished]) : [];
+    const pool = own.length >= ABANDON_MIN_FOR_ODDS ? own : reached(decided);
+    const genreDrop = byGenre[pt.genre] && byGenre[pt.genre].abandoned.length >= ABANDON_MIN_PER_GENRE ? median(byGenre[pt.genre].abandoned.map(a => a.sec)) : null;
+    return { pt, pool, ownGenre: pool === own, odds: pool.length ? pool.filter(other => other.finalStatus !== 'Abandoned').length / pool.length : null, genreDrop };
+  });
+  const game = name => `<span class="hover-trigger" data-game="${escapeHTML(name)}">${escapeHTML(name)}</span>`;
+
+  return `
+    <section class="card-row grid-2">
+      <div class="card" style="max-height: none;">
+        <div class="card-header"><h2>When Playthroughs Get Abandoned</h2></div>
+        <div class="card-content">
+          <div class="score-dist-summary"><strong>${abandoned.length}</strong> of ${decided.length.toLocaleString()} finished-or-dropped playthroughs were abandoned (${(abandoned.length / decided.length * 100).toFixed(1)}%). Half were dropped within <strong>${formatTime(median(abandoned.map(pt => pt.sec)))}</strong> and <strong>${median(abandoned.map(pt => pt.finalPtLifetimeDays))} days</strong> of play; completed ones took a median of ${formatTime(median(finished.map(pt => pt.sec)))}.</div>
+          ${buckets.map(b => `
+            <div class="score-dist-row">
+              <span class="score-dist-label session-length-label">${b.label}</span>
+              <div class="score-dist-track"><div class="score-dist-bar" style="width: ${(b.count / maxCount) * 100}%;"></div></div>
+              <span class="score-dist-count session-length-count">${b.count} · ${Math.round(b.count / abandoned.length * 100)}%</span>
+            </div>`).join('')}
+        </div>
+      </div>
+      <div class="card" style="max-height: none;">
+        <div class="card-header"><h2>Still Going: Finish Odds</h2></div>
+        <div class="card-content">
+          <div class="score-dist-summary">For each active playthrough: of the past ones that got at least this far, the share that were finished.</div>
+          ${active.length ? rankedListHtml(active.map(a => ({
+            title: a.pt.gameName, game: a.pt.gameName,
+            sub: `${a.pt.finalPtLifetime} over ${a.pt.finalPtLifetimeDays} day${a.pt.finalPtLifetimeDays === 1 ? "" : "s"} · ${a.pool.length} ${a.ownGenre ? escapeHTML(a.pt.genre) : 'playthroughs of any genre'} got this far${a.genreDrop !== null ? ` · ${escapeHTML(a.pt.genre)} drops come at a median of ${formatTime(a.genreDrop)}` : ''}`,
+            badge: a.odds === null ? 'Uncharted' : `${Math.round(a.odds * 100)}% finished`
+          }))) : '<div class="loading-text">No active playthroughs.</div>'}
+        </div>
+      </div>
+    </section>
+    <section class="card-row grid-1">
+      <div class="card" style="max-height: none;">
+        <div class="card-header"><h2>Abandonment by Genre</h2></div>
+        <div class="card-content hub-flush">
+          <div class="monthly-table-wrapper hub-pad">
+            <table class="monthly-table" style="min-width: 760px;">
+              <thead><tr><th>Genre</th><th>Abandoned</th><th>Finished</th><th>Abandon Rate</th><th>Median Time When Dropped</th><th>Median Time to Finish</th><th>Longest Before Dropping</th></tr></thead>
+              <tbody>${genres.map(g => `
+                <tr>
+                  <td class="text-left hub-bold"><a href="genre.html?item=${encodeURIComponent(g.name)}" class="toc-link">${escapeHTML(g.name)}</a></td>
+                  <td class="text-center">${g.abandoned.length}</td>
+                  <td class="text-center">${g.finished.length}</td>
+                  <td class="text-center"><span class="stat-highlight">${(g.rate * 100).toFixed(0)}%</span></td>
+                  <td class="text-center">${formatTime(median(g.abandoned.map(pt => pt.sec)))}</td>
+                  <td class="text-center">${g.finished.length ? formatTime(median(g.finished.map(pt => pt.sec))) : '-'}</td>
+                  <td class="text-left">${game(g.longest.gameName)} (${formatTime(g.longest.sec)})</td>
+                </tr>`).join('')}
+              </tbody>
+            </table>
+          </div>
+          <div class="score-scatter-note">Genres with at least ${ABANDON_MIN_PER_GENRE} abandoned playthroughs, highest abandon rate first. Multiplayer and non-completable playthroughs are left out.</div>
+        </div>
+      </div>
+    </section>`;
 }

@@ -5,24 +5,17 @@
 let _profileCache = null;
 function profileCache() {
   if (_profileCache) return _profileCache;
-  const cache = { daySeconds: new Map(), monthSeries: {}, yearSeries: {}, seriesSeconds: new Map(), seriesOfGame: new Map() };
-  const bump = (obj, key, name, sec) => { (obj[key] = obj[key] || {})[name] = (obj[key][name] || 0) + sec; };
+  // Each day's time per game: { day: Map(game -> seconds) }
+  const cache = { daySeconds: new Map() };
   rawData.allEntries.forEach(e => {
-    const sec = timeStringToSeconds(e.time), day = e.date.slice(0, 10);
+    const day = e.date.slice(0, 10);
     if (!cache.daySeconds.has(day)) cache.daySeconds.set(day, new Map());
     const games = cache.daySeconds.get(day);
-    games.set(e.game, (games.get(e.game) || 0) + sec);
-    if (!isRealSeries(e.series)) return;
-    cache.seriesOfGame.set(e.game, e.series);
-    cache.seriesSeconds.set(e.series, (cache.seriesSeconds.get(e.series) || 0) + sec);
-    bump(cache.monthSeries, day.slice(0, 7), e.series, sec);
-    bump(cache.yearSeries, day.slice(0, 4), e.series, sec);
+    games.set(e.game, (games.get(e.game) || 0) + timeStringToSeconds(e.time));
   });
   return (_profileCache = cache);
 }
 function isRealSeries(series) { return !!series && !['ZZNONE', 'N/A', 'Unknown', '-'].includes(series); }
-// Every series in the log, alphabetical
-function profileSeriesNames() { return [...profileCache().seriesSeconds.keys()].sort((a, b) => a.localeCompare(b)); }
 
 // Place of `name` among { name: value } (1 = highest; ties share a place), and how many there are
 function profileRank(values, name) {
@@ -197,6 +190,17 @@ function buildGameCard(gameName) {
     ratings.push({ label: 'First completion', value: `${formatFullDate(first.completionDates && first.completionDates[0] || first.lastDate)} after ${first.finalPtLifetime}` });
   }
 
+  // Then and now: the longest wait between finishing it and finishing it again
+  if (completions.length > 1) {
+    const finished = completions.map(pt => ({ pt, date: pt.completionDates && pt.completionDates[0] || pt.lastDate })).sort((a, b) => new Date(a.date) - new Date(b.date));
+    let wait = null;
+    for (let i = 1; i < finished.length; i++) {
+      const days = Math.round((new Date(finished[i].date) - new Date(finished[i - 1].date)) / 86400000);
+      if (!wait || days > wait.days) wait = { days, then: finished[i - 1], now: finished[i] };
+    }
+    ratings.push({ label: 'Longest wait between completions', value: `${pluralCount(wait.days, 'day')}: ${wait.then.pt.finalPtLifetime} on ${toList(wait.then.pt.systems).join(', ')} in ${formatFullDate(wait.then.date).slice(0, 4)}, then ${wait.now.pt.finalPtLifetime} on ${toList(wait.now.pt.systems).join(', ')} in ${formatFullDate(wait.now.date).slice(0, 4)}` });
+  }
+
   // Each year it was played, with its place among that year's games
   const yearRows = Object.keys(rawData.metrics.yearlyGameStats || {}).sort().filter(y => rawData.metrics.yearlyGameStats[y][gameName]).map(y => {
     const year = rawData.metrics.yearlyGameStats[y];
@@ -262,30 +266,89 @@ function buildGameCard(gameName) {
   };
 }
 
-// --- SERIES CARD ---
-function buildSeriesCard(series) {
-  const entries = rawData.allEntries.filter(e => e.series === series);
+// --- GROUP CARDS: a series, system, genre, developer, publisher, multiplayer partner or year ---
+// valueOf picks the group a log entry belongs to. Kinds without it choose their entries another way and have no
+// rivals to rank against. spotlight is the Spotlight column heading that ranks this kind.
+const CARD_KINDS = {
+  series: { label: 'Series', noun: 'series', plural: 'series', valueOf: e => e.series, spotlight: 'Series', page: name => `franchise.html?item=${encodeURIComponent(name)}` },
+  system: { label: 'System', noun: 'system', plural: 'systems', valueOf: e => e.system, spotlight: 'System', page: name => `systems.html?item=${encodeURIComponent(name)}` },
+  genre: { label: 'Genre', noun: 'genre', plural: 'genres', valueOf: e => e.genre, spotlight: 'Genre', page: name => `genre.html?item=${encodeURIComponent(name)}` },
+  developer: { label: 'Developer', noun: 'developer', plural: 'developers', valueOf: e => e.developer, spotlight: 'Developer' },
+  publisher: { label: 'Publisher', noun: 'publisher', plural: 'publishers', valueOf: e => e.publisher, spotlight: 'Publisher' },
+  partner: { label: 'Partner', noun: 'partner', plural: 'partners', page: name => `partner.html?name=${encodeURIComponent(name)}` },
+  year: { label: 'Year', noun: 'year', plural: 'years', valueOf: e => e.date.slice(0, 4), page: name => `review.html?year=${name}` }
+};
+const CARD_MAX_GAME_ROWS = 30, CARD_MAX_COMPLETION_ROWS = 60;
+
+// For a kind with valueOf: every group's total time, its time by month and by year, and the games in it
+const _kindTotals = {};
+function cardKindTotals(kind) {
+  if (_kindTotals[kind]) return _kindTotals[kind];
+  const totals = { seconds: {}, byMonth: {}, byYear: {}, games: {} };
+  const bump = (obj, key, name, sec) => { (obj[key] = obj[key] || {})[name] = (obj[key][name] || 0) + sec; };
+  rawData.allEntries.forEach(e => {
+    const name = CARD_KINDS[kind].valueOf(e);
+    if (!isRealSeries(name)) return;
+    const sec = timeStringToSeconds(e.time);
+    totals.seconds[name] = (totals.seconds[name] || 0) + sec;
+    bump(totals.byMonth, e.date.slice(0, 7), name, sec);
+    bump(totals.byYear, e.date.slice(0, 4), name, sec);
+    (totals.games[name] = totals.games[name] || new Set()).add(e.game);
+  });
+  return (_kindTotals[kind] = totals);
+}
+// Names a card of this kind can be made for
+function cardNames(kind) {
+  if (kind === 'game') return [...new Set(rawData.allEntries.map(e => e.game))].sort((a, b) => a.localeCompare(b));
+  if (kind === 'partner') return [...getPartners().map(p => p.name), ...(getPartners().length > 1 ? ['Family'] : [])];
+  const names = Object.keys(cardKindTotals(kind).seconds);
+  return kind === 'year' ? names.sort().reverse() : names.sort((a, b) => a.localeCompare(b));
+}
+function cardEntries(kind, name) {
+  if (kind === 'partner') {
+    const partners = getPartners();
+    // "Family" is the sessions that mention everyone
+    if (name === 'Family') return rawData.allEntries.filter(e => isMultiplayerEntry(e) && partners.every(p => p.noteNames.some(n => (e.note || '').toUpperCase().includes(n))));
+    const partner = partners.find(p => p.name === name);
+    return partner ? partnerEntries(partner) : [];
+  }
+  return rawData.allEntries.filter(e => CARD_KINDS[kind].valueOf(e) === name);
+}
+// Any card by kind: 'game' or one of CARD_KINDS
+function buildCard(kind, name) { return kind === 'game' ? buildGameCard(name) : buildGroupCard(kind, name); }
+
+function buildGroupCard(kind, name) {
+  const info = CARD_KINDS[kind];
+  const entries = info ? cardEntries(kind, name) : [];
   if (entries.length === 0) return null;
   const cache = profileCache();
+  const totals = info.valueOf ? cardKindTotals(kind) : null;
+  const isYear = kind === 'year';
   const play = profilePlayFacts(entries), sum = play.sum;
   const gameNames = [...sum.games.keys()];
-  const inSeries = new Set(gameNames);
   const scoredGames = gameNames.map(g => ({ name: g, score: getGameScore(g) })).filter(g => g.score !== null).sort((a, b) => b.score - a.score);
   const average = scoredGames.length ? scoredGames.reduce((t, g) => t + g.score, 0) / scoredGames.length : null;
-  const playthroughs = Object.values(rawData.playthroughHistory).filter(pt => inSeries.has(pt.gameName));
-  const completions = getSortedCompletions('All-Time').filter(pt => inSeries.has(pt.gameName));
-  const timeRank = profileRank(Object.fromEntries(cache.seriesSeconds), series);
+  // Playthroughs with at least one session in the group
+  const tags = new Set(entries.map(e => e.ptTag));
+  const playthroughs = Object.values(rawData.playthroughHistory).filter(pt => tags.has(pt.ptTag));
+  const completions = getSortedCompletions('All-Time').filter(pt => tags.has(pt.ptTag) && (!isYear || pt.displayDate.toISOString().startsWith(name)));
+  const timeRank = totals ? profileRank(totals.seconds, name) : null;
   const metaOf = new Map(metaGames.map(g => [g.name, g]));
   const releaseYears = gameNames.map(g => (metaOf.get(g) || {}).releaseYear).filter(y => /^\d{4}$/.test(y)).sort();
+  const allSeconds = [...cache.daySeconds.values()].reduce((t, games) => t + [...games.values()].reduce((a, b) => a + b, 0), 0);
 
   const ratings = [];
   if (average !== null) {
     ratings.push({ label: 'Average Yoshi score', value: `${average.toFixed(2)} across ${pluralCount(scoredGames.length, 'scored game')}` });
-    // Against other series with at least three scored games
-    const bySeries = {};
-    metaGames.forEach(g => { if (g.score !== null && isRealSeries(g.franchise)) (bySeries[g.franchise] = bySeries[g.franchise] || []).push(g.score); });
-    const averages = Object.fromEntries(Object.entries(bySeries).filter(([, scores]) => scores.length >= 3).map(([name, scores]) => [name, scores.reduce((a, b) => a + b, 0) / scores.length]));
-    if (averages[series] !== undefined) ratings.push({ label: 'Average score, series with 3+ scored games', value: rankText(profileRank(averages, series)) });
+    if (totals) {
+      // Against the other groups of this kind with at least three scored games
+      const averages = {};
+      Object.entries(totals.games).forEach(([group, games]) => {
+        const scores = [...games].map(g => getGameScore(g)).filter(v => v !== null);
+        if (scores.length >= 3) averages[group] = scores.reduce((a, b) => a + b, 0) / scores.length;
+      });
+      if (averages[name] !== undefined) ratings.push({ label: `Average score, ${info.plural} with 3+ scored games`, value: rankText(profileRank(averages, name)) });
+    }
     ratings.push({ label: 'Highest rated', value: `${scoredGames[0].name} (${formatScore(scoredGames[0].score)})` });
     if (scoredGames.length > 1) ratings.push({ label: 'Lowest rated', value: `${scoredGames[scoredGames.length - 1].name} (${formatScore(scoredGames[scoredGames.length - 1].score)})` });
     ratings.push({ label: 'Games scored 9 or higher', value: String(scoredGames.filter(g => g.score >= 9).length) });
@@ -294,84 +357,119 @@ function buildSeriesCard(series) {
       const year = (metaOf.get(g.name) || {}).releaseYear;
       return year && year !== 'Unknown' && !metaGames.some(o => o.releaseYear === year && o.score !== null && o.score > g.score);
     });
-    ratings.push({ label: 'Games of the Year', value: winners.length ? winners.map(g => `${g.name} (${metaOf.get(g.name).releaseYear})`).join(', ') : 'None' });
+    ratings.push({ label: 'Games of the Year', value: winners.length ? `${winners.slice(0, 8).map(g => `${g.name} (${metaOf.get(g.name).releaseYear})`).join(', ')}${winners.length > 8 ? ` and ${winners.length - 8} more` : ''}` : 'None' });
   }
-  ratings.push({ label: 'Most played series, all-time', value: rankText(timeRank) });
-  ratings.push({ label: 'Share of all play time', value: `${(sum.seconds / [...cache.daySeconds.values()].reduce((t, games) => t + [...games.values()].reduce((a, b) => a + b, 0), 0) * 100).toFixed(2)}%` });
+  if (timeRank) ratings.push({ label: `Most played ${info.plural}, all-time`, value: rankText(timeRank) });
+  ratings.push({ label: 'Share of all play time', value: `${(sum.seconds / allSeconds * 100).toFixed(2)}%` });
   const [topGame, topGameSec] = topOfMap(sum.games, 1)[0];
   ratings.push({ label: 'Most played game', value: `${topGame} (${formatTime(topGameSec)})` });
-  const topGenre = topOfMap(sum.genres, 1)[0];
+  const topGenre = kind === 'genre' ? null : topOfMap(sum.genres, 1)[0];
   if (topGenre) ratings.push({ label: 'Main genre', value: `${topGenre[0]} (${Math.round(topGenre[1] / sum.seconds * 100)}% of the time)` });
+  const topSeries = kind === 'series' ? null : topOfMap(sum.series, 1)[0];
+  if (topSeries) ratings.push({ label: 'Main series', value: `${topSeries[0]} (${formatTime(topSeries[1])})` });
   ratings.push({ label: 'Playthroughs', value: `${playthroughs.length}: ${completions.length} completed, ${playthroughs.filter(pt => pt.finalStatus === 'Abandoned').length} abandoned` });
+  if (isYear) {
+    // Games whose very first session was this year, and the year's milestones
+    const firstYear = {};
+    rawData.allEntries.forEach(e => { if (!firstYear[e.game]) firstYear[e.game] = e.date.slice(0, 4); });
+    ratings.push({ label: 'Games played for the first time', value: `${gameNames.filter(g => firstYear[g] === name).length} of ${gameNames.length}` });
+  }
 
-  // Every game in the series, most played first
-  const completionsOf = name => completions.filter(pt => pt.gameName === name).length;
+  // The games in the group, most played first
+  const completionsOf = game => completions.filter(pt => pt.gameName === game).length;
   const lists = rawData.metrics.top25Lists || [];
-  const gameRows = topOfMap(sum.games, Infinity).map(([name, sec]) => {
-    const gameEntries = entries.filter(e => e.game === name);
-    const score = getGameScore(name);
-    const latest = playthroughs.filter(pt => pt.gameName === name).sort((a, b) => new Date(b.lastDate) - new Date(a.lastDate))[0];
-    const ranked = lists.filter(list => list.headersLeft[1] === 'Videogame' && list.allTime.some(row => row[1] === name));
-    const leads = ranked.filter(list => list.allTime[0][1] === name).length;
+  const rankedGames = topOfMap(sum.games, Infinity);
+  const gameRows = rankedGames.slice(0, CARD_MAX_GAME_ROWS).map(([game, sec]) => {
+    const gameEntries = entries.filter(e => e.game === game);
+    const score = getGameScore(game);
+    const latest = playthroughs.filter(pt => pt.gameName === game).sort((a, b) => new Date(b.lastDate) - new Date(a.lastDate))[0];
+    const ranked = lists.filter(list => list.headersLeft[1] === 'Videogame' && list.allTime.some(row => row[1] === game));
+    const leads = ranked.filter(list => list.allTime[0][1] === game).length;
     return [
-      name, (metaOf.get(name) || {}).releaseYear || '', score !== null ? { text: formatScore(score), color: SHARE_COLORS.green, weight: 900 } : '-', formatTime(sec),
-      new Set(gameEntries.map(e => e.date.slice(0, 10))).size, completionsOf(name) || '-',
+      game, (metaOf.get(game) || {}).releaseYear || '', score !== null ? { text: formatScore(score), color: SHARE_COLORS.green, weight: 900 } : '-', formatTime(sec),
+      new Set(gameEntries.map(e => e.date.slice(0, 10))).size, completionsOf(game) || '-',
       latest ? { text: latest.finalStatus, pill: SHARE_STATUS_COLORS[latest.finalStatus] || ['#ececec', '#555555'] } : '',
       formatFullDate(gameEntries[0].date), ranked.length ? `${ranked.length}${leads ? ` (#1 in ${leads})` : ''}` : '-'
     ];
   });
   const gamesTable = {
-    type: 'table', title: `Games: ${gameRows.length}`,
+    type: 'table', title: rankedGames.length > gameRows.length ? `Games: the ${gameRows.length} most played of ${rankedGames.length}` : `Games: ${gameRows.length}`,
     columns: [
       { label: 'Game', flex: 1, weight: 800 }, { label: 'Released', width: 105, align: 'center' }, { label: 'Score', width: 80, align: 'center' },
       { label: 'Time', width: 125, align: 'right', weight: 800 }, { label: 'Days', width: 70, align: 'right' }, { label: 'Completed', width: 110, align: 'center' },
-      { label: 'Latest Status', width: 190, align: 'center' }, { label: 'First Played', width: 130, align: 'center' }, { label: 'Spotlight Lists', width: 165, align: 'right' }
+      { label: 'Latest Status', width: 190, align: 'center' }, { label: isYear ? 'First That Year' : 'First Played', width: 140, align: 'center' }, { label: 'Spotlight Lists', width: 165, align: 'right' }
     ],
     rows: gameRows
   };
 
-  const yearRows = Object.keys(sum.byYear).sort().map(y => {
-    const rank = profileRank(cache.yearSeries[y], series);
-    const yearEntries = entries.filter(e => e.date.startsWith(y));
-    const top = topOfMap(summarizeEntries(yearEntries).games, 1)[0];
-    return [y, formatTime(sum.byYear[y]), new Set(yearEntries.map(e => e.date.slice(0, 10))).size, new Set(yearEntries.map(e => e.game)).size,
-      { text: rankText(rank), color: rank.rank <= 5 ? SHARE_COLORS.green : SHARE_COLORS.text, weight: rank.rank <= 5 ? 900 : 600 }, `${top[0]} (${formatTime(top[1])})`];
+  // A year is broken down by month; everything else by year
+  const periodKeys = Object.keys(isYear ? sum.byMonth : sum.byYear).sort();
+  const periodRows = periodKeys.map(key => {
+    const periodEntries = entries.filter(e => e.date.startsWith(key));
+    const top = topOfMap(summarizeEntries(periodEntries).games, 1)[0];
+    const row = [isYear ? MONTH_NAMES[Number(key.slice(5)) - 1] : key, formatTime((isYear ? sum.byMonth : sum.byYear)[key]),
+      new Set(periodEntries.map(e => e.date.slice(0, 10))).size, new Set(periodEntries.map(e => e.game)).size];
+    if (totals && !isYear) {
+      const rank = profileRank(totals.byYear[key], name);
+      row.push({ text: rankText(rank), color: rank.rank <= 5 ? SHARE_COLORS.green : SHARE_COLORS.text, weight: rank.rank <= 5 ? 900 : 600 });
+    }
+    row.push(`${top[0]} (${formatTime(top[1])})`);
+    return row;
   });
-  const yearTable = {
-    type: 'table', title: 'Year by Year',
-    columns: [{ label: 'Year', width: 70, weight: 900 }, { label: 'Time', width: 120, align: 'right', weight: 800 }, { label: 'Days', width: 65, align: 'right' }, { label: 'Games', width: 75, align: 'right' },
-      { label: 'Rank That Year', width: 130, align: 'right' }, { label: 'Most Played', flex: 1, align: 'right', size: 17 }],
-    rows: yearRows
+  const periodTable = {
+    type: 'table', title: isYear ? 'Month by Month' : 'Year by Year',
+    columns: [{ label: isYear ? 'Month' : 'Year', width: isYear ? 130 : 70, weight: 900 }, { label: 'Time', width: 120, align: 'right', weight: 800 }, { label: 'Days', width: 65, align: 'right' }, { label: 'Games', width: 75, align: 'right' },
+      ...(totals && !isYear ? [{ label: 'Rank That Year', width: 130, align: 'right' }] : []), { label: 'Most Played', flex: 1, align: 'right', size: 17 }],
+    rows: periodRows
   };
+  const months = totals && !isYear ? profileMonthChips(totals.byMonth, name, info.noun) : null;
 
+  const shownCompletions = isYear ? completions : completions.slice(-CARD_MAX_COMPLETION_ROWS); // a year shows all of its own
   const completionTable = completions.length ? splitTable({
-    type: 'table', title: `Completions: ${completions.length}`,
+    type: 'table', title: shownCompletions.length < completions.length ? `Completions: the latest ${shownCompletions.length} of ${completions.length}` : `Completions: ${completions.length}`,
     columns: [{ label: 'Date', width: 125, weight: 800 }, { label: 'Game', flex: 1, weight: 700 }, { label: 'System', width: 110, align: 'center' }, { label: 'Time', width: 95, align: 'right', weight: 800 }],
-    rows: completions.map(pt => [formatFullDate(pt.displayDate), pt.gameName, toList(pt.systems).join(', '), pt.finalPtLifetime])
+    rows: shownCompletions.map(pt => [formatFullDate(pt.displayDate), pt.gameName, toList(pt.systems).join(', '), pt.finalPtLifetime])
   }) : [];
 
+  // A year's own milestones: records and firsts, newest first
+  let milestoneTable = null;
+  if (isYear) {
+    const all = (rawData.metrics.milestones || []).filter(m => String(m.date).startsWith(name));
+    const shown = all.filter(m => m.type !== 'ranking').sort((a, b) => new Date(b.date) - new Date(a.date)).slice(0, 12);
+    if (shown.length) milestoneTable = {
+      type: 'table', title: `Milestones: ${all.length}`,
+      columns: [{ label: 'Date', width: 130, weight: 800 }, { label: 'Milestone', flex: 1, maxLines: 3 }],
+      rows: shown.map(m => [formatFullDate(m.date), m.details]),
+      note: all.length > shown.length ? `Plus ${all.length - shown.length} more on the Milestones page at yoshi.gg` : ''
+    };
+  }
+
   const span = play.firstYear === play.lastYear ? play.firstYear : `${play.firstYear}–${play.lastYear}`;
+  const inProgress = isYear && dataDateKey().startsWith(name);
   return {
-    kicker: 'Series Profile', title: series,
-    subtitle: [pluralCount(gameNames.length, 'game'), releaseYears.length ? `Released ${releaseYears[0]}${releaseYears[releaseYears.length - 1] !== releaseYears[0] ? `–${releaseYears[releaseYears.length - 1]}` : ''}` : '',
-      topGenre ? topGenre[0] : '', play.systems.join(', ')].filter(Boolean).join(' · '),
+    kicker: isYear ? 'Year in Review' : `${info.label} Profile`, title: isYear ? `${name} in Review` : (kind === 'partner' ? `Multiplayer with ${name}` : name),
+    subtitle: [inProgress ? `So far, through ${formatFullDate(dataDateKey())}` : '', pluralCount(gameNames.length, 'game'),
+      !isYear && releaseYears.length ? `Released ${releaseYears[0]}${releaseYears[releaseYears.length - 1] !== releaseYears[0] ? `–${releaseYears[releaseYears.length - 1]}` : ''}` : '',
+      topGenre ? topGenre[0] : '', kind === 'system' ? '' : play.systems.slice(0, 12).join(', ')].filter(Boolean).join(' · '),
     badge: average !== null ? { value: average.toFixed(1), label: 'Average score' } : null,
-    footer: 'yoshi.gg · series profile',
+    footer: `yoshi.gg · ${isYear ? 'year in review' : `${info.noun} profile`}`,
     layout: [
       [{ type: 'stats', items: [
-        { label: 'Total Time', value: formatTime(sum.seconds), sub: `${rankText(timeRank)} series` },
+        { label: 'Total Time', value: formatTime(sum.seconds), sub: timeRank ? `${rankText(timeRank)} ${info.plural}` : `${sum.sessions.toLocaleString('en-US')} sessions` },
         { label: 'Games', value: gameNames.length, sub: `${pluralCount(scoredGames.length, 'game')} scored` },
         { label: 'Days Played', value: play.days.length, sub: `avg ${formatTime(sum.seconds / play.days.length)} a day` },
         { label: 'Longest Session', value: formatTime(play.longest.sec), sub: play.longest.entry.game },
         { label: 'Completions', value: completions.length, sub: pluralCount(playthroughs.length, 'playthrough') },
-        { label: 'Played', value: span, sub: `${formatFullDate(sum.first.date)} to ${formatFullDate(sum.last.date)}` }
+        isYear ? { label: 'Sessions', value: sum.sessions.toLocaleString('en-US'), sub: `avg ${formatTime(sum.seconds / sum.sessions)}` }
+          : { label: 'Played', value: span, sub: `${formatFullDate(sum.first.date)} to ${formatFullDate(sum.last.date)}` }
       ] }],
       [{ type: 'facts', title: 'Ratings and Rankings', items: ratings }, { type: 'facts', title: 'Records and Habits', items: play.facts }],
       play.chart ? [play.chart] : [],
       [gamesTable],
-      [yearTable, profileMonthChips(cache.monthSeries, series, 'series')].filter(Boolean),
+      [periodTable, months].filter(Boolean),
       completionTable,
-      ...profileSpotlight(series, 'Series')
+      ...(info.spotlight ? profileSpotlight(name, info.spotlight) : []),
+      milestoneTable ? [milestoneTable] : []
     ]
   };
 }

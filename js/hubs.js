@@ -525,7 +525,7 @@ function buildAnalyticsHub(containerId, dataKey, titleLabel) {
             <select id="hub-item-select" class="header-dropdown hub-title-lg">
               ${sortedItems.map(s => `<option value="${escapeHTML(s.name)}">${escapeHTML(s.name)}</option>`).join('')}
             </select>
-            ${dataKey === 'series' ? '<a id="hub-share-link" class="share-btn" href="card.html">Share card</a>' : ''}
+            ${['series', 'system', 'genre'].includes(dataKey) ? '<a id="hub-share-link" class="share-btn" href="card.html">Share card</a>' : ''}
           </h2>
         </div>
       </div>
@@ -542,7 +542,7 @@ function buildAnalyticsHub(containerId, dataKey, titleLabel) {
     const item = hubData[valName];
     if (!item) return;
     const shareLink = document.getElementById('hub-share-link');
-    if (shareLink) shareLink.href = `card.html?series=${encodeURIComponent(valName)}`;
+    if (shareLink) shareLink.href = `card.html?${dataKey}=${encodeURIComponent(valName)}`;
 
     const dynamicContainer = document.getElementById('dynamic-hub-content');
     

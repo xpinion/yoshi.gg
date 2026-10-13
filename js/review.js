@@ -26,20 +26,7 @@ function initReviewPage() {
   render();
 
   const shareButton = document.getElementById('review-share');
-  if (shareButton) shareButton.addEventListener('click', () => {
-    const year = select.value;
-    const sum = summarizeEntries(rawData.allEntries.filter(e => e.date.startsWith(year)));
-    const inProgress = dataDateKey().startsWith(year);
-    openShareCard({
-      kicker: 'Year in Review', title: `${year} in Review`,
-      subtitle: inProgress ? `So far, through ${formatFullDate(dataDateKey())}` : `${sum.sessions.toLocaleString()} sessions across ${sum.systems.size} systems`,
-      stats: [
-        { label: 'Time Played', value: formatTime(sum.seconds) }, { label: 'Days Played', value: sum.days.size },
-        { label: 'Games', value: sum.games.size }, { label: 'Completions', value: getSortedCompletions(year).length }
-      ],
-      rows: topOfMap(sum.games, 6).map(([game, sec], i) => ({ left: `#${i + 1} ${game}`, right: formatTime(sec) }))
-    });
-  });
+  if (shareButton) shareButton.addEventListener('click', () => openShareCard(buildGroupCard('year', select.value)));
 }
 
 function reviewBodyHtml(year) {

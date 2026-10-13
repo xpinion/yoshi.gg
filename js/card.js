@@ -1,15 +1,13 @@
-// card.js - The Share Cards page (card.html?game=... or ?series=...): pick a game or series and get its
-// profile card as a picture to download, copy or share. The cards are built in profilecard.js.
+// card.js - The Share Cards page (card.html?game=..., ?series=..., ?system=..., ?year=... and so on): pick a
+// game, series, system, genre, developer, publisher, partner or year and get its profile card as a picture to download, copy or share. The cards are built in profilecard.js.
 
 function initCardPage() {
   const container = document.getElementById('card-page-container');
   if (!container || !rawData || !rawData.allEntries) return;
-  const names = {
-    game: [...new Set(rawData.allEntries.map(e => e.game))].sort((a, b) => a.localeCompare(b)),
-    series: profileSeriesNames()
-  };
+  const kinds = ['game', ...Object.keys(CARD_KINDS)].filter(kind => cardNames(kind).length);
+  const names = Object.fromEntries(kinds.map(kind => [kind, cardNames(kind)]));
   const params = new URLSearchParams(window.location.search);
-  let type = params.get('series') ? 'series' : 'game';
+  let type = kinds.find(kind => params.get(kind)) || 'game';
   // With nothing asked for, start on the game played most recently
   let name = params.get(type) || rawData.allEntries[rawData.allEntries.length - 1].game;
 
@@ -18,8 +16,8 @@ function initCardPage() {
     <section class="card-row grid-1">
       <div class="card" style="max-height: none;">
         <div class="compare-controls">
-          <select id="card-type" class="milestone-year" aria-label="Card for a game or a series">
-            <option value="game">Game</option><option value="series">Series</option>
+          <select id="card-type" class="milestone-year" aria-label="What the card is for">
+            ${kinds.map(kind => `<option value="${kind}">${kind === 'game' ? 'Game' : CARD_KINDS[kind].label}</option>`).join('')}
           </select>
           <input type="search" id="card-name" class="spotlight-filter" list="card-list" aria-label="Game or series">
           <datalist id="card-list"></datalist>
@@ -32,14 +30,14 @@ function initCardPage() {
   const preview = document.getElementById('card-preview'), actions = document.getElementById('card-actions');
   const fillList = () => {
     document.getElementById('card-list').innerHTML = names[type].map(n => `<option value="${escapeHTML(n)}">`).join('');
-    input.placeholder = type === 'game' ? 'Pick a game…' : 'Pick a series…';
+    input.placeholder = `Pick a ${type === 'game' ? 'game' : CARD_KINDS[type].noun}…`;
   };
 
   let image = null, drawing = 0;
   const draw = async () => {
     const turn = ++drawing;
     typeSelect.value = type; input.value = name;
-    const card = type === 'game' ? buildGameCard(name) : buildSeriesCard(name);
+    const card = buildCard(type, name);
     actions.innerHTML = '';
     if (!card) { preview.innerHTML = `<div class="loading-text">No log entries for "${escapeHTML(name)}".</div>`; return; }
     if (typeof CanvasRenderingContext2D === 'undefined') { preview.innerHTML = `<div class="loading-text">This browser can't draw the card.</div>`; return; }
@@ -50,7 +48,8 @@ function initCardPage() {
     image = made;
     history.replaceState(null, '', `card.html?${type}=${encodeURIComponent(name)}`);
     document.title = `${name} Share Card | yoshi xcx's Videogame Dashboard`;
-    actions.innerHTML = `${shareActionButtonsHtml(image)}<a class="share-btn" href="${type === 'game' ? gameProfileUrl(name) : `franchise.html?item=${encodeURIComponent(name)}`}">Open its page</a>`;
+    const page = type === 'game' ? gameProfileUrl(name) : (CARD_KINDS[type].page ? CARD_KINDS[type].page(name) : '');
+    actions.innerHTML = `${shareActionButtonsHtml(image)}${page ? `<a class="share-btn" href="${page}">Open its page</a>` : ''}`;
     preview.innerHTML = `<img src="${image.url}" alt="${escapeHTML(name)} share card" width="${image.canvas.width}" height="${image.canvas.height}">`;
   };
 
