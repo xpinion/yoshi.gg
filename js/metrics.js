@@ -234,7 +234,9 @@ function renderHeatmap(mode, targetContainerId = 'heatmap-content') {
           titleText += `: ${formatHHMM(timeSec)} Hours`;
         }
       }
-      html += `<td style="background-color: ${bgColor};" title="${titleText}">${innerText}</td>`;
+      // The cell colors are the same in light and dark mode, so the number's color is set to suit the cell
+      const textColor = ['#008837', '#990000', '#d7301f'].includes(bgColor) ? '#fff' : '#111';
+      html += `<td style="background-color: ${bgColor}; color: ${textColor};" title="${titleText}">${innerText}</td>`;
     }
     html += `</tr>`;
   }

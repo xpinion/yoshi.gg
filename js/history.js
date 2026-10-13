@@ -114,7 +114,7 @@ function renderOnThisDay(monthIndex = new Date().getMonth(), dayIndex = new Date
     return `
     <div class="list-item" style="border-left-color: ${bgColor};">
       <div class="item-info">
-        <span class="item-rank" style="color: #444;">${year}</span>
+        <span class="item-rank" style="color: var(--text-muted);">${year}</span>
         <div class="item-text">
           <span class="item-title hover-trigger" data-game="${escapeHTML(e.game)}">${escapeHTML(e.game)} (${escapeHTML(e.system)})</span>
           <span class="item-sub" style="color: #666;">${escapeHTML(e.note)}</span>

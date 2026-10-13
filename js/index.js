@@ -255,7 +255,7 @@ function renderRecentRecords() {
 // Data only one Index tab shows is downloaded the first time that tab opens, then its cards are drawn
 const INDEX_TAB_DATA = {
   overview: { groups: ['milestones'], cards: ['recent-records-list'], render: renderRecentRecords },
-  rankings: { groups: ['sessions'], cards: ['longest-session-list'], render: () => renderLongestSession(document.getElementById('year-select-session').value) },
+  rankings: { groups: [], cards: ['longest-session-list'], render: () => renderLongestSession(document.getElementById('year-select-session').value) },
   breakdowns: { groups: ['analysis'], cards: ['analysis-content'], render: () => renderAnalysis(document.getElementById('analysis-select').value, 'analysis-content') },
   history: { groups: ['milestones'], cards: ['milestones-list'], render: () => renderMilestones('milestones-list') },
   spotlight: { groups: ['lists'], cards: ['random-top25-content'], render: setupSpotlightDropdown }
@@ -527,13 +527,14 @@ function renderTopGamesList(year, containerId, sortBy) {
 }
 
 // Longest Single Session
+let _singleSessions = null;
 function renderLongestSession(year) {
   const container = document.getElementById('longest-session-list');
-  if (!rawData.metrics.singleDaySessions) return; // drawn once the Rankings tab has loaded its data
-
-  const sessions = year === 'All-Time'
-    ? rawData.metrics.singleDaySessions
-    : rawData.metrics.singleDaySessions.filter(s => new Date(s.date).getUTCFullYear().toString() === year);
+  // Every log entry as a session, longest first (worked out once from the log)
+  if (!_singleSessions) {
+    _singleSessions = rawData.allEntries.map(e => ({ time: timeStringToSeconds(e.time), date: e.date, game: e.game, system: e.system })).sort((a, b) => b.time - a.time);
+  }
+  const sessions = year === 'All-Time' ? _singleSessions.slice() : _singleSessions.filter(s => s.date.slice(0, 4) === year);
 
   if (sessions.length === 0) { container.innerHTML = `<div class="loading-text">No sessions logged.</div>`; return; }
 
@@ -821,7 +822,7 @@ function renderSideBySideMetrics(year) {
               <span style="font-size: 0.75rem;">${formatDate(item.firstPlayed)} - ${formatDate(item.lastPlayed)}</span>
             </div>
             <div style="text-overflow: ellipsis; overflow: hidden; white-space: nowrap;">
-              Top Game: <span class="hover-trigger" data-game="${escapeHTML(topGameInfo.split(' (')[0])}" style="color: #0056b3; cursor: pointer;">${escapeHTML(topGameInfo)}</span>
+              Top Game: <span class="hover-trigger" data-game="${escapeHTML(topGameInfo.split(' (')[0])}" style="color: var(--primary-green); cursor: pointer;">${escapeHTML(topGameInfo)}</span>
             </div>
           </div>
         </div>

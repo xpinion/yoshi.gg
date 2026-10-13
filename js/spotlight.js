@@ -75,8 +75,7 @@ function generateUniversalDualTableHtml(listObj, directoryRowId = '') {
 
       const currentYear = getDataDate().getFullYear().toString();
       const isBold = !isEmptyYear && ((end && end.toString().startsWith(currentYear)) || (col1 && col1.toString() === currentYear));
-      // Ensure we keep your custom active class or bold styling here
-      const boldStyle = isBold ? 'style="font-weight: 800; color: #000; background-color: #f0fff4;"' : '';
+      const boldStyle = isBold ? 'class="text-left top25-current"' : 'class="text-left"';
 
       const detailMainHtml = isEmptyYear
         ? `<span style="font-style: italic; color: var(--text-muted);">${escapeHTML(String(detail))}</span>`
@@ -92,7 +91,7 @@ function generateUniversalDualTableHtml(listObj, directoryRowId = '') {
       html += `
       <tr>
       <td class="text-center" style="font-weight: 800; color: var(--text-muted);">${escapeHTML(String(col1))}</td>
-      <td class="text-left" ${boldStyle}>
+      <td ${boldStyle}>
         ${detailMainHtml}
         ${sysStr ? `<span style="color: var(--text-muted); font-size: 0.85rem; font-weight: 600; margin-left: 4px;">(${escapeHTML(String(sysStr))})</span>` : ''}
         ${detailSubHtml}

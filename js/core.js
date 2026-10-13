@@ -217,7 +217,7 @@ function renderGlobalHeader() {
 // --- DATA LOADING ---
 // The data is split into one file per group in data/ (built by buildWebDataFiles in Integration.gs),
 // so a page only downloads the groups it shows.
-const DATA_GROUPS = ['core', 'entries', 'playthroughs', 'games', 'genres', 'analysis', 'lists', 'milestones', 'sessions'];
+const DATA_GROUPS = ['core', 'entries', 'playthroughs', 'games', 'genres', 'analysis', 'lists', 'milestones'];
 // Groups each page needs, counting everything its dropdowns can show. A page not listed loads them all.
 // If a page starts reading something new, add its group here (tools/usage.js lists what a page reads).
 // The hub pages (Systems, Franchise, Genre, Release Year) also fetch 'lists' after drawing, for their Spotlight records card.
@@ -297,10 +297,27 @@ function loadData(groups) {
           const { metrics, ...rest } = part;
           Object.assign(rawData.metrics, metrics);
           Object.assign(rawData, rest);
+          hydrateEntries();
         });
     }
     return _dataLoads[group];
   }));
+}
+
+// The log's entries are stored without their game's series, release year, genre, developer and publisher, which
+// would repeat on every entry. They are filled in here from the Metadata sheet, the same way the Apps Script
+// does it, once both the entries and the metadata have arrived (whichever comes last calls this).
+let _metaRowsByGame = null;
+function hydrateEntries() {
+  if (!_metaRowsByGame || !rawData || !rawData.allEntries || rawData.allEntries.hydrated) return;
+  rawData.allEntries.forEach(e => {
+    const row = _metaRowsByGame.get(e.game);
+    if (!row || 'genre' in e) return; // no Metadata row, or a file from before the fields were dropped
+    const series = row[META_SERIES];
+    e.series = (series && series.toUpperCase() !== 'ZZNONE') ? series : null;
+    e.releaseYear = row[META_RELEASE_YEAR]; e.genre = row[META_GENRE]; e.developer = row[META_DEVELOPER]; e.publisher = row[META_PUBLISHER];
+  });
+  rawData.allEntries.hydrated = true;
 }
 
 // --- UPDATE: DASHBOARD INIT (Add routing and global parsing) ---
@@ -333,6 +350,9 @@ async function initDashboard() {
         metaScores.set(row[META_GAME], isNaN(score) ? '-' : score);
       }
     }
+
+    _metaRowsByGame = new Map(metaData.values.slice(1).filter(row => row && row[META_GAME]).map(row => [row[META_GAME], row]));
+    hydrateEntries();
 
     renderGlobalHeader();
     setupThemeToggle();

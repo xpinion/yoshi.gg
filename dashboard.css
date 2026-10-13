@@ -1429,6 +1429,8 @@ body.dark-theme .cal-l5 { fill: #9be9a8; }
 .toc-link:hover { color: var(--text-main); text-decoration: underline; }
 
 /* NEW: Active Record Highlighting */
+/* A Top 25 row from the current year (theme colors, so it reads in dark mode too) */
+.top25-table td.top25-current { font-weight: 800; color: var(--text-title); background-color: var(--highlight-green-bg); border-left: 4px solid var(--primary-green); }
 .toc-active-row { background-color: var(--highlight-green-bg) !important; }
 .toc-active-row td:first-child { border-left: 4px solid var(--primary-green) !important; }
 
