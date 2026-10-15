@@ -329,10 +329,25 @@ function miniCard(card) {
   const wanted = ['Total Time', 'Completions', 'Days Played', 'Played'];
   const picked = wanted.every(label => stats.some(s => s.label === label)) ? wanted.map(label => stats.find(s => s.label === label)) : stats.slice(0, 4);
   const facts = (blocks.find(block => block.type === 'facts') || { items: [] }).items.filter(item => item.label !== 'Yoshi score');
+  // A game's playthroughs, newest first: the four latest, each on two lines
+  const table = blocks.find(block => block.type === 'table' && /^Playthroughs/.test(block.title));
+  let playthroughs = null;
+  if (table && table.rows.length) {
+    const latest = table.rows.slice(-4).reverse();
+    playthroughs = {
+      title: table.title,
+      items: latest.map(([tag, systems, status, started, completed, last, time, days, note]) => ({
+        tag, systems, status: status.text || status, time: `${formatTime(timeStringToSeconds(String(time)))} over ${pluralCount(Number(days) || 0, 'day')}`,
+        dates: completed && completed !== '-' ? `${started} → ${String(completed).split(', ').pop()}` : `${started} → ${last}`,
+        note: String(note || '').replace(/^Game \d+ - /, '')
+      })),
+      more: table.rows.length > 4 ? `Plus ${pluralCount(table.rows.length - 4, 'earlier playthrough')} on the full card` : ''
+    };
+  }
   return {
     kicker: card.kicker, title: card.title, subtitle: card.subtitle, badge: card.badge,
     stats: picked.map(s => ({ label: s.label, value: s.value })),
-    rows: facts.map(item => ({ left: item.label, right: item.value })),
+    rows: facts.map(item => ({ left: item.label, right: item.value })), maxRows: playthroughs ? 3 : undefined, playthroughs,
     footer: card.footer, mini: true
   };
 }

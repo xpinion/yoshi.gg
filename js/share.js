@@ -14,6 +14,8 @@ function shareButtonHtml(attrs = '') {
 }
 
 // card: { kicker, title, subtitle, badge: { value, label } (optional), stats: [{ label, value }] (up to 4), rows: [{ left, right }], footer }
+// A mini profile card adds maxRows and playthroughs: { title, items: [{ tag, systems, status, dates, time, note }], more },
+// drawn under the rows on a taller canvas (miniCardHeight).
 // A card with `tables` (a Spotlight list) or `layout` (a game or series profile) is drawn in full instead, as tall
 // as its content needs: see drawShareTables and drawProfileCard.
 // Draws the card and returns { canvas, blob, url, fileName, file }; the caller revokes url when done with it.
@@ -26,7 +28,7 @@ async function makeShareImage(card) {
   if (card.layout) drawProfileCard(canvas, card);
   else if (card.tables) drawShareTables(canvas, card);
   else {
-    canvas.width = SHARE_WIDTH; canvas.height = SHARE_HEIGHT;
+    canvas.width = SHARE_WIDTH; canvas.height = miniCardHeight(card);
     drawShareCard(canvas.getContext('2d'), card);
   }
   const fileName = `${String(card.title).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'card'}${card.mini ? '-mini' : ''}.png`;
@@ -79,8 +81,18 @@ async function openShareCard(card) {
   document.body.appendChild(modal);
 }
 
+// The playthrough section's sizes, shared by miniCardHeight and drawShareCard
+const MINI_PT = { head: 64, item: 82, more: 34 };
+// How tall a compact card is: the usual 630, plus room for its playthroughs (with at most maxRows rows above them)
+function miniCardHeight(card) {
+  const pts = card.playthroughs;
+  if (!pts || !pts.items.length) return SHARE_HEIGHT;
+  const rowsBelowStats = Math.min((card.rows || []).length, card.maxRows || 99);
+  return 364 + rowsBelowStats * 42 + 16 + MINI_PT.head + pts.items.length * MINI_PT.item + (pts.more ? MINI_PT.more : 0) + 104;
+}
+
 function drawShareCard(ctx, card) {
-  const C = SHARE_COLORS, pad = 56, inner = SHARE_WIDTH - pad * 2 - 64;
+  const C = SHARE_COLORS, pad = 56, inner = SHARE_WIDTH - pad * 2 - 64, HEIGHT = ctx.canvas.height || SHARE_HEIGHT;
   const font = (weight, size) => { ctx.font = `${weight} ${size}px Inter, "Segoe UI", sans-serif`; };
   // Draws text no wider than maxWidth: the size shrinks to minSize first, then the text is cut with an ellipsis
   const fit = (text, x, y, maxWidth, weight, size, minSize, color, align = 'left') => {
@@ -98,9 +110,9 @@ function drawShareCard(ctx, card) {
     ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath();
   };
 
-  ctx.fillStyle = C.page; ctx.fillRect(0, 0, SHARE_WIDTH, SHARE_HEIGHT);
-  ctx.fillStyle = C.card; roundRect(pad - 24, pad - 24, SHARE_WIDTH - (pad - 24) * 2, SHARE_HEIGHT - (pad - 24) * 2, 24); ctx.fill();
-  ctx.fillStyle = C.green; roundRect(pad - 24, pad - 24, 14, SHARE_HEIGHT - (pad - 24) * 2, 7); ctx.fill();
+  ctx.fillStyle = C.page; ctx.fillRect(0, 0, SHARE_WIDTH, HEIGHT);
+  ctx.fillStyle = C.card; roundRect(pad - 24, pad - 24, SHARE_WIDTH - (pad - 24) * 2, HEIGHT - (pad - 24) * 2, 24); ctx.fill();
+  ctx.fillStyle = C.green; roundRect(pad - 24, pad - 24, 14, HEIGHT - (pad - 24) * 2, 7); ctx.fill();
   ctx.textBaseline = 'alphabetic';
 
   const left = pad + 32;
@@ -131,10 +143,11 @@ function drawShareCard(ctx, card) {
     y += boxH + 26;
   }
 
-  // As many rows as fit above the footer
-  const footerY = SHARE_HEIGHT - pad - 8;
+  // As many rows as fit above the footer (or the playthroughs), and no more than maxRows
+  const footerY = HEIGHT - pad - 8, pts = card.playthroughs && card.playthroughs.items.length ? card.playthroughs : null;
   const rowH = 42;
-  const rows = (card.rows || []).slice(0, Math.max(0, Math.floor((footerY - 34 - y) / rowH)));
+  const room = pts ? (card.maxRows || 3) : Math.floor((footerY - 34 - y) / rowH);
+  const rows = (card.rows || []).slice(0, Math.max(0, Math.min(room, card.maxRows || 99)));
   rows.forEach((row, i) => {
     const ry = y + i * rowH + 28;
     if (i > 0) { ctx.strokeStyle = C.line; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(left, ry - 28); ctx.lineTo(left + inner, ry - 28); ctx.stroke(); }
@@ -143,6 +156,32 @@ function drawShareCard(ctx, card) {
     if (row.right) fit(row.right, left + inner, ry, inner * 0.4, 900, 24, 16, C.green, 'right');
     fit(row.left, left, ry, inner - rightWidth - 24, 700, 24, 16, C.text);
   });
+
+  // Playthroughs: tag and systems, a status pill and the dates and time on the first line, where it ended under them
+  if (pts) {
+    let py = y + rows.length * rowH + 16;
+    fit(String(pts.title).toUpperCase(), left, py + 30, inner, 800, 22, 16, C.green);
+    ctx.fillStyle = C.green; ctx.fillRect(left, py + 44, inner, 3);
+    py += MINI_PT.head;
+    pts.items.forEach((pt, i) => {
+      const ly = py + 30;
+      if (i > 0) { ctx.strokeStyle = C.line; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(left, py); ctx.lineTo(left + inner, py); ctx.stroke(); }
+      font(900, 24);
+      const tagW = Math.min(ctx.measureText(pt.tag).width, 240);
+      fit(pt.tag, left, ly, 240, 900, 24, 16, C.text);
+      fit(pt.systems, left + tagW + 14, ly, 140, 600, 22, 14, C.muted);
+      // The status as a coloured pill
+      const [bg, fg] = SHARE_STATUS_COLORS[pt.status] || ['#ececec', '#555555'];
+      font(800, 18);
+      const pillW = ctx.measureText(pt.status).width + 28, pillX = left + 410;
+      ctx.fillStyle = bg; roundRect(pillX, ly - 24, pillW, 32, 16); ctx.fill();
+      fit(pt.status, pillX + pillW / 2, ly - 2, pillW, 800, 18, 12, fg, 'center');
+      fit(`${pt.dates}  ·  ${pt.time}`, left + inner, ly, inner - (pillX - left) - pillW - 24, 800, 22, 14, C.text, 'right');
+      if (pt.note) fit(pt.note, left, ly + 32, inner, 600, 19, 19, C.muted); // one size: a long note is cut, not shrunk
+      py += MINI_PT.item;
+    });
+    if (pts.more) fit(pts.more, left, py + 22, inner, 600, 19, 15, C.muted);
+  }
 
   fit(card.footer || 'yoshi.gg', left, footerY, inner * 0.6, 800, 20, 14, C.muted);
   fit(`as of ${formatFullDate(dataDateKey())}`, left + inner, footerY, inner * 0.4, 600, 20, 14, C.muted, 'right');
