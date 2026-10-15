@@ -6,7 +6,7 @@
 //   timeframe.js  Monthly and Yearly        hubs.js        Systems, Franchise, Genre, Release Year
 //   completions.js, goty.js, game.js, spotlight.js, metrics.js, milestones.js, analysis.js, history.js
 //   reach.js (Within Reach), review.js (Year in Review), partner.js, compare.js, ratings.js (also uses hubs)
-//   timeline.js, patterns.js (Seasonality, System Lifecycles), checks.js (Data Checks)
+//   timeline.js, patterns.js (Seasonality, System Lifecycles), checks.js (Data Checks), charts.js (Charts)
 //   share.js      Share cards, loaded by the pages that offer them (game, review, spotlight)
 
 // Global State
@@ -141,7 +141,7 @@ const NAV_GROUPS = [
   { label: 'Log', links: [['Monthly', 'monthly.html'], ['Yearly', 'yearly.html'], ['Year in Review', 'review.html'], ['Timeline', 'timeline.html'], ['History', 'history.html'], ['Completions', 'completions.html']] },
   { label: 'Collections', links: [['Systems', 'systems.html'], ['Franchise', 'franchise.html'], ['Genre', 'genre.html'], ['Release Year', 'releaseyear.html'], ['Partners', 'partner.html']] },
   { label: 'Records', links: [['Spotlight', 'spotlight.html'], ['Milestones', 'milestones.html'], ['Within Reach', 'reach.html'], ['GotY', 'goty.html']] },
-  { label: 'Stats', links: [['Analysis', 'analysis.html'], ['Metrics', 'metrics.html'], ['Ratings', 'ratings.html'], ['Patterns', 'patterns.html'], ['Compare', 'compare.html'], ['Share Cards', 'card.html'], ['Data Checks', 'checks.html']] }
+  { label: 'Stats', links: [['Analysis', 'analysis.html'], ['Metrics', 'metrics.html'], ['Ratings', 'ratings.html'], ['Patterns', 'patterns.html'], ['Charts', 'charts.html'], ['Compare', 'compare.html'], ['Share Cards', 'card.html'], ['Data Checks', 'checks.html']] }
 ];
 
 function renderGlobalHeader() {
@@ -225,6 +225,7 @@ const PAGE_DATA = {
   'index.html': ['entries', 'playthroughs', 'games', 'genres'], // its other tabs load theirs: see INDEX_TAB_DATA
   'analysis.html': ['analysis'],
   'card.html': ['entries', 'playthroughs', 'games', 'milestones', 'lists'],
+  'charts.html': ['entries'],
   'checks.html': ['entries', 'playthroughs'],
   'compare.html': ['entries', 'playthroughs'],
   'completions.html': ['entries', 'playthroughs'],
@@ -253,6 +254,7 @@ const PAGE_INIT = {
   'index.html': () => initIndexPage(),
   'analysis.html': () => initAnalysisPage(),
   'card.html': () => initCardPage(),
+  'charts.html': () => initChartsPage(),
   'checks.html': () => initChecksPage(),
   'compare.html': () => initComparePage(),
   'completions.html': () => initCompletionsPage(),

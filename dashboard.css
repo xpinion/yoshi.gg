@@ -1551,3 +1551,53 @@ a.tl-band:hover { filter: brightness(1.15); }
 .check-clear { opacity: 0.7; }
 .check-why { margin: 8px 0 10px 58px; font-size: 0.85rem; color: var(--text-muted); }
 .monthly-table.check-table { min-width: 0; }
+
+/* --- CHARTS PAGE (js/charts.js) ---
+   Categorical slots and ramps, validated (dataviz validate_palette.js) against the card surface in each theme:
+   light #ffffff, dark #1e1e1e. Slots 3-5 sit under 3:1 on white, so every chart has a legend, labels and a
+   tooltip. The age ramp is ordinal: light runs pale to deep, dark runs deep to pale, so older is always stronger. */
+.viz-root {
+  --series-1: #2a78d6; --series-2: #eb6834; --series-3: #1baf7a; --series-4: #eda100;
+  --series-5: #e87ba4; --series-6: #008300; --series-7: #6250d6; --series-8: #e34948;
+  --viz-other: #b9b8b2; --viz-empty: #eeeeee; --viz-faster: #2a78d6; --viz-slower: #e34948;
+  --age-1: #86b6ef; --age-2: #5598e7; --age-3: #2a78d6; --age-4: #1c5cab; --age-5: #104281; --age-6: #0b2a52;
+  --viz-grid: #ececec; --viz-axis: #888888; --viz-ink: #222222;
+}
+body.dark-theme .viz-root {
+  --series-1: #3987e5; --series-2: #d95926; --series-3: #199e70; --series-4: #c98500;
+  --series-5: #d55181; --series-6: #008300; --series-7: #9085e9; --series-8: #e66767;
+  --viz-other: #6b6a65; --viz-empty: #2c2c2c; --viz-faster: #3987e5; --viz-slower: #e66767;
+  --age-1: #184f95; --age-2: #256abf; --age-3: #3987e5; --age-4: #6da7ec; --age-5: #9ec5f4; --age-6: #cde2fb;
+  --viz-grid: #2e2e2e; --viz-axis: #9a9a9a; --viz-ink: #e0e0e0;
+}
+.viz-note { margin: 0 0 12px; color: var(--text-muted); font-size: 0.9rem; }
+.viz-lead { margin: 0 0 12px; color: var(--text-main); font-size: 0.95rem; }
+.viz-controls { display: flex; gap: 10px; margin-bottom: 10px; }
+.viz-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.viz-svg { display: block; width: 100%; min-width: 760px; height: auto; font-family: Inter, sans-serif; }
+.viz-pixels { min-width: 980px; }
+.viz-svg text { font-family: Inter, sans-serif; }
+.viz-axis { fill: var(--viz-axis); font-size: 12px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.viz-label { fill: var(--viz-ink); font-size: 12px; font-weight: 700; paint-order: stroke; stroke: var(--card-bg); stroke-width: 3px; stroke-linejoin: round; }
+.viz-change { font-variant-numeric: tabular-nums; }
+.viz-grid { stroke: var(--viz-grid); stroke-width: 1; }
+.viz-baseline { stroke: var(--viz-axis); stroke-width: 1.5; }
+.viz-band { stroke: var(--card-bg); stroke-width: 1.5; stroke-linejoin: round; }
+.viz-cursor { stroke: var(--viz-ink); stroke-width: 1; stroke-dasharray: 3 3; pointer-events: none; }
+.viz-race .viz-line, .viz-race .viz-race-name { transition: opacity 0.15s; }
+.viz-race.focus .viz-line, .viz-race.focus .viz-race-name { opacity: 0.15; }
+.viz-race.focus .hot { opacity: 1; }
+.viz-legend { display: flex; flex-wrap: wrap; gap: 6px 16px; margin-top: 10px; font-size: 0.85rem; color: var(--text-main); }
+.viz-legend i, .viz-tip i, .viz-top h3 i { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 6px; vertical-align: -1px; }
+.viz-legend em, .viz-top em { font-style: normal; color: var(--text-muted); }
+.viz-table { margin-top: 12px; }
+.viz-table summary { cursor: pointer; color: var(--primary-green); font-weight: 700; font-size: 0.9rem; }
+.viz-table table { margin-top: 8px; }
+.viz-tops { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px 24px; margin-top: 16px; }
+.viz-top h3 { margin: 0 0 6px; font-size: 0.95rem; }
+.viz-top ol { margin: 0; padding-left: 20px; font-size: 0.9rem; }
+.viz-top li { margin: 2px 0; }
+.viz-tip { position: fixed; z-index: 1000; max-width: 320px; padding: 10px 12px; border-radius: 10px; background: var(--card-bg); color: var(--text-main);
+  border: 1px solid var(--border-table); box-shadow: 0 6px 20px rgba(0, 0, 0, 0.18); font-size: 0.85rem; line-height: 1.4; pointer-events: none; }
+.viz-tip div { display: flex; justify-content: space-between; gap: 12px; }
+.viz-tip div span { color: var(--text-muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
