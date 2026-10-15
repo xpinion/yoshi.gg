@@ -78,7 +78,7 @@ function initGamePage() {
           ${score !== null ? `<div class="game-score">${formatScore(score)}</div>` : ''}
         </div>
         ${gotyHtml}
-        ${typeof openShareCard === 'function' ? `<div class="share-row">${shareButtonHtml('id="game-share"')}</div>` : ''}
+        ${typeof openShareCard === 'function' ? `<div class="share-row">${shareButtonHtml('id="game-share"')}<button type="button" class="share-btn" id="game-share-mini">Mini card</button></div>` : ''}
         <div class="game-meta">
           ${plainMeta('Release Year', meta.releaseYear)}
           ${metaLink('Genre', meta.genre, 'genre.html')}
@@ -166,6 +166,8 @@ function initGamePage() {
 
   const shareButton = document.getElementById('game-share');
   if (shareButton) shareButton.addEventListener('click', () => openShareCard(buildGameCard(gameName)));
+  const miniButton = document.getElementById('game-share-mini');
+  if (miniButton) miniButton.addEventListener('click', () => openShareCard(miniCard(buildGameCard(gameName))));
 }
 
 function setupGameProfileSearch(allGames) {

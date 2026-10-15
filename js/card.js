@@ -1,4 +1,5 @@
-// card.js - The Share Cards page (card.html?game=..., ?series=..., ?system=..., ?year=... and so on): pick a
+// card.js - The Share Cards page (card.html?game=..., ?series=..., ?system=..., ?year=... and so on, plus &size=mini for
+// the small card): pick a
 // game, series, system, genre, developer, publisher, partner or year and get its profile card as a picture to download, copy or share. The cards are built in profilecard.js.
 
 function initCardPage() {
@@ -7,7 +8,7 @@ function initCardPage() {
   const kinds = ['game', ...Object.keys(CARD_KINDS)].filter(kind => cardNames(kind).length);
   const names = Object.fromEntries(kinds.map(kind => [kind, cardNames(kind)]));
   const params = new URLSearchParams(window.location.search);
-  let type = kinds.find(kind => params.get(kind)) || 'game';
+  let type = kinds.find(kind => params.get(kind)) || 'game', mini = params.get('size') === 'mini';
   // With nothing asked for, start on the game played most recently
   let name = params.get(type) || rawData.allEntries[rawData.allEntries.length - 1].game;
 
@@ -21,12 +22,16 @@ function initCardPage() {
           </select>
           <input type="search" id="card-name" class="spotlight-filter" list="card-list" aria-label="Game or series">
           <datalist id="card-list"></datalist>
+          <select id="card-size" class="milestone-year" aria-label="Card size">
+            <option value="full">Full card</option>
+            <option value="mini">Mini card</option>
+          </select>
         </div>
         <div id="card-actions" class="share-actions card-page-actions"></div>
         <div id="card-preview" class="card-preview"></div>
       </div>
     </section>`;
-  const typeSelect = document.getElementById('card-type'), input = document.getElementById('card-name');
+  const typeSelect = document.getElementById('card-type'), input = document.getElementById('card-name'), sizeSelect = document.getElementById('card-size');
   const preview = document.getElementById('card-preview'), actions = document.getElementById('card-actions');
   const fillList = () => {
     document.getElementById('card-list').innerHTML = names[type].map(n => `<option value="${escapeHTML(n)}">`).join('');
@@ -36,8 +41,8 @@ function initCardPage() {
   let image = null, drawing = 0;
   const draw = async () => {
     const turn = ++drawing;
-    typeSelect.value = type; input.value = name;
-    const card = buildCard(type, name);
+    typeSelect.value = type; input.value = name; sizeSelect.value = mini ? 'mini' : 'full';
+    const full = buildCard(type, name), card = mini ? miniCard(full) : full;
     actions.innerHTML = '';
     if (!card) { preview.innerHTML = `<div class="loading-text">No log entries for "${escapeHTML(name)}".</div>`; return; }
     if (typeof CanvasRenderingContext2D === 'undefined') { preview.innerHTML = `<div class="loading-text">This browser can't draw the card.</div>`; return; }
@@ -46,13 +51,14 @@ function initCardPage() {
     if (turn !== drawing) { URL.revokeObjectURL(made.url); return; } // another card was picked meanwhile
     if (image) URL.revokeObjectURL(image.url);
     image = made;
-    history.replaceState(null, '', `card.html?${type}=${encodeURIComponent(name)}`);
+    history.replaceState(null, '', `card.html?${type}=${encodeURIComponent(name)}${mini ? '&size=mini' : ''}`);
     document.title = `${name} Share Card | yoshi xcx's Videogame Dashboard`;
     const page = type === 'game' ? gameProfileUrl(name) : (CARD_KINDS[type].page ? CARD_KINDS[type].page(name) : '');
     actions.innerHTML = `${shareActionButtonsHtml(image)}${page ? `<a class="share-btn" href="${page}">Open its page</a>` : ''}`;
     preview.innerHTML = `<img src="${image.url}" alt="${escapeHTML(name)} share card" width="${image.canvas.width}" height="${image.canvas.height}">`;
   };
 
+  sizeSelect.addEventListener('change', () => { mini = sizeSelect.value === 'mini'; draw(); });
   typeSelect.addEventListener('change', () => { type = typeSelect.value; input.value = ''; fillList(); input.focus(); });
   input.addEventListener('change', () => { if (names[type].includes(input.value)) { name = input.value; draw(); } });
   actions.addEventListener('click', e => { if (e.target.dataset.shareAction && image) runShareAction(e.target, image, name); });

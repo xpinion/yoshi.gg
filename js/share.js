@@ -13,7 +13,7 @@ function shareButtonHtml(attrs = '') {
   return `<button type="button" class="share-btn" ${attrs}>Share card</button>`;
 }
 
-// card: { kicker, title, subtitle, stats: [{ label, value }] (up to 4), rows: [{ left, right }], footer }
+// card: { kicker, title, subtitle, badge: { value, label } (optional), stats: [{ label, value }] (up to 4), rows: [{ left, right }], footer }
 // A card with `tables` (a Spotlight list) or `layout` (a game or series profile) is drawn in full instead, as tall
 // as its content needs: see drawShareTables and drawProfileCard.
 // Draws the card and returns { canvas, blob, url, fileName, file }; the caller revokes url when done with it.
@@ -29,7 +29,7 @@ async function makeShareImage(card) {
     canvas.width = SHARE_WIDTH; canvas.height = SHARE_HEIGHT;
     drawShareCard(canvas.getContext('2d'), card);
   }
-  const fileName = `${String(card.title).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'card'}.png`;
+  const fileName = `${String(card.title).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'card'}${card.mini ? '-mini' : ''}.png`;
   const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
   return { canvas, blob, url: URL.createObjectURL(blob), fileName, file: typeof File === 'function' ? new File([blob], fileName, { type: 'image/png' }) : null };
 }
@@ -105,10 +105,18 @@ function drawShareCard(ctx, card) {
 
   const left = pad + 32;
   let y = pad + 36;
-  fit(String(card.kicker || '').toUpperCase(), left, y, inner, 800, 22, 16, C.green);
+  // A score in a green box at the top right, as on the full profile card; the heading lines stop short of it
+  const badgeW = card.badge ? 170 : 0, headW = card.badge ? inner - badgeW - 24 : inner;
+  if (card.badge) {
+    const bx = left + inner - badgeW, by = pad - 4;
+    ctx.fillStyle = C.green; roundRect(bx, by, badgeW, 112, 16); ctx.fill();
+    fit(card.badge.value, bx + badgeW / 2, by + 66, badgeW - 20, 900, 56, 30, '#ffffff', 'center');
+    fit(String(card.badge.label).toUpperCase(), bx + badgeW / 2, by + 94, badgeW - 20, 800, 15, 11, '#ffffff', 'center');
+  }
+  fit(String(card.kicker || '').toUpperCase(), left, y, headW, 800, 22, 16, C.green);
   y += 68;
-  fit(card.title, left, y, inner, 900, 62, 34, C.title);
-  if (card.subtitle) { y += 40; fit(card.subtitle, left, y, inner, 600, 24, 16, C.muted); }
+  fit(card.title, left, y, headW, 900, 62, 34, C.title);
+  if (card.subtitle) { y += 40; fit(card.subtitle, left, y, headW, 600, 24, 16, C.muted); }
   y += 34;
 
   const stats = (card.stats || []).slice(0, 4);

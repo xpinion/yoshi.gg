@@ -317,6 +317,26 @@ function cardEntries(kind, name) {
 // Any card by kind: 'game' or one of CARD_KINDS
 function buildCard(kind, name) { return kind === 'game' ? buildGameCard(name) : buildGroupCard(kind, name); }
 
+/**
+ * The mini version of a profile card: one 1200x630 picture (drawShareCard) with the heading, the score, four of
+ * the headline numbers and the first rankings, for sharing in a chat or a post.
+ */
+function miniCard(card) {
+  if (!card || !card.layout) return card;
+  const blocks = card.layout.flat().filter(Boolean);
+  const stats = (blocks.find(block => block.type === 'stats') || { items: [] }).items;
+  // The game card's own pick: time, completions, days and the years played; other cards take their first four
+  const wanted = ['Total Time', 'Completions', 'Days Played', 'Played'];
+  const picked = wanted.every(label => stats.some(s => s.label === label)) ? wanted.map(label => stats.find(s => s.label === label)) : stats.slice(0, 4);
+  const facts = (blocks.find(block => block.type === 'facts') || { items: [] }).items.filter(item => item.label !== 'Yoshi score');
+  return {
+    kicker: card.kicker, title: card.title, subtitle: card.subtitle, badge: card.badge,
+    stats: picked.map(s => ({ label: s.label, value: s.value })),
+    rows: facts.map(item => ({ left: item.label, right: item.value })),
+    footer: card.footer, mini: true
+  };
+}
+
 function buildGroupCard(kind, name) {
   const info = CARD_KINDS[kind];
   const entries = info ? cardEntries(kind, name) : [];
