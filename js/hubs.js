@@ -90,7 +90,7 @@ function buildAnalyticsHub(containerId, dataKey, titleLabel) {
   // 2. Playthrough Tallying
   if (rawData.playthroughHistory) {
     Object.values(rawData.playthroughHistory).forEach(pt => {
-      if (['Completed', 'M-Completed', 'Postgame'].includes(pt.finalStatus)) {
+      if (isMainPt(pt) && ['Completed', 'M-Completed', 'Postgame'].includes(pt.finalStatus)) {
         if (dataKey === 'system') {
           const ptSystems = pt.systems && pt.systems.has ? Array.from(pt.systems) : (pt.systems || []);
           ptSystems.forEach(sysName => { if (hubData[sysName]) hubData[sysName].completions++; });
@@ -587,6 +587,7 @@ function buildAnalyticsHub(containerId, dataKey, titleLabel) {
     
     let compCount = 0, abanCount = 0, actCount = 0, multiCount = 0;
     itemPlaythroughs.forEach(pt => {
+      if (!isMainPt(pt)) return; // DLC and modes don't count toward a hub's completions or abandons
       if (['Completed', 'M-Completed', 'Postgame'].includes(pt.finalStatus)) compCount++;
       else if (pt.finalStatus === 'Abandoned') abanCount++;
       else if (pt.finalStatus === 'Active') actCount++;

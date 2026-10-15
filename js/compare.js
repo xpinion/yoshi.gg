@@ -84,7 +84,7 @@ function compareBodyHtml(type, names) {
     // A year's completions are the ones finished that year; anything else counts its playthroughs that were completed
     const completions = type.id === 'year'
       ? getSortedCompletions(name).length
-      : playthroughs.filter(pt => (pt.completionDates && pt.completionDates.length > 0) || ['Completed', 'M-Completed', 'Postgame'].includes(pt.finalStatus)).length;
+      : playthroughs.filter(pt => isMainPt(pt) && ptFinished(pt)).length;
     const scores = [...sum.games.keys()].map(getGameScore).filter(s => s !== null);
     return { name, sum, completions, playthroughs: playthroughs.length, avgScore: scores.length ? scores.reduce((a, b) => a + b, 0) / scores.length : null, scored: scores.length };
   });

@@ -45,7 +45,7 @@ function renderIndexGlance() {
   // Spotlight's Top 25 Completion Streaks)
   let completionStreak = 0, bestCompletionStreak = 0;
   Object.values(rawData.playthroughHistory)
-    .filter(pt => ['Completed', 'M-Completed', 'Postgame', 'Abandoned'].includes(pt.finalStatus))
+    .filter(pt => isMainPt(pt) && ['Completed', 'M-Completed', 'Postgame', 'Abandoned'].includes(pt.finalStatus))
     .sort((a, b) => new Date(a.lastDate) - new Date(b.lastDate))
     .forEach(pt => {
       completionStreak = pt.finalStatus === 'Abandoned' ? 0 : completionStreak + 1;
@@ -132,7 +132,7 @@ function buildIndexHighlights() {
   if (completions.length) {
     const latest = completions[completions.length - 1];
     const days = Math.round((Date.parse(today) - Date.parse(latest.displayDate.toISOString().slice(0, 10))) / 86400000);
-    add('Latest completion', `${game(latest.gameName)}, ${days === 0 ? 'today' : `${plural(days, 'day')} ago`}. That makes ${completions.length.toLocaleString()} in all.`, ['Completions', 'completions.html']);
+    add('Latest completion', `${game(latest.gameName)}, ${days === 0 ? 'today' : `${plural(days, 'day')} ago`}. That makes ${completions.length.toLocaleString()} in all${getExtraCompletions().length ? `, plus ${getExtraCompletions().length} DLC and modes` : ''}.`, ['Completions', 'completions.html']);
   }
   const idle = Object.values(rawData.playthroughHistory).filter(pt => pt.finalStatus === 'Active').sort((a, b) => String(a.lastDate).localeCompare(String(b.lastDate)))[0];
   if (idle) {

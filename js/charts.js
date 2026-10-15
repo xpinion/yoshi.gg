@@ -338,7 +338,7 @@ function replayGames(data) {
   // Each playthrough's first Completed (or M-Completed) entry: the time it had taken by then
   const done = new Map();
   data.entries.forEach(e => {
-    if (!['Completed', 'M-Completed'].includes(e.status) || !e.ptTag || done.has(e.ptTag)) return;
+    if (!['Completed', 'M-Completed'].includes(e.status) || !e.ptTag || e.ptKind || done.has(e.ptTag)) return; // main runs only
     done.set(e.ptTag, { game: e.game, tag: e.ptTag, date: e.date.slice(0, 10), sec: timeStringToSeconds(e.ptLifetime), system: e.system });
   });
   const byGame = new Map();

@@ -172,7 +172,7 @@ const ABANDON_MIN_PER_GENRE = 3, ABANDON_MIN_FOR_ODDS = 5;
 function abandonPatternsHtml() {
   if (!rawData.playthroughHistory) return '';
   const median = list => { const sorted = [...list].sort((a, b) => a - b); return sorted.length ? sorted[Math.floor(sorted.length / 2)] : 0; };
-  const playthroughs = Object.values(rawData.playthroughHistory).map(pt => ({ ...pt, sec: timeStringToSeconds(pt.finalPtLifetime) }));
+  const playthroughs = Object.values(rawData.playthroughHistory).filter(isMainPt).map(pt => ({ ...pt, sec: timeStringToSeconds(pt.finalPtLifetime) }));
   const finished = playthroughs.filter(pt => ['Completed', 'Postgame'].includes(pt.finalStatus));
   const abandoned = playthroughs.filter(pt => pt.finalStatus === 'Abandoned');
   if (abandoned.length === 0) return '';

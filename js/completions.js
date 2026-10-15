@@ -38,6 +38,7 @@ function initCompletionsPage() {
   <div class="card-row grid-1">
     <div style="text-align: center; margin-bottom: 10px;">
       <h2 class="page-title">All-Time Completions: <span class="page-title-accent">${totalCompletions}</span></h2>
+      ${getExtraCompletions().length ? `<p class="viz-note" style="margin-top: 4px;">Plus ${getExtraCompletions().filter(x => x.kind === 'dlc').length} DLC and ${getExtraCompletions().filter(x => x.kind === 'mode').length} modes finished: <a href="#dlc-and-modes" class="reach-link">see them below</a></p>` : ''}
     </div>
   </div>
   ${completionFiltersHtml(completions)}
@@ -104,8 +105,33 @@ function initCompletionsPage() {
   }).join('');
 
   html += `</div>`;
+  html += extraCompletionsHtml();
   container.innerHTML = html;
   setupCompletionFilters(container, completions);
+}
+
+// The DLC and side modes finished, newest first: they aren't game completions, so they get their own list
+function extraCompletionsHtml() {
+  const extras = getExtraCompletions().slice().reverse();
+  if (!extras.length) return '';
+  return `
+    <section class="card-row grid-1" id="dlc-and-modes">
+      <div class="card" style="max-height: none;">
+        <div class="card-header"><h2>DLC and Modes Finished <span class="goty-gap-count">${extras.filter(x => x.kind === 'dlc').length} DLC · ${extras.filter(x => x.kind === 'mode').length} modes</span></h2></div>
+        <div class="card-content hub-flush"><div class="monthly-table-wrapper hub-pad">
+          <table class="monthly-table">
+            <thead><tr><th>Finished</th><th>Game</th><th>Kind</th><th>Name</th><th>System</th><th>Time</th></tr></thead>
+            <tbody>${extras.map(x => `<tr>
+              <td class="text-center">${formatFullDate(x.date)}</td>
+              <td class="text-left"><span class="hover-trigger" data-game="${escapeHTML(x.gameName)}">${escapeHTML(x.gameName)}</span></td>
+              <td class="text-center">${PT_KIND_LABELS[x.kind] || x.kind}</td>
+              <td class="text-left">${escapeHTML(x.name)}</td>
+              <td class="text-center">${escapeHTML(x.system)}</td>
+              <td class="text-center">${escapeHTML(x.time || '')}</td></tr>`).join('')}</tbody>
+          </table>
+        </div></div>
+      </div>
+    </section>`;
 }
 
 // Year / system / genre pickers for the Completions page

@@ -162,7 +162,9 @@ function buildGameCard(gameName) {
   const allTime = rawData.metrics.allTimeGameStats || {};
   const timeRank = profileRank(Object.fromEntries(Object.entries(allTime).map(([g, s]) => [g, s.totalSeconds])), gameName);
   const playthroughs = Object.values(rawData.playthroughHistory).filter(pt => pt.gameName === gameName).sort((a, b) => new Date(a.startDate) - new Date(b.startDate));
-  const completions = playthroughs.filter(pt => (pt.completionDates && pt.completionDates.length) || ['Completed', 'M-Completed', 'Postgame'].includes(pt.finalStatus));
+  // Completions are the main game's; DLC and modes finished are counted beside them
+  const completions = playthroughs.filter(pt => isMainPt(pt) && ptFinished(pt));
+  const extrasDone = playthroughs.filter(pt => !isMainPt(pt) && ptFinished(pt));
   const daysOnTop = play.days.filter(day => Math.max(...cache.daySeconds.get(day).values()) === cache.daySeconds.get(day).get(gameName)).length;
 
   // Ratings: the score, and where it places among every group the game belongs to
@@ -216,14 +218,14 @@ function buildGameCard(gameName) {
   const months = profileMonthChips(monthGames, gameName, 'game');
 
   const playthroughTable = {
-    type: 'table', title: `Playthroughs: ${playthroughs.length}, completed ${completions.length}`,
+    type: 'table', title: `Playthroughs: ${playthroughs.length}, completed ${completions.length}${extrasDone.length ? `, DLC and modes finished ${extrasDone.length}` : ''}`,
     columns: [
       { label: 'Tag', width: 120, weight: 800 }, { label: 'Systems', width: 120 }, { label: 'Status', width: 190, align: 'center' },
       { label: 'Started', width: 125, align: 'center' }, { label: 'Completed', width: 125, align: 'center' }, { label: 'Last Played', width: 125, align: 'center' },
       { label: 'Time', width: 95, align: 'right', weight: 800 }, { label: 'Days', width: 70, align: 'right' }, { label: 'Where It Ended', flex: 1, maxLines: 3, size: 17 }
     ],
     rows: playthroughs.map(pt => [
-      pt.ptTag || '', toList(pt.systems).join(', '), { text: pt.finalStatus, pill: SHARE_STATUS_COLORS[pt.finalStatus] || ['#ececec', '#555555'] },
+      `${pt.ptTag || ''}${isMainPt(pt) ? '' : ` · ${PT_KIND_LABELS[ptKind(pt)]}`}`, toList(pt.systems).join(', '), { text: pt.finalStatus, pill: SHARE_STATUS_COLORS[pt.finalStatus] || ['#ececec', '#555555'] },
       formatFullDate(pt.startDate), (pt.completionDates || []).map(d => formatFullDate(d)).join(', ') || '-', formatFullDate(pt.lastDate),
       pt.finalPtLifetime, pt.finalPtLifetimeDays, String(pt.finalNote || '').trim()
     ])
@@ -253,7 +255,7 @@ function buildGameCard(gameName) {
         { label: 'Days Played', value: play.days.length, sub: `avg ${formatTime(sum.seconds / play.days.length)} a day` },
         { label: 'Sessions', value: sum.sessions, sub: `avg ${formatTime(sum.seconds / sum.sessions)}` },
         { label: 'Longest Session', value: formatTime(play.longest.sec), sub: formatFullDate(play.longest.entry.date) },
-        { label: 'Completions', value: completions.length, sub: pluralCount(playthroughs.length, 'playthrough') },
+        { label: 'Completions', value: completions.length, sub: extrasDone.length ? `+ ${extrasDone.length} DLC/modes · ${pluralCount(playthroughs.length, 'playthrough')}` : pluralCount(playthroughs.length, 'playthrough') },
         { label: 'Played', value: span, sub: `${formatFullDate(sum.first.date)} to ${formatFullDate(sum.last.date)}` }
       ] }],
       [{ type: 'facts', title: 'Ratings and Rankings', items: ratings }, { type: 'facts', title: 'Records and Habits', items: play.facts }],

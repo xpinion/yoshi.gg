@@ -91,10 +91,21 @@ function getStatusColor(status) {
     default: return '#FFFFFF';
   }
 }
-// Completed playthroughs (optionally for one year), oldest first, with displayDate and entryNum set
+// What a playthrough is: 'main', or 'dlc' / 'mode' when its notes start "Game N - [DLC: Name]" or "[Mode: Name]".
+// Only main playthroughs complete (or abandon) a game; DLC and modes finished are counted on their own.
+function ptKind(pt) { return (pt && pt.kind) || 'main'; }
+function isMainPt(pt) { return ptKind(pt) === 'main'; }
+function ptFinished(pt) { return (pt.completionDates && pt.completionDates.length > 0) || ['Completed', 'M-Completed', 'Postgame'].includes(pt.finalStatus); }
+const PT_KIND_LABELS = { dlc: 'DLC', mode: 'Mode' };
+// The DLC and modes finished (optionally for one year), oldest first: [{ gameName, kind, name, date, system, ptTag, time }]
+function getExtraCompletions(year) {
+  return (rawData.metrics.extraCompletions || []).filter(x => !year || year === 'All-Time' || String(x.date).slice(0, 4) === String(year));
+}
+
+// Completed main playthroughs (optionally for one year), oldest first, with displayDate and entryNum set
 function getSortedCompletions(year) {
   return Object.values(rawData.playthroughHistory)
-    .filter(pt => (pt.completionDates && pt.completionDates.length > 0) || ['Completed', 'M-Completed', 'Postgame'].includes(pt.finalStatus))
+    .filter(pt => isMainPt(pt) && ptFinished(pt))
     .map(pt => {
       pt.displayDate = new Date((pt.completionDates && pt.completionDates.length > 0) ? pt.completionDates[0] : pt.lastDate);
       pt.entryNum = getCompletionEntryNum(pt.ptTag);
