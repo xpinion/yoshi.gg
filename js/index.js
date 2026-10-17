@@ -238,7 +238,7 @@ function renderYearPace() {
   `;
 }
 
-// Spotlight records that changed hands (or were extended) in the last RECENT_RECORD_DAYS days of the log
+// Spotlight records that changed hands in the last RECENT_RECORD_DAYS days of the log
 const RECENT_RECORD_DAYS = 30;
 function renderRecentRecords() {
   const container = document.getElementById('recent-records-list');
