@@ -1601,3 +1601,52 @@ body.dark-theme .viz-root {
   border: 1px solid var(--border-table); box-shadow: 0 6px 20px rgba(0, 0, 0, 0.18); font-size: 0.85rem; line-height: 1.4; pointer-events: none; }
 .viz-tip div { display: flex; justify-content: space-between; gap: 12px; }
 .viz-tip div span { color: var(--text-muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+/* --- ERAS PAGE (js/eras.js) --- */
+.era-bests td { vertical-align: top; }
+.era-bests td.era-best { background: var(--highlight-green-bg); box-shadow: inset 3px 0 0 var(--primary-green); }
+.era-swatch { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 8px; vertical-align: -1px; }
+.drift-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 12px 32px; }
+.drift-col h3 { margin: 0 0 8px; font-size: 0.95rem; }
+.drift-row { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr) auto; gap: 10px; align-items: center; padding: 6px 0; border-bottom: 1px solid var(--border-light); }
+.drift-name { font-weight: 700; font-size: 0.9rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.drift-bars { display: flex; flex-direction: column; gap: 3px; }
+.drift-bars i { display: block; height: 7px; border-radius: 3px; min-width: 2px; }
+.drift-from { background: var(--viz-other); }
+.drift-to.up { background: var(--viz-faster); }
+.drift-to.down { background: var(--viz-slower); }
+.drift-change { text-align: right; font-weight: 800; font-size: 0.85rem; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.drift-change span { display: block; font-weight: 600; font-size: 0.75rem; color: var(--text-muted); }
+.chapter-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; margin-top: 16px; }
+.chapter-card { background: var(--item-bg); border-radius: 10px; padding: 12px 14px; font-size: 0.88rem; }
+.chapter-card h3 { margin: 2px 0 2px; font-size: 1.05rem; color: var(--text-title); }
+.chapter-num { font-size: 0.72rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.04em; color: var(--primary-green); }
+.chapter-stat { margin: 8px 0 6px; }
+.chapter-line { margin-top: 3px; }
+.chapter-line span { font-weight: 800; color: var(--text-muted); margin-right: 4px; }
+.chapter-line em { font-style: normal; color: var(--text-muted); }
+
+/* --- HALL OF FAME PAGE (js/halloffame.js) --- */
+.hof-class { margin: 20px 0 10px; font-size: 1.1rem; color: var(--text-title); }
+.hof-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px; }
+.hof-card { background: var(--item-bg); border-radius: 10px; padding: 12px 14px; border-top: 3px solid var(--primary-green); }
+.hof-card h3 { margin: 0 0 3px; font-size: 1rem; }
+.hof-card h3 a { color: var(--text-title); text-decoration: none; }
+.hof-card h3 a:hover { color: var(--primary-green); }
+.hof-card .hub-sub { font-size: 0.8rem; }
+.hof-marks { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 8px; }
+.hof-mark { display: inline-block; padding: 2px 8px; border-radius: 999px; background: var(--highlight-green-bg); color: var(--text-title); font-size: 0.75rem; font-weight: 800; white-space: nowrap; }
+.hof-mark em { font-style: normal; font-weight: 600; color: var(--text-muted); }
+.hof-ballot { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 6px 20px; font-size: 0.9rem; }
+.hof-ballot > div { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 4px 0; border-bottom: 1px solid var(--border-light); }
+.viz-subhead { margin: 18px 0 4px; font-size: 0.95rem; color: var(--text-title); }
+.series-timeline { min-width: 760px; }
+.tf-rank { font-size: 0.72rem; font-weight: 700; color: var(--text-muted); }
+.tf-rank-best { color: var(--primary-green); font-weight: 800; }
+.throwback-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; }
+.throwback-col { background: var(--item-bg); border-radius: 10px; padding: 12px 14px; font-size: 0.9rem; }
+.throwback-col h3 { margin: 0 0 2px; font-size: 1rem; color: var(--text-title); }
+.throwback-col h3 em, .throwback-col li em { font-style: normal; font-weight: 600; color: var(--text-muted); font-size: 0.85em; }
+.throwback-col ol { margin: 8px 0; padding-left: 20px; }
+.throwback-col li { margin: 2px 0; }
+.throwback-done { font-size: 0.82rem; margin-bottom: 6px; }

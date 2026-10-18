@@ -7,6 +7,7 @@
 //   completions.js, goty.js, game.js, spotlight.js, metrics.js, milestones.js, analysis.js, history.js
 //   reach.js (Within Reach), review.js (Year in Review), partner.js, compare.js, ratings.js (also uses hubs)
 //   timeline.js, patterns.js (Seasonality, System Lifecycles), checks.js (Data Checks), charts.js (Charts)
+//   eras.js (Eras; uses charts.js), halloffame.js (Hall of Fame; uses eras.js)
 //   share.js      Share cards, loaded by the pages that offer them (game, review, spotlight)
 
 // Global State
@@ -151,8 +152,8 @@ const NAV_GROUPS = [
   { label: 'Index', href: 'index.html' },
   { label: 'Log', links: [['Monthly', 'monthly.html'], ['Yearly', 'yearly.html'], ['Year in Review', 'review.html'], ['Timeline', 'timeline.html'], ['History', 'history.html'], ['Completions', 'completions.html']] },
   { label: 'Collections', links: [['Systems', 'systems.html'], ['Franchise', 'franchise.html'], ['Genre', 'genre.html'], ['Release Year', 'releaseyear.html'], ['Partners', 'partner.html']] },
-  { label: 'Records', links: [['Spotlight', 'spotlight.html'], ['Milestones', 'milestones.html'], ['Within Reach', 'reach.html'], ['GotY', 'goty.html']] },
-  { label: 'Stats', links: [['Analysis', 'analysis.html'], ['Metrics', 'metrics.html'], ['Ratings', 'ratings.html'], ['Patterns', 'patterns.html'], ['Charts', 'charts.html'], ['Compare', 'compare.html'], ['Share Cards', 'card.html'], ['Data Checks', 'checks.html']] }
+  { label: 'Records', links: [['Spotlight', 'spotlight.html'], ['Hall of Fame', 'halloffame.html'], ['Milestones', 'milestones.html'], ['Within Reach', 'reach.html'], ['GotY', 'goty.html']] },
+  { label: 'Stats', links: [['Analysis', 'analysis.html'], ['Metrics', 'metrics.html'], ['Ratings', 'ratings.html'], ['Patterns', 'patterns.html'], ['Eras', 'eras.html'], ['Charts', 'charts.html'], ['Compare', 'compare.html'], ['Share Cards', 'card.html'], ['Data Checks', 'checks.html']] }
 ];
 
 function renderGlobalHeader() {
@@ -239,11 +240,13 @@ const PAGE_DATA = {
   'charts.html': ['entries'],
   'checks.html': ['entries', 'playthroughs'],
   'compare.html': ['entries', 'playthroughs'],
+  'eras.html': ['entries', 'playthroughs'],
   'completions.html': ['entries', 'playthroughs'],
   'franchise.html': ['entries', 'playthroughs', 'games'],
   'game.html': ['entries', 'playthroughs', 'games', 'milestones', 'lists'],
   'genre.html': ['entries', 'playthroughs', 'games'],
   'goty.html': ['games'],
+  'halloffame.html': ['entries', 'playthroughs'],
   'history.html': ['entries'],
   'metrics.html': ['entries', 'games', 'genres'],
   'milestones.html': ['milestones'],
@@ -268,11 +271,13 @@ const PAGE_INIT = {
   'charts.html': () => initChartsPage(),
   'checks.html': () => initChecksPage(),
   'compare.html': () => initComparePage(),
+  'eras.html': () => initErasPage(),
   'completions.html': () => initCompletionsPage(),
   'franchise.html': () => initFranchisePage(),
   'game.html': () => initGamePage(),
   'genre.html': () => initGenrePage(),
   'goty.html': () => initGotyPage(),
+  'halloffame.html': () => initHallOfFamePage(),
   'history.html': () => initHistoryPage(),
   'metrics.html': () => initMetricsPage(),
   'milestones.html': () => initMilestonesPage(),
@@ -591,6 +596,50 @@ function summarizeEntries(entries) {
   });
   return sum;
 }
+// Where a year ranks among every year of the log on each of its totals. A year still in progress is measured
+// against the other years up to the same day. Returns { seconds, days, games, newGames, completions, partial },
+// each { rank, of, text } with text like "3rd of 21 years".
+function yearRankings(year) {
+  const today = dataDateKey(), partial = today.startsWith(year) && today.slice(5) < '12-31';
+  const cutoff = partial ? today.slice(5) : '12-31';
+  const firstSeen = new Map(), years = new Map();
+  const yearOf = y => {
+    if (!years.has(y)) years.set(y, { seconds: 0, days: new Set(), games: new Set(), newGames: 0, completions: 0 });
+    return years.get(y);
+  };
+  rawData.allEntries.forEach(e => {
+    const y = e.date.slice(0, 4), counted = e.date.slice(5, 10) <= cutoff;
+    if (!firstSeen.has(e.game)) {
+      firstSeen.set(e.game, y);
+      if (counted) yearOf(y).newGames++;
+    }
+    if (!counted) return;
+    const t = yearOf(y);
+    t.seconds += timeStringToSeconds(e.time);
+    t.days.add(e.date.slice(0, 10));
+    t.games.add(e.game);
+  });
+  if (rawData.playthroughHistory) {
+    getSortedCompletions('All-Time').forEach(pt => {
+      const date = pt.displayDate.toISOString();
+      if (date.slice(5, 10) <= cutoff) yearOf(date.slice(0, 4)).completions++;
+    });
+  }
+  const ordinal = n => n + (n % 100 >= 11 && n % 100 <= 13 ? 'th' : ({ 1: 'st', 2: 'nd', 3: 'rd' }[n % 10] || 'th'));
+  const all = [...years.values()], result = { partial };
+  const value = { seconds: t => t.seconds, days: t => t.days.size, games: t => t.games.size, newGames: t => t.newGames, completions: t => t.completions };
+  Object.entries(value).forEach(([key, of]) => {
+    const mine = years.has(year) ? of(years.get(year)) : 0;
+    const rank = 1 + all.filter(t => of(t) > mine).length;
+    result[key] = { rank, of: all.length, text: rank === 1 ? `Best of ${all.length} years` : `${ordinal(rank)} of ${all.length} years` };
+  });
+  return result;
+}
+// The rank as a small line under a stat
+function yearRankHtml(rank, partial) {
+  return `<span class="tf-rank${rank.rank === 1 ? ' tf-rank-best' : ''}">${rank.text}${partial ? ' at this point' : ''}</span>`;
+}
+
 // Days since January 1 of the date's own year (0 for January 1), from a "YYYY-MM-DD..." string
 function dayOfYear(date) {
   return Math.round((Date.parse(date.slice(0, 10)) - Date.parse(date.slice(0, 4) + '-01-01')) / 86400000);

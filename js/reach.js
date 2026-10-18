@@ -6,6 +6,9 @@ const REACH_ACTIVE_DAYS = 30;
 const REACH_MAX_HOURS = 10;       // a time gap to the next rank or round number
 const REACH_MAX_COUNT = 3;        // a count gap (days, months, sessions, completions) to the next rank
 const REACH_MAX_HUB_HOURS = 25;   // series, genres and the like move in bigger steps
+// Anniversaries of a game's first play or first completion, shown when they fall within this many days
+const REACH_ANNIVERSARY_YEARS = [10, 15, 20];
+const REACH_ANNIVERSARY_DAYS = 60;
 // Spotlight lists a game keeps climbing as it's played, besides the "Top Games by ..." sections (weekday lists
 // are left out: they'd fill the page with one row per day of the week)
 const REACH_GROWING_LISTS = new Set([
@@ -190,6 +193,28 @@ function initReachPage() {
       <div class="card-content"><div class="goty-gap-subtitle">${note}</div>${rows.length ? rows.map(rowHtml).join('') : `<div class="loading-text">${empty}</div>`}</div>
     </div>`;
 
+  // --- Anniversaries coming up: 10, 15 or 20 years since a game was first played or first completed ---
+  const firsts = new Map();
+  rawData.allEntries.forEach(e => { if (!firsts.has(e.game)) firsts.set(e.game, { played: e.date.slice(0, 10), system: e.system }); });
+  getSortedCompletions('All-Time').forEach(pt => {
+    const f = firsts.get(pt.gameName);
+    if (f && !f.completed) f.completed = pt.displayDate.toISOString().slice(0, 10);
+  });
+  const anniversaries = [];
+  firsts.forEach((f, game) => {
+    [['played', 'First played'], ['completed', 'First completed']].forEach(([kind, label]) => {
+      if (!f[kind]) return;
+      REACH_ANNIVERSARY_YEARS.forEach(n => {
+        const date = `${Number(f[kind].slice(0, 4)) + n}${f[kind].slice(4)}`;
+        const days = Math.round((Date.parse(date + 'T12:00:00Z') - todayTime) / 86400000);
+        if (days < 0 || days > REACH_ANNIVERSARY_DAYS) return;
+        anniversaries.push({ title: game, game, rank: '', sort: days, badge: days === 0 ? `${n} years today` : `${n} years in ${plural(days, 'day')}`,
+                             sub: `${label} ${formatFullDate(f[kind])}${kind === 'played' ? ` on ${f.system}` : ''} · ${formatFullDate(date)}` });
+      });
+    });
+  });
+  anniversaries.sort((a, b) => a.sort - b.sort || a.title.localeCompare(b.title));
+
   container.innerHTML = `
     <div class="card-row grid-1">
       <h2 class="page-title">Within Reach</h2>
@@ -202,6 +227,9 @@ function initReachPage() {
     <section class="card-row grid-2">
       ${card('Climbing the Spotlight', `Games being played that are within ${REACH_MAX_HOURS} hours (or ${REACH_MAX_COUNT} days, months or sessions) of the next rank in a list. The badge is how far behind they are.`, climbs, 'No game is close to its next rank.')}
       ${card('Races', `The most played games of ${year}, and series, genres, developers, publishers and systems within ${REACH_MAX_HUB_HOURS} hours of the next rank.`, races, 'No close races.')}
+    </section>
+    <section class="card-row grid-1">
+      ${card('Anniversary Watch', `Games coming up on ${REACH_ANNIVERSARY_YEARS.join(', ').replace(/, (\d+)$/, ' or $1')} years since they were first played or first completed, in the next ${REACH_ANNIVERSARY_DAYS} days.`, anniversaries, 'No anniversaries coming up.')}
     </section>
   `;
 }

@@ -56,6 +56,28 @@ function initChecksPage() {
   add('fix', 'Game totals that don\'t add up', 'The Game Total typed on the entry differs from the sum of all that game\'s sessions up to then.',
     [...ENTRY_HEADERS, 'Sheet Says', 'Sessions Add Up To'], gameMismatch);
 
+  // --- How the log was kept, year by year (the 2006-2014 years were merged in from the old archive) ---
+  const years = new Map();
+  entries.forEach(e => {
+    const y = e.date.slice(0, 4), sec = timeStringToSeconds(e.time), meta = metaByName.get(e.game);
+    if (!years.has(y)) years.set(y, { entries: 0, days: new Set(), secs: [], quarter: 0, bare: 0, seconds: 0, unscored: 0, missing: 0 });
+    const t = years.get(y);
+    t.entries++;
+    t.days.add(e.date.slice(0, 10));
+    t.secs.push(sec);
+    t.seconds += sec;
+    if (sec % 900 === 0) t.quarter++;
+    if (/^Game \d+ - (Played|Completed) Game$/.test((e.note || '').trim())) t.bare++;
+    if (!meta || meta.score === null) t.unscored += sec;
+    if (!meta || missingFields(meta).length) t.missing += sec;
+  });
+  const median = list => { const s = list.slice().sort((a, b) => a - b); return s.length ? s[Math.floor(s.length / 2)] : 0; };
+  const pct = (n, of) => `${of ? Math.round(n / of * 100) : 0}%`;
+  add('info', 'How the log was kept, year by year', 'For comparing years fairly. The 2006–2014 entries came from the old archive: fewer, longer sessions per day and more bare "Played Game" notes, so counts of sessions or notes don\'t compare one-to-one with later years. Times are in 5-minute steps in every year.',
+    ['Year', 'Entries', 'Per Day Played', 'Median Session', 'On a 15-Minute Mark', 'Bare Notes', 'Time on Unscored Games', 'Time Missing Metadata'],
+    [...years.entries()].sort((a, b) => a[0].localeCompare(b[0])).map(([y, t]) => [y, t.entries, (t.entries / t.days.size).toFixed(1), formatTime(median(t.secs)),
+      pct(t.quarter, t.entries), pct(t.bare, t.entries), pct(t.unscored, t.seconds), pct(t.missing, t.seconds)]));
+
   // --- Entries ---
   const numbers = entries.map(e => Number(e.entryNum));
   const seen = new Set(), repeated = new Set();

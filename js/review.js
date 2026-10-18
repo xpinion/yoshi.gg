@@ -64,6 +64,7 @@ function reviewBodyHtml(year) {
     return `<span class="tf-compare ${diff >= 0 ? 'tf-up' : 'tf-down'}">${diff >= 0 ? '▲' : '▼'} ${show(Math.abs(diff))} vs ${prevYear}${inProgress ? ' at this point' : ''}</span>`;
   };
   const plain = v => String(Math.round(v));
+  const ranks = yearRankings(year), rank = key => yearRankHtml(ranks[key], ranks.partial);
   const stat = (label, value, extra = '') => `<div class="tf-stat"><span class="sys-widget-title">${label}</span><strong>${value}</strong>${extra}</div>`;
   const sub = text => `<span class="tf-sub">${text}</span>`;
 
@@ -94,11 +95,11 @@ function reviewBodyHtml(year) {
         <div class="card-header"><h2>${year} at a Glance${inProgress ? ` <span class="goty-gap-count">through ${formatFullDate(today)}</span>` : ''}</h2></div>
         <div class="card-content">
           <div class="tf-stats">
-            ${stat('Time Played', formatTime(sum.seconds), versus(sum.seconds, prev ? prev.seconds : 0))}
-            ${stat('Days Played', sum.days.size, sub(`of ${daysSoFar} · ${formatTime(sum.seconds / Math.max(1, sum.days.size))} per day played`))}
-            ${stat('Games', sum.games.size, versus(sum.games.size, prev ? prev.games.size : 0, plain))}
-            ${stat('New Games', newGames.length, sub(`${sum.games.size - newGames.length} returning`))}
-            ${stat('Completions', completions.length, versus(completions.length, prevCompletions, plain))}
+            ${stat('Time Played', formatTime(sum.seconds), versus(sum.seconds, prev ? prev.seconds : 0) + rank('seconds'))}
+            ${stat('Days Played', sum.days.size, sub(`of ${daysSoFar} · ${formatTime(sum.seconds / Math.max(1, sum.days.size))} per day played`) + rank('days'))}
+            ${stat('Games', sum.games.size, versus(sum.games.size, prev ? prev.games.size : 0, plain) + rank('games'))}
+            ${stat('New Games', newGames.length, sub(`${sum.games.size - newGames.length} returning`) + rank('newGames'))}
+            ${stat('Completions', completions.length, versus(completions.length, prevCompletions, plain) + rank('completions'))}
             ${stat('Longest Streak', `${streak.length} days`, sub(`${formatFullDate(streak.start)} to ${formatFullDate(streak.end)}`))}
             ${stat('Longest Session', formatTime(sum.longest.sec), sub(`${escapeHTML(sum.longest.entry.game)} · ${formatFullDate(sum.longest.entry.date)}`))}
             ${stat('Busiest Day', formatTime(bestDay[1]), sub(formatFullDate(bestDay[0])))}
@@ -109,6 +110,8 @@ function reviewBodyHtml(year) {
         </div>
       </div>
     </section>
+
+    ${similarYearsHtml(year)}
 
     <section class="card-row grid-2">
       <div class="card">
@@ -165,4 +168,47 @@ function reviewBodyHtml(year) {
       </div>
     </section>
   `;
+}
+
+// The years whose mix of genres and systems looks most like this one: each year as its share of hours by genre and
+// by system, compared by cosine similarity (100% would be an identical mix)
+const SIMILAR_YEARS_SHOWN = 3;
+function similarYearsHtml(year) {
+  const mixes = new Map();
+  rawData.allEntries.forEach(e => {
+    const y = e.date.slice(0, 4), sec = timeStringToSeconds(e.time);
+    if (!mixes.has(y)) mixes.set(y, { genre: new Map(), system: new Map(), games: new Map() });
+    const m = mixes.get(y);
+    [['genre', e.genre], ['system', e.system], ['games', e.game]].forEach(([k, v]) => { if (v && v !== 'N/A' && v !== 'Unknown') m[k].set(v, (m[k].get(v) || 0) + sec); });
+  });
+  const mine = mixes.get(year);
+  if (!mine || mixes.size < 2) return '';
+  const shares = map => { const t = [...map.values()].reduce((a, b) => a + b, 0) || 1; return new Map([...map].map(([k, v]) => [k, v / t])); };
+  const cosine = (a, b) => {
+    let dot = 0, na = 0, nb = 0;
+    a.forEach((v, k) => { dot += v * (b.get(k) || 0); na += v * v; });
+    b.forEach(v => { nb += v * v; });
+    return na && nb ? dot / Math.sqrt(na * nb) : 0;
+  };
+  const likeness = (a, b) => (cosine(shares(a.genre), shares(b.genre)) + cosine(shares(a.system), shares(b.system))) / 2;
+  const others = [...mixes.entries()].filter(([y]) => y !== year).map(([y, m]) => {
+    // What the two years have most in common: the genres and systems with the largest shared share
+    const common = kind => { const a = shares(mine[kind]), b = shares(m[kind]); return [...a.keys()].filter(k => b.has(k)).sort((x, z) => Math.min(b.get(z), a.get(z)) - Math.min(b.get(x), a.get(x))).slice(0, 2); };
+    return { year: y, score: likeness(mine, m), genres: common('genre'), systems: common('system'), top: topOfMap(m.games, 1)[0] };
+  }).sort((a, b) => b.score - a.score);
+  const rows = others.slice(0, SIMILAR_YEARS_SHOWN).map(o => ({
+    title: o.year, rank: '', badge: `${Math.round(o.score * 100)}%`,
+    sub: `Both heavy on ${[...o.genres, ...o.systems].join(', ')} · its top game was ${o.top[0]}`
+  }));
+  const least = others[others.length - 1];
+  return `
+    <section class="card-row grid-1">
+      <div class="card">
+        <div class="card-header"><h2>Years Most Like ${year}</h2></div>
+        <div class="card-content">
+          <div class="goty-gap-subtitle">By the mix of genres and systems played. The least alike: ${least.year} (${Math.round(least.score * 100)}%).</div>
+          ${rankedListHtml(rows)}
+        </div>
+      </div>
+    </section>`;
 }

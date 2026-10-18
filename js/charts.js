@@ -1,10 +1,14 @@
-// charts.js - The Charts page (charts.html): six pictures of the whole log.
+// charts.js - The Charts page (charts.html): pictures of the whole log.
 //   Year in Pixels    every day since the log began, coloured by the genre played most that day
 //   Genre River       hours (or share of hours) by genre, quarter by quarter
 //   Rank Race         where each of the top series (or systems) ranked by hours, year by year
 //   How Fresh         the age of the games played each year, weighted by hours
 //   Replays           finishing a game again: faster or slower than before
 //   Family Time       hours played with each partner, year by year, and the games played most together
+//   Console Generations  each year's hours by the hardware generation they were played on
+//   Day-of-Week Drift    each weekday's share of every year's hours
+//   Thousand-Hour Pace   how many days each 1,000 lifetime hours took
+//   Record Churn, Record Age   Spotlight records broken each year, and the year each current record was set (lists load after the page)
 // Colours: the categorical slots and ramps in dashboard.css (.viz-root), validated for colour-blind separation
 // in both themes. Every mark has a hover tooltip (vizTip) and the larger charts have a "Show the numbers" table.
 
@@ -15,6 +19,17 @@ const VIZ_AGE_BUCKETS = [
   { label: 'Released that year', max: 0 }, { label: '1–2 years old', max: 2 }, { label: '3–5 years old', max: 5 },
   { label: '6–10 years old', max: 10 }, { label: '11–20 years old', max: 20 }, { label: 'Over 20 years old', max: Infinity }
 ];
+// Systems by hardware generation (as logged in the System column); anything not listed counts as PC & Other
+const VIZ_GENERATIONS = [
+  { label: 'Retro (NES to N64)', systems: ['NES', 'FC', 'SMS', 'SNES', 'GEN', 'TG16', 'PCE', 'NEOG', 'N64', 'PSX', 'GB', 'GBC', 'G&W', 'ARC'] },
+  { label: 'PS2, GameCube, Xbox', systems: ['PS2', 'GCN', 'XBOX', 'DC', 'GBA'] },
+  { label: '360, Wii, PS3', systems: ['XB360', 'Wii', 'PS3', 'NDS', 'PSP'] },
+  { label: 'Switch, PS4, Xbox One', systems: ['NS', 'PS4', 'XB1', 'Wii U', '3DS', 'Vita'] },
+  { label: 'PS5, Series X, Switch 2', systems: ['PS5', 'XSX', 'NS2'] },
+  { label: 'PC & Other', systems: [] }
+];
+const VIZ_PACE_STEP = 1000; // hours per bar in the thousand-hour pace
+const VIZ_WEEKDAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 const VIZ_MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
 // Each chart's hover text, looked up from the hovered mark's data-viz and data-k (marks carry keys, not text)
@@ -39,6 +54,11 @@ function initChartsPage() {
         <div class="viz-controls"><select id="replay-show" class="milestone-year" aria-label="Show"><option value="changes">Biggest changes</option><option value="all">All replayed games</option></select></div>
         <div id="replay-chart">${replaysHtml(data, 'changes')}</div>`)}
       ${vizCard('family', 'Family Time', 'Multiplayer hours with each partner, year by year.', familyTimeHtml(data))}
+      ${vizCard('generations', 'Console Generations', 'Each year\'s hours by the hardware generation they were played on. Handhelds count with the consoles of their day.', generationsHtml(data))}
+      ${vizCard('weekdays', 'Day-of-Week Drift', 'Each weekday\'s share of every year\'s hours. An even spread would be 14% a day; darker means more than that.', weekdayDriftHtml(data))}
+      ${vizCard('pace', 'Thousand-Hour Pace', `How many days each ${VIZ_PACE_STEP.toLocaleString()} hours of lifetime play took. Shorter bars are faster.`, thousandHourPaceHtml(data))}
+      ${vizCard('churn', 'Record Churn', 'How many Spotlight records changed hands each year.', '<div id="churn-chart" class="loading-text">Loading Spotlight records...</div>')}
+      ${vizCard('record-age', 'How Old Are Today\'s Records?', 'The year each current Spotlight record was set.', '<div id="record-age-chart" class="loading-text">Loading Spotlight records...</div>')}
       <div id="viz-tip" class="viz-tip" hidden></div>
     </div>`;
 
@@ -46,6 +66,12 @@ function initChartsPage() {
   document.getElementById('race-kind').addEventListener('change', e => { document.getElementById('race-chart').innerHTML = rankRaceHtml(data, e.target.value); });
   document.getElementById('replay-show').addEventListener('change', e => { document.getElementById('replay-chart').innerHTML = replaysHtml(data, e.target.value); });
   wireVizTips(container);
+  loadData(['lists']).then(() => {
+    const lists = (rawData.metrics.top25Lists || []).filter(l => l.wrp && l.wrp.timeline && l.wrp.timeline.length);
+    const churn = document.getElementById('churn-chart'), age = document.getElementById('record-age-chart');
+    if (churn) { churn.className = ''; churn.innerHTML = recordChurnHtml(lists); }
+    if (age) { age.className = ''; age.innerHTML = recordAgeHtml(lists); }
+  });
 }
 
 function vizCard(id, title, note, body) {
@@ -83,6 +109,12 @@ function vizTicks(max) {
   const step = [1, 2, 5, 10].map(m => m * mag).find(s => s >= raw);
   const ticks = [];
   for (let t = 0; t <= max + 1e-9; t += step) ticks.push(t);
+  return ticks;
+}
+// Ticks that always reach past max (vizTicks can stop one step short of it)
+function vizTicksCovering(max) {
+  const ticks = vizTicks(max), step = ticks[1] - ticks[0] || 1;
+  while (ticks[ticks.length - 1] < max) ticks.push(ticks[ticks.length - 1] + step);
   return ticks;
 }
 const vizHours = sec => sec >= 36000 ? `${Math.round(sec / 3600)}h` : formatTime(sec);
@@ -284,11 +316,12 @@ function rankRaceHtml(data, kind) {
 
 // --- 4. HOW FRESH ---
 function howFreshHtml(data) {
-  const years = new Map(), unknown = new Map(), topGame = new Map();
+  const years = new Map(), unknown = new Map(), topGame = new Map(), ageSeconds = new Map();
   data.entries.forEach(e => {
     const year = +e.date.slice(0, 4), sec = timeStringToSeconds(e.time), released = parseInt(e.releaseYear, 10);
     if (!years.has(year)) years.set(year, VIZ_AGE_BUCKETS.map(() => 0));
     if (!released) { unknown.set(year, (unknown.get(year) || 0) + sec); return; }
+    ageSeconds.set(year, (ageSeconds.get(year) || 0) + Math.max(0, year - released) * sec);
     const b = VIZ_AGE_BUCKETS.findIndex(bucket => Math.max(0, year - released) <= bucket.max);
     years.get(year)[b] += sec;
     const k = `${year}|${b}`, games = topGame.get(k) || new Map();
@@ -325,12 +358,19 @@ function howFreshHtml(data) {
   // The headline: how much of the latest year went to games out that year or the year before, against the first
   const newShare = year => { const p = years.get(year), t = p.reduce((a, b) => a + b, 0); return t ? Math.round((p[0] + p[1]) / t * 100) : 0; };
   const first = list[0], last = list[list.length - 1];
-  const lead = `<p class="viz-lead">Games no more than 2 years old: <b>${newShare(first)}%</b> of hours in ${first}, <b>${newShare(last)}%</b> in ${last}.</p>`;
+  // Average age of the games played, weighted by hours (games with a release year only)
+  const averageAge = year => { const t = years.get(year).reduce((a, b) => a + b, 0); return t ? (ageSeconds.get(year) || 0) / t : 0; };
+  const releasedShare = year => { const p = years.get(year), t = p.reduce((a, b) => a + b, 0); return t ? Math.round(p[0] / t * 100) : 0; };
+  const oldest = list.reduce((best, y) => averageAge(y) > averageAge(best) ? y : best, first);
+  const lead = `<p class="viz-lead">Games no more than 2 years old: <b>${newShare(first)}%</b> of hours in ${first}, <b>${newShare(last)}%</b> in ${last}.
+    The average game played was <b>${averageAge(first).toFixed(1)}</b> years old in ${first} and <b>${averageAge(last).toFixed(1)}</b> in ${last}; the most retro year was ${oldest} at ${averageAge(oldest).toFixed(1)}.</p>`;
+  const ageChart = `<h3 class="viz-subhead">Average age of the games played, by hours</h3>` + lineChartSvg([{ label: 'Average age', color: 'var(--series-1)', width: 3, points: list.map(y => [y, averageAge(y)]) }],
+    { xMin: first, xMax: last, xTicks: list.filter((y, i) => i % 2 === 0).map(y => [y, y]), yFormat: v => `${v.toFixed(1)} yrs`, height: 240 });
   const table = `<details class="viz-table"><summary>Show the numbers</summary><div class="monthly-table-wrapper"><table class="monthly-table">
-    <thead><tr><th>Year</th>${VIZ_AGE_BUCKETS.map(b => `<th>${b.label}</th>`).join('')}<th>No release year</th></tr></thead>
-    <tbody>${list.map(year => `<tr><td class="text-left">${year}</td>${years.get(year).map(s => `<td>${formatTime(s)}</td>`).join('')}<td>${formatTime(unknown.get(year) || 0)}</td></tr>`).join('')}</tbody>
+    <thead><tr><th>Year</th>${VIZ_AGE_BUCKETS.map(b => `<th>${b.label}</th>`).join('')}<th>No release year</th><th>Average age</th><th>Released that year</th></tr></thead>
+    <tbody>${list.map(year => `<tr><td class="text-left">${year}</td>${years.get(year).map(s => `<td>${formatTime(s)}</td>`).join('')}<td>${formatTime(unknown.get(year) || 0)}</td><td>${averageAge(year).toFixed(1)} yrs</td><td>${releasedShare(year)}%</td></tr>`).join('')}</tbody>
   </table></div></details>`;
-  return lead + `<div class="viz-scroll">${svg}</div>` + vizLegendHtml(VIZ_AGE_BUCKETS.map((b, i) => [b.label, `var(--age-${i + 1})`])) + table;
+  return lead + `<div class="viz-scroll">${svg}</div>` + vizLegendHtml(VIZ_AGE_BUCKETS.map((b, i) => [b.label, `var(--age-${i + 1})`])) + ageChart + table;
 }
 
 // --- 5. REPLAYS ---
@@ -406,7 +446,7 @@ function familyTimeHtml(data) {
   const years = [...byYear.keys()].sort();
   const color = g => `var(--series-${groups.indexOf(g) + 1})`;
   const width = 1000, height = 320, padL = 52, padR = 16, padT = 16, padB = 34, innerW = width - padL - padR, innerH = height - padT - padB;
-  const ticks = vizTicks(Math.max(...years.map(y => [...byYear.get(y).values()].reduce((a, b) => a + b, 0))) / 3600 * 1.08);
+  const ticks = vizTicksCovering(Math.max(...years.map(y => [...byYear.get(y).values()].reduce((a, b) => a + b, 0))) / 3600 * 1.08);
   const maxH = ticks[ticks.length - 1] * 1.04;
   const slot = innerW / years.length, barW = Math.min(56, slot - 14);
   let svg = `<svg class="viz-svg" viewBox="0 0 ${width} ${height}" role="img" aria-label="Family time by year">`;
@@ -441,6 +481,186 @@ function familyTimeHtml(data) {
       <ol>${list.map(([game, s]) => `<li><span class="hover-trigger" data-game="${escapeHTML(game)}">${escapeHTML(game)}</span> <em>${formatTime(s)}</em></li>`).join('')}</ol></div>`;
   }).join('');
   return `<div class="viz-scroll">${svg}</div>${vizLegendHtml(groups.map(g => [g, color(g)]))}<div class="viz-tops">${tops}</div>`;
+}
+
+// A stacked bar per year, each bar's parts as shares of that year's total. parts: Map(year -> [seconds per group])
+function vizShareBars(key, years, parts, colorOf, label) {
+  const width = 1000, height = 340, padL = 52, padR = 16, padT = 16, padB = 34, innerW = width - padL - padR, innerH = height - padT - padB;
+  const slot = innerW / years.length, barW = Math.min(56, slot - 14);
+  let svg = `<svg class="viz-svg" viewBox="0 0 ${width} ${height}" role="img" aria-label="${label}">`;
+  [0, 0.25, 0.5, 0.75, 1].forEach(t => {
+    const y = padT + innerH - t * innerH;
+    svg += `<line x1="${padL}" x2="${padL + innerW}" y1="${y}" y2="${y}" class="viz-grid"/>` + vizText(padL - 8, y + 4, `${t * 100}%`, 'class="viz-axis" text-anchor="end"');
+  });
+  years.forEach((year, i) => {
+    const p = parts.get(year), total = p.reduce((a, b) => a + b, 0), cx = padL + slot * i + slot / 2;
+    const lastPart = p.reduce((top, sec, g) => sec ? g : top, -1);
+    let acc = 0;
+    p.forEach((sec, g) => {
+      if (!sec) return;
+      const h = sec / total * innerH;
+      svg += vizSegment(cx, barW, padT + innerH, acc, h, g === lastPart, colorOf(g), `data-viz="${key}" data-k="${year}|${g}"`);
+      acc += h;
+    });
+    svg += vizText(cx, height - 12, year, 'class="viz-axis" text-anchor="middle"');
+  });
+  return svg + '</svg>';
+}
+
+// --- 7. CONSOLE GENERATIONS ---
+function generationsHtml(data) {
+  const genOf = system => { const i = VIZ_GENERATIONS.findIndex(g => g.systems.includes(system)); return i < 0 ? VIZ_GENERATIONS.length - 1 : i; };
+  const parts = new Map(), systems = new Map();
+  data.entries.forEach(e => {
+    const year = +e.date.slice(0, 4), sec = timeStringToSeconds(e.time), g = genOf(e.system);
+    if (!parts.has(year)) parts.set(year, VIZ_GENERATIONS.map(() => 0));
+    parts.get(year)[g] += sec;
+    const k = `${year}|${g}`, m = systems.get(k) || new Map();
+    m.set(e.system, (m.get(e.system) || 0) + sec);
+    systems.set(k, m);
+  });
+  const years = [...parts.keys()].sort((a, b) => a - b);
+  const colorOf = g => g === VIZ_GENERATIONS.length - 1 ? 'var(--viz-other)' : `var(--series-${g + 1})`;
+  vizTips.generations = key => {
+    const [year, g] = key.split('|').map(Number), p = parts.get(year), total = p.reduce((a, b) => a + b, 0);
+    const list = [...(systems.get(key) || new Map()).entries()].sort((a, b) => b[1] - a[1]);
+    return `<b>${year}</b> · ${VIZ_GENERATIONS[g].label}<div>${formatTime(p[g])} <span>${Math.round(p[g] / total * 100)}% of the year</span></div>${list.map(([sys, sec]) => `<div>${escapeHTML(sys)} <span>${formatTime(sec)}</span></div>`).join('')}`;
+  };
+  // The first year each generation had the biggest share
+  const leader = year => { const p = parts.get(year); return p.indexOf(Math.max(...p)); };
+  const firstLed = new Map();
+  years.forEach(y => { if (!firstLed.has(leader(y))) firstLed.set(leader(y), y); });
+  const lead = `<p class="viz-lead">First year each generation had the biggest share: ${[...firstLed.entries()].map(([g, y]) => `<b>${escapeHTML(VIZ_GENERATIONS[g].label)}</b> ${y}`).join(' · ')}.</p>`;
+  const table = `<details class="viz-table"><summary>Show the numbers</summary><div class="monthly-table-wrapper"><table class="monthly-table">
+    <thead><tr><th>Year</th>${VIZ_GENERATIONS.map(g => `<th>${escapeHTML(g.label)}</th>`).join('')}</tr></thead>
+    <tbody>${years.map(y => `<tr><td class="text-left">${y}</td>${parts.get(y).map(sec => `<td>${formatTime(sec)}</td>`).join('')}</tr>`).join('')}</tbody>
+  </table></div></details>`;
+  return lead + `<div class="viz-scroll">${vizShareBars('generations', years, parts, colorOf, 'Hours by console generation each year')}</div>`
+    + vizLegendHtml(VIZ_GENERATIONS.map((g, i) => [g.label, colorOf(i)])) + table;
+}
+
+// --- 8. DAY-OF-WEEK DRIFT ---
+function weekdayDriftHtml(data) {
+  const years = new Map();
+  data.entries.forEach(e => {
+    const year = e.date.slice(0, 4), day = (new Date(e.date).getUTCDay() + 6) % 7; // Monday first
+    if (!years.has(year)) years.set(year, Array(7).fill(0));
+    years.get(year)[day] += timeStringToSeconds(e.time);
+  });
+  const list = [...years.keys()].sort();
+  const even = 1 / 7;
+  const rows = list.map(year => {
+    const secs = years.get(year), total = secs.reduce((a, b) => a + b, 0);
+    const shares = secs.map(s => total ? s / total : 0);
+    const weekend = shares[5] + shares[6];
+    return `<tr><th class="season-name">${year}</th>${shares.map((share, d) => {
+      const strength = Math.max(0, Math.min(1, (share / even - 0.5) / 1.5));
+      return `<td style="background: rgba(46, 125, 50, ${(0.06 + 0.9 * strength).toFixed(2)}); color: ${strength > 0.55 ? '#fff' : 'var(--text-title)'};" title="${VIZ_WEEKDAYS[d]}s in ${year}: ${formatTime(secs[d])}, ${(share * 100).toFixed(1)}% of the year">${Math.round(share * 100)}%</td>`;
+    }).join('')}<td class="season-total">${Math.round(weekend * 100)}%</td></tr>`;
+  }).join('');
+  return `<div class="monthly-table-wrapper"><table class="season-table">
+    <thead><tr><th></th>${VIZ_WEEKDAYS.map(d => `<th>${d}</th>`).join('')}<th>Weekend</th></tr></thead>
+    <tbody>${rows}</tbody></table></div>`;
+}
+
+// --- 9. THOUSAND-HOUR PACE ---
+function thousandHourPaceHtml(data) {
+  const step = VIZ_PACE_STEP * 3600, steps = [];
+  let total = 0, start = data.entries[0].date.slice(0, 10), games = new Map();
+  data.entries.forEach(e => {
+    const sec = timeStringToSeconds(e.time), day = e.date.slice(0, 10);
+    total += sec;
+    games.set(e.game, (games.get(e.game) || 0) + sec);
+    while (total >= (steps.length + 1) * step) {
+      steps.push({ n: steps.length + 1, start, end: day, days: Math.round((Date.parse(day) - Date.parse(start)) / 86400000) + 1, games });
+      start = day;
+      games = new Map();
+    }
+  });
+  const next = { start, hours: (total - steps.length * step) / 3600, days: Math.round((Date.parse(data.last) - Date.parse(start)) / 86400000) + 1, games };
+  const width = 1000, height = 320, padL = 52, padR = 16, padT = 24, padB = 34, innerW = width - padL - padR, innerH = height - padT - padB;
+  const ticks = vizTicksCovering(Math.max(...steps.map(s => s.days), next.days) * 1.08), maxY = ticks[ticks.length - 1];
+  const bars = steps.length + 1, slot = innerW / bars, barW = Math.min(44, slot - 10);
+  const y = v => padT + innerH - (v / maxY) * innerH;
+  let svg = `<svg class="viz-svg" viewBox="0 0 ${width} ${height}" role="img" aria-label="Days taken for each thousand hours">`;
+  ticks.forEach(t => { svg += `<line x1="${padL}" x2="${padL + innerW}" y1="${y(t)}" y2="${y(t)}" class="viz-grid"/>` + vizText(padL - 8, y(t) + 4, `${t}d`, 'class="viz-axis" text-anchor="end"'); });
+  const fastest = steps.reduce((best, s) => s.days < best.days ? s : best, steps[0]);
+  steps.forEach((s, i) => {
+    const cx = padL + slot * i + slot / 2;
+    svg += `<rect x="${cx - barW / 2}" y="${y(s.days)}" width="${barW}" height="${y(0) - y(s.days)}" rx="3" fill="${s === fastest ? 'var(--series-2)' : 'var(--series-1)'}" data-viz="pace" data-k="${i}"/>`;
+    svg += vizText(cx, y(s.days) - 6, s.days, 'class="viz-label" text-anchor="middle"');
+    svg += vizText(cx, height - 12, `${s.n}k`, 'class="viz-axis" text-anchor="middle"');
+  });
+  // The thousand under way: an outline as tall as its days so far
+  const cx = padL + slot * steps.length + slot / 2;
+  svg += `<rect x="${cx - barW / 2}" y="${y(next.days)}" width="${barW}" height="${y(0) - y(next.days)}" rx="3" fill="none" stroke="var(--series-1)" stroke-width="2" stroke-dasharray="4 3" data-viz="pace" data-k="next"/>`;
+  svg += vizText(cx, height - 12, `${steps.length + 1}k`, 'class="viz-axis" text-anchor="middle"');
+  svg += `<line x1="${padL}" x2="${padL + innerW}" y1="${y(0)}" y2="${y(0)}" class="viz-baseline"/></svg>`;
+  const topGames = m => [...m.entries()].sort((a, b) => b[1] - a[1]).slice(0, 3).map(([g, sec]) => `<div>${escapeHTML(g)} <span>${formatTime(sec)}</span></div>`).join('');
+  vizTips.pace = key => {
+    if (key === 'next') return `<b>${(steps.length + 1).toLocaleString()},000 hours (under way)</b><div>${Math.round(next.hours)}h of ${VIZ_PACE_STEP} in ${next.days} days</div>${topGames(next.games)}`;
+    const s = steps[key];
+    return `<b>${s.n.toLocaleString()},000 hours</b><div>${s.days} days <span>${formatFullDate(s.start)} – ${formatFullDate(s.end)}</span></div>${topGames(s.games)}`;
+  };
+  const slowest = steps.reduce((best, s) => s.days > best.days ? s : best, steps[0]);
+  const lead = `<p class="viz-lead">Fastest: <b>${fastest.n}k</b> in ${fastest.days} days (reached ${formatFullDate(fastest.end)}). Slowest: <b>${slowest.n}k</b> in ${slowest.days} days. Next up: ${(steps.length + 1)}k, ${Math.round(next.hours)} of ${VIZ_PACE_STEP} hours in ${next.days} days so far.</p>`;
+  return lead + `<div class="viz-scroll">${svg}</div>` + vizLegendHtml([['Days for each thousand', 'var(--series-1)'], ['Fastest', 'var(--series-2)']]);
+}
+
+// A bar per year of the log, with a count over each. counts: Map(year -> number)
+function vizYearCountBars(key, counts, label) {
+  const first = Number(rawData.allEntries[0].date.slice(0, 4)), last = Number(dataDateKey().slice(0, 4));
+  const years = []; for (let y = first; y <= last; y++) years.push(y);
+  const width = 1000, height = 300, padL = 52, padR = 16, padT = 24, padB = 34, innerW = width - padL - padR, innerH = height - padT - padB;
+  const ticks = vizTicksCovering(Math.max(1, ...years.map(y => counts.get(y) || 0)) * 1.08), maxY = ticks[ticks.length - 1];
+  const slot = innerW / years.length, barW = Math.min(44, slot - 10), y = v => padT + innerH - (v / maxY) * innerH;
+  let svg = `<svg class="viz-svg" viewBox="0 0 ${width} ${height}" role="img" aria-label="${label}">`;
+  ticks.forEach(t => { svg += `<line x1="${padL}" x2="${padL + innerW}" y1="${y(t)}" y2="${y(t)}" class="viz-grid"/>` + vizText(padL - 8, y(t) + 4, t, 'class="viz-axis" text-anchor="end"'); });
+  years.forEach((year, i) => {
+    const n = counts.get(year) || 0, cx = padL + slot * i + slot / 2;
+    if (n) svg += `<rect x="${cx - barW / 2}" y="${y(n)}" width="${barW}" height="${y(0) - y(n)}" rx="3" fill="var(--series-1)" data-viz="${key}" data-k="${year}"/>` + vizText(cx, y(n) - 6, n, 'class="viz-label" text-anchor="middle"');
+    svg += vizText(cx, height - 12, year, 'class="viz-axis" text-anchor="middle"');
+  });
+  svg += `<line x1="${padL}" x2="${padL + innerW}" y1="${y(0)}" y2="${y(0)}" class="viz-baseline"/></svg>`;
+  return `<div class="viz-scroll">${svg}</div>`;
+}
+
+// --- 10. RECORD CHURN ---
+function recordChurnHtml(lists) {
+  const counts = new Map(), byList = new Map();
+  lists.forEach(l => l.wrp.timeline.slice(1).forEach(ev => {
+    const year = Number(ev.date.slice(0, 4));
+    counts.set(year, (counts.get(year) || 0) + 1);
+    const k = `${year}|${l.titleLeft}`;
+    byList.set(k, (byList.get(k) || 0) + 1);
+  }));
+  vizTips.churn = year => {
+    const top = [...byList.entries()].filter(([k]) => k.startsWith(`${year}|`)).sort((a, b) => b[1] - a[1]).slice(0, 5);
+    return `<b>${year}</b> · ${counts.get(Number(year))} records broken${top.map(([k, n]) => `<div>${escapeHTML(k.split('|')[1])} <span>${n}×</span></div>`).join('')}`;
+  };
+  const busiest = [...counts.entries()].sort((a, b) => b[1] - a[1])[0];
+  const total = [...counts.values()].reduce((a, b) => a + b, 0);
+  return `<p class="viz-lead">${total.toLocaleString()} record changes across ${lists.length} lists (each list's first holder isn't counted). The busiest year was <b>${busiest[0]}</b> with ${busiest[1]}.</p>`
+    + vizYearCountBars('churn', counts, 'Spotlight records broken each year');
+}
+
+// --- 11. HOW OLD ARE TODAY'S RECORDS ---
+function recordAgeHtml(lists) {
+  const counts = new Map(), titles = new Map();
+  lists.forEach(l => {
+    const current = l.wrp.timeline[l.wrp.timeline.length - 1], year = Number(current.date.slice(0, 4));
+    counts.set(year, (counts.get(year) || 0) + 1);
+    if (!titles.has(year)) titles.set(year, []);
+    titles.get(year).push({ title: l.titleLeft, holder: current.champion, date: current.date });
+  });
+  vizTips['record-age'] = year => {
+    const list = titles.get(Number(year)).sort((a, b) => a.date.localeCompare(b.date));
+    return `<b>${year}</b> · ${list.length} current records${list.slice(0, 6).map(r => `<div>${escapeHTML(r.title)} <span>${escapeHTML(r.holder.length > 24 ? r.holder.slice(0, 23) + '…' : r.holder)}</span></div>`).join('')}${list.length > 6 ? `<div>and ${list.length - 6} more</div>` : ''}`;
+  };
+  const years = [...counts.keys()].sort((a, b) => a - b), latest = years[years.length - 1];
+  const oldest = years[0];
+  return `<p class="viz-lead">Of ${lists.length} Spotlight records, <b>${counts.get(latest)}</b> were set in ${latest}. The oldest still standing go back to <b>${oldest}</b> (${counts.get(oldest)}).</p>`
+    + vizYearCountBars('record-age', counts, 'The year each current Spotlight record was set');
 }
 
 // --- HOVER ---

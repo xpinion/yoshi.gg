@@ -28,7 +28,7 @@ function buildTimeframeFeed(containerId, mode) {
     }
 
     html += `
-    <section class="card-row grid-1">
+    <section class="card-row grid-1" id="${mode}-${key}">
       <div class="card">
         <div class="card-header">
           <h2>${displayTitle} Summary</h2>
@@ -53,6 +53,10 @@ function buildTimeframeFeed(containerId, mode) {
     renderTimeframeWidgets(key, mode, `${mode}-widgets-${key}`, widgetData);
     renderTimeframeSummary(key, mode, `${mode}-summary-${key}`);
   });
+
+  // A link to one period (monthly.html#monthly-2016-10) scrolls to it once the cards exist
+  const target = window.location.hash && document.getElementById(decodeURIComponent(window.location.hash.slice(1)));
+  if (target) target.scrollIntoView();
 
   // 4. Stagger the fade-in animation
   document.querySelectorAll('.card').forEach((card, index) => {
@@ -231,6 +235,10 @@ function renderTimeframeWidgets(key, mode, containerId, data) {
   };
   const comparisons = monthly ? [compare(shiftKey(-1)), compare(shiftKey(-12))] : [compare(shiftKey(-1))];
 
+  // Yearly: where this year ranks among every year of the log
+  const ranks = monthly ? null : yearRankings(key);
+  const rank = k => ranks ? yearRankHtml(ranks[k], ranks.partial) : '';
+
   // Projection for the period that's still in progress
   let projection = '';
   if (inProgress) {
@@ -266,10 +274,10 @@ function renderTimeframeWidgets(key, mode, containerId, data) {
 
   container.innerHTML = `
     <div class="tf-stats">
-      <div class="tf-stat"><span class="sys-widget-title">Time Played</span><strong>${formatTime(t.seconds)}</strong>${comparisons.join('')}</div>
-      <div class="tf-stat"><span class="sys-widget-title">Days Played</span><strong>${t.days.size}</strong></div>
-      <div class="tf-stat"><span class="sys-widget-title">Games</span><strong>${t.games.size}</strong></div>
-      <div class="tf-stat"><span class="sys-widget-title">Completions</span><strong>${data.completions[key] || 0}</strong></div>
+      <div class="tf-stat"><span class="sys-widget-title">Time Played</span><strong>${formatTime(t.seconds)}</strong>${comparisons.join('')}${rank('seconds')}</div>
+      <div class="tf-stat"><span class="sys-widget-title">Days Played</span><strong>${t.days.size}</strong>${rank('days')}</div>
+      <div class="tf-stat"><span class="sys-widget-title">Games</span><strong>${t.games.size}</strong>${rank('games')}</div>
+      <div class="tf-stat"><span class="sys-widget-title">Completions</span><strong>${data.completions[key] || 0}</strong>${rank('completions')}</div>
       <div class="tf-stat"><span class="sys-widget-title">Top Genre</span><strong class="tf-genre">${topGenre ? escapeHTML(topGenre[0]) : '-'}</strong>${topGenre ? `<span class="tf-sub">${formatTime(topGenre[1].totalSeconds)}</span>` : ''}</div>
       ${projection}
     </div>

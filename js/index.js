@@ -7,6 +7,7 @@ function initIndexPage() {
   renderIndexHighlights();
   renderNowPlaying();
   renderYearPace();
+  renderThrowback();
   setupIndexTabs();
   setupDropdowns();
   setupLiveSearch();
@@ -236,6 +237,31 @@ function renderYearPace() {
     ${lineChartSvg(series, { xMax: 365, xTicks, width: 640, height: 300 })}
     ${chartLegendHtml([{ label: thisYear, color: THIS }, { label: lastYear, color: LAST }, { label: 'Earlier years', color: OTHER }])}
   `;
+}
+
+// This calendar month 5, 10, 15 and 20 years ago (as far back as the log goes): time, days, completions and top games
+const THROWBACK_YEARS = [5, 10, 15, 20];
+function renderThrowback() {
+  const container = document.getElementById('throwback-content');
+  if (!container) return;
+  const now = getDataDate(), month = String(now.getMonth() + 1).padStart(2, '0');
+  const firstYear = Number(rawData.allEntries[0].date.slice(0, 4));
+  const completions = getSortedCompletions('All-Time');
+  const columns = THROWBACK_YEARS.map(ago => now.getFullYear() - ago).filter(y => y >= firstYear).map(year => {
+    const key = `${year}-${month}`;
+    const sum = summarizeEntries(rawData.allEntries.filter(e => e.date.startsWith(key)));
+    const done = completions.filter(pt => pt.displayDate.toISOString().startsWith(key));
+    const label = `${MONTH_NAMES[now.getMonth()]} ${year}`;
+    if (!sum.sessions) return `<div class="throwback-col"><h3>${label} <em>${now.getFullYear() - year} years ago</em></h3><div class="loading-text">Nothing played.</div></div>`;
+    return `<div class="throwback-col">
+      <h3>${label} <em>${now.getFullYear() - year} years ago</em></h3>
+      <div class="hub-sub">${formatTime(sum.seconds)} over ${sum.days.size} ${sum.days.size === 1 ? 'day' : 'days'}${done.length ? ` · ${done.length} completed` : ''}</div>
+      <ol>${topOfMap(sum.games, 3).map(([g, sec]) => `<li><span class="hover-trigger" data-game="${escapeHTML(g)}">${escapeHTML(g)}</span> <em>${formatTime(sec)}</em></li>`).join('')}</ol>
+      ${done.length ? `<div class="throwback-done">Finished: ${done.map(pt => `<span class="hover-trigger" data-game="${escapeHTML(pt.gameName)}">${escapeHTML(pt.gameName)}</span>`).join(', ')}</div>` : ''}
+      <a class="reach-link" href="monthly.html#monthly-${key}">${label} in full</a>
+    </div>`;
+  });
+  container.innerHTML = `<div class="throwback-grid">${columns.join('')}</div>`;
 }
 
 // Spotlight records that changed hands in the last RECENT_RECORD_DAYS days of the log

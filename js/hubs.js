@@ -664,6 +664,14 @@ function buildAnalyticsHub(containerId, dataKey, titleLabel) {
         </div>
       </section>
 
+      ${dataKey === 'series' ? `
+      <section class="card-row grid-1">
+        <div class="card" style="max-height: none;">
+          <div class="card-header"><h2>Series Timeline: ${escapeHTML(valName)}</h2></div>
+          <div class="card-content">${seriesTimelineHtml(item, valName)}</div>
+        </div>
+      </section>` : ''}
+
       <section class="card-row grid-strict-3">
         <div class="card hub-sessions-card">
           <div class="hub-session-first">
@@ -885,6 +893,57 @@ function buildAnalyticsHub(containerId, dataKey, titleLabel) {
 
 // --- SPOTLIGHT RECORDS HELD BY A HUB ITEM ---
 // The Spotlight column heading that ranks each kind of hub item
+// Franchise deep dive: one row per game in the series (in the order first played), a cell for each year it was
+// played (darker for more hours) and a dot for each completion of the main game
+function seriesTimelineHtml(item, seriesName) {
+  const firstYear = Number(rawData.allEntries[0].date.slice(0, 4)), lastYear = Number(dataDateKey().slice(0, 4));
+  const games = new Map();
+  item.entries.forEach(e => {
+    if (!games.has(e.game)) games.set(e.game, { name: e.game, years: new Map(), completions: [] });
+    const y = Number(e.date.slice(0, 4));
+    games.get(e.game).years.set(y, (games.get(e.game).years.get(y) || 0) + timeStringToSeconds(e.time));
+  });
+  getSortedCompletions('All-Time').filter(pt => pt.series === seriesName && games.has(pt.gameName))
+    .forEach(pt => games.get(pt.gameName).completions.push(pt.displayDate.toISOString().slice(0, 10)));
+  const rows = [...games.values()];
+  const yearTotals = new Map();
+  rows.forEach(g => g.years.forEach((sec, y) => yearTotals.set(y, (yearTotals.get(y) || 0) + sec)));
+  const maxSec = Math.max(...rows.flatMap(g => [...g.years.values()]));
+  const padL = 250, padR = 12, padT = 22, rowH = 22, width = 1000, cellW = (width - padL - padR) / (lastYear - firstYear + 1);
+  const height = padT + (rows.length + 1) * rowH + 6;
+  const x = y => padL + (y - firstYear) * cellW;
+  // Shade by the square root of the hours, so a 2-hour visit still shows beside a 100-hour year
+  const shade = sec => (0.15 + 0.85 * Math.sqrt(sec / maxSec)).toFixed(2);
+  const label = (text, y, bold) => `<text x="${padL - 10}" y="${y}" text-anchor="end" font-family="Inter, sans-serif" font-size="12" font-weight="${bold ? 800 : 600}" fill="var(--text-title)">${escapeHTML(text.length > 36 ? text.slice(0, 35) + '…' : text)}</text>`;
+  let svg = `<svg class="hub-chart series-timeline" viewBox="0 0 ${width} ${height}" role="img" aria-label="Years each ${escapeHTML(seriesName)} game was played">`;
+  for (let y = firstYear; y <= lastYear; y++) {
+    if ((y - firstYear) % 2 === 0) svg += `<text x="${x(y) + cellW / 2}" y="${padT - 8}" text-anchor="middle" font-family="Inter, sans-serif" font-size="11" font-weight="700" fill="var(--text-muted)">${y}</text>`;
+  }
+  // The series as a whole on top, then each game
+  svg += label('All games', padT + rowH / 2 + 4, true);
+  const maxYear = Math.max(...yearTotals.values());
+  yearTotals.forEach((sec, y) => {
+    svg += `<rect x="${x(y) + 1}" y="${padT + 3}" width="${cellW - 2}" height="${rowH - 6}" rx="3" fill="var(--text-title)" opacity="${(0.15 + 0.85 * Math.sqrt(sec / maxYear)).toFixed(2)}"><title>${escapeHTML(seriesName)} in ${y}: ${formatTime(sec)}</title></rect>`;
+  });
+  rows.forEach((g, i) => {
+    const top = padT + (i + 1) * rowH;
+    svg += label(g.name, top + rowH / 2 + 4, false);
+    svg += `<line x1="${padL}" x2="${width - padR}" y1="${top + rowH / 2}" y2="${top + rowH / 2}" stroke="var(--border-light)"/>`;
+    g.years.forEach((sec, y) => {
+      svg += `<rect x="${x(y) + 1}" y="${top + 3}" width="${cellW - 2}" height="${rowH - 6}" rx="3" fill="var(--primary-green)" opacity="${shade(sec)}"><title>${escapeHTML(g.name)} in ${y}: ${formatTime(sec)}</title></rect>`;
+    });
+    g.completions.forEach(date => {
+      const y = Number(date.slice(0, 4)), cx = x(y) + cellW * (dayOfYear(date) + 0.5) / 366;
+      svg += `<circle cx="${cx.toFixed(1)}" cy="${top + rowH / 2}" r="4.5" fill="var(--card-bg)" stroke="var(--text-title)" stroke-width="2"><title>${escapeHTML(g.name)} completed ${formatFullDate(date)}</title></circle>`;
+    });
+  });
+  svg += '</svg>';
+  const spanYears = [...yearTotals.keys()];
+  const active = spanYears.length, span = Math.max(...spanYears) - Math.min(...spanYears) + 1;
+  return `<div class="goty-gap-subtitle">Played in ${active} of the ${span} years from ${Math.min(...spanYears)} to ${Math.max(...spanYears)}. Darker cells mean more hours; a dot is a completion.</div>
+    <div class="monthly-table-wrapper">${svg}</div>`;
+}
+
 const HUB_SPOTLIGHT_HEADERS = { system: 'System', series: 'Series', genre: 'Genre', releaseYear: 'Release Year' };
 
 // Lists this system, franchise, genre or release year leads or appears in. The lists are downloaded only when needed.
