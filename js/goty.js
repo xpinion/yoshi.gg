@@ -252,6 +252,9 @@ function initGotyPage() {
 
   html += `</section>`;
   container.innerHTML = html;
+  // A link to one year (goty.html#year-2017) scrolls to it once the cards exist
+  const target = window.location.hash && document.getElementById(decodeURIComponent(window.location.hash.slice(1)));
+  if (target) target.scrollIntoView();
 
   document.querySelectorAll('.goty-card').forEach((card, index) => {
     card.style.animationDelay = `${Math.min(index * 0.05, 1.5)}s`;

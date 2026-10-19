@@ -1,5 +1,5 @@
 // eras.js - The Eras page (eras.html): the log seen in long stretches.
-//   The Eras         five-year blocks side by side, with each one's Game of the Era and top games
+//   The Eras         five-year blocks side by side, with each one's most played game and top games
 //   Era Bests        the personal bests set inside each era
 //   Taste Drift      which genres (or series, systems...) rose and faded between two eras
 //   Reigns           the #1 game (or system, genre, series) of each year, and how long each one stayed on top
@@ -38,7 +38,7 @@ function initErasPage() {
   container.innerHTML = `
     <div class="card-row grid-1"><h2 class="page-title">Eras</h2></div>
     <div class="viz-root page-stack">
-      ${vizCard('eras', 'The Eras', `The log in ${ERA_YEARS}-year blocks. The Game of the Era is the one played most inside it.`, erasOverviewHtml(eras))}
+      ${vizCard('eras', 'The Eras', `The log in ${ERA_YEARS}-year blocks. The Most Played column is the game with the most hours inside each era.`, erasOverviewHtml(eras))}
       ${vizCard('bests', 'Era Bests', 'The personal bests set inside each era. The highlighted cell is the best of all time.', eraBestsHtml(eras))}
       ${vizCard('drift', 'Taste Drift', 'Each one\'s share of the hours in one era against another, with the biggest risers and faders.', `
         <div class="viz-controls">
@@ -105,7 +105,7 @@ function erasOverviewHtml(eras) {
       <ol>${list.map(([game, sec]) => `<li><span class="hover-trigger" data-game="${escapeHTML(game)}">${escapeHTML(game)}</span> <em>${formatTime(sec)}</em></li>`).join('')}</ol></div>`;
   }).join('');
   return `<div class="monthly-table-wrapper"><table class="monthly-table">
-      <thead><tr><th>Era</th><th>Time</th><th>Days</th><th>Games</th><th>New Games</th><th>Completions</th><th>Game of the Era</th><th>Top System</th><th>Top Genre</th><th>Top Series</th></tr></thead>
+      <thead><tr><th>Era</th><th>Time</th><th>Days</th><th>Games</th><th>New Games</th><th>Completions</th><th>Most Played</th><th>Top System</th><th>Top Genre</th><th>Top Series</th></tr></thead>
       <tbody>${rows}</tbody></table></div>
     <div class="viz-tops">${tops}</div>`;
 }

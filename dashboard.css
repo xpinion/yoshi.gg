@@ -1650,3 +1650,8 @@ body.dark-theme .viz-root {
 .throwback-col ol { margin: 8px 0; padding-left: 20px; }
 .throwback-col li { margin: 2px 0; }
 .throwback-done { font-size: 0.82rem; margin-bottom: 6px; }
+a.hof-mark { text-decoration: none; }
+.hof-mark.hof-goty { background: #fff1c2; color: #5c4300; box-shadow: inset 0 0 0 1px #e8c35a; }
+.hof-mark.hof-goty em { color: #7a5c00; }
+body.dark-theme .hof-mark.hof-goty { background: #3d3100; color: #ffe08a; box-shadow: inset 0 0 0 1px #8a6d10; }
+body.dark-theme .hof-mark.hof-goty em { color: #e6c766; }
