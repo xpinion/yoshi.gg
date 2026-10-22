@@ -1669,3 +1669,8 @@ body.dark-theme .hof-mark.hof-goty em { color: #e6c766; }
 /* the page itself is the table: no card box or height cap, full window width */
 .master-container { max-width: none; }
 .master-title { color: var(--primary-green); font-size: 1.6rem; font-weight: 900; text-align: center; margin-bottom: 18px; }
+.master-entries-btn { float: right; margin-left: 10px; padding: 2px 8px; border: 1px solid var(--border-light); border-radius: 6px; background: var(--item-bg); color: var(--text-main); font: inherit; font-size: 0.8rem; font-weight: 800; cursor: pointer; white-space: nowrap; }
+.master-entries-btn:hover { border-color: var(--primary-green); }
+.master-entries-btn[aria-expanded="true"] { background: var(--primary-green); border-color: var(--primary-green); color: #fff; }
+.master-entries-row > td { padding: 6px 12px 14px 36px !important; background: var(--item-bg); }
+.master-entries-table { font-size: 0.85rem; }

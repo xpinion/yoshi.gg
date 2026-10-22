@@ -60,7 +60,7 @@ function buildMasterGames() {
     // A playthrough's finalGameLifetime is the game's total on its last day, so the latest one holds the game's lifetime
     const seconds = Math.max(...pts.map(pt => timeStringToSeconds(pt.finalGameLifetime)));
     const days = Math.max(...pts.map(pt => Number(pt.finalGameLifetimeDays) || 0));
-    const systems = [...new Set(pts.flatMap(pt => (pt.systems && pt.systems.data) || [pt.system]))];
+    const systems = [...new Set(pts.flatMap(pt => pt.systems instanceof Set ? [...pt.systems] : [pt.system]))];
     return { name, pts, latest: pts[0], seconds, days, systems, lastDate: pts[0].lastDate,
       startDate: pts.reduce((m, pt) => pt.startDate < m ? pt.startDate : m, pts[0].startDate) };
   });
@@ -126,7 +126,7 @@ function renderMasterTable(games, state) {
 
   const total = shown.reduce((s, g) => s + g.seconds, 0);
   const runs = shown.reduce((s, g) => s + g.pts.length, 0);
-  const pct = n => games.length ? ` (${Math.round(n / games.length * 100)}%)` : '';
+  const pct = n => { const v = n / games.length * 100; return ` (${v > 0 && v < 1 ? '<1' : Math.round(v)}%)`; };
 
   // A–Z jump links only make sense while the list is alphabetical
   const lettersEl = document.getElementById('master-letters');
@@ -150,7 +150,7 @@ function renderMasterTable(games, state) {
     <td class="text-center">${formatFullDate(pt.startDate)}</td>
     <td class="text-center">${formatFullDate(pt.lastDate)}</td>
     <td class="text-center status-cell" style="background-color: ${getStatusColor(pt.finalStatus)};">${pt.finalStatus}</td>
-    <td class="text-left">${escapeHTML(pt.finalNote)}</td>`;
+    <td class="text-left"><button type="button" class="master-entries-btn" data-pt="${escapeHTML(pt.ptTag)}" aria-expanded="false">▸ Entries</button>${escapeHTML(pt.finalNote)}</td>`;
 
   let html = `<div class="monthly-table-wrapper"><table class="monthly-table master-table"><thead>
   <tr><th rowspan="2">Videogame</th><th rowspan="2">System</th><th colspan="2">Playthrough Lifetime</th><th colspan="2">Game Lifetime</th><th rowspan="2">Date Started</th><th rowspan="2">Last Updated</th><th rowspan="2">Game Status</th><th rowspan="2">Playthrough Details</th></tr>
@@ -166,12 +166,57 @@ function renderMasterTable(games, state) {
     const groupId = `master-past-${i}`;
     const style = state.expand ? 'opacity: 0.65;' : 'display: none; opacity: 0.65;';
     html += `
-      <tr class="accordion-toggle-row" onclick="toggleAccordion('${groupId}', this)" style="cursor: pointer; background-color: rgba(0,0,0,0.03);">
+      <tr class="accordion-toggle-row" onclick="toggleMasterPast('${groupId}', this)" style="cursor: pointer; background-color: rgba(0,0,0,0.03);">
       <td colspan="10" class="text-left" style="padding: 6px 12px; font-size: 0.85rem; color: #666;">
-      <span class="toggle-icon">${state.expand ? '▼' : '▶'}</span> ${state.expand ? 'Hide Past' : `Show ${past.length} Past`} Playthrough${past.length !== 1 ? 's' : ''}
+      <span class="toggle-icon">${state.expand ? '▼' : '▶'}</span> <span class="master-past-label" data-count="${past.length}">${masterPastLabel(past.length, state.expand)}</span>
       </td></tr>`;
     past.forEach(pt => { html += `<tr class="inactive-row ${groupId}" style="${style}">${ptCells(g, pt, '')}</tr>`; });
   });
   html += `</tbody></table></div>`;
-  document.getElementById('master-table').innerHTML = html;
+  const table = document.getElementById('master-table');
+  table.innerHTML = html;
+  if (!table.dataset.wired) { table.dataset.wired = '1'; table.addEventListener('click', toggleMasterEntries); }
+}
+
+function masterPastLabel(n, open) { return `${open ? 'Hide' : 'Show'} ${n} Past Playthrough${n !== 1 ? 's' : ''}`; }
+// Past playthroughs open and close like Yearly's; closing them also closes any entry lists they had open
+function toggleMasterPast(groupId, toggleRow) {
+  const rows = [...document.querySelectorAll(`tr.${groupId}`)];
+  const opening = rows.some(r => r.style.display === 'none');
+  rows.forEach(r => { r.style.display = opening ? 'table-row' : 'none'; });
+  if (!opening) document.querySelectorAll(`tr.master-entries-row.${groupId}`).forEach(closeMasterEntries);
+  toggleRow.querySelector('.toggle-icon').textContent = opening ? '▼' : '▶';
+  const label = toggleRow.querySelector('.master-past-label');
+  label.textContent = masterPastLabel(Number(label.dataset.count), opening);
+}
+
+// Every entry of one playthrough, newest first, in a row under it. The log loads on the first click.
+let _masterEntriesByPt = null;
+function closeMasterEntries(row) {
+  const btn = row.previousElementSibling && row.previousElementSibling.querySelector('.master-entries-btn');
+  if (btn) { btn.textContent = '▸ Entries'; btn.setAttribute('aria-expanded', 'false'); }
+  row.remove();
+}
+function toggleMasterEntries(e) {
+  const btn = e.target.closest('.master-entries-btn');
+  if (!btn) return;
+  const ptRow = btn.closest('tr');
+  const open = ptRow.nextElementSibling;
+  if (open && open.classList.contains('master-entries-row')) { closeMasterEntries(open); return; }
+  btn.textContent = '… Loading'; btn.disabled = true;
+  loadData(['entries']).then(() => {
+    if (!_masterEntriesByPt) {
+      _masterEntriesByPt = {};
+      rawData.allEntries.forEach(en => { (_masterEntriesByPt[en.ptTag] = _masterEntriesByPt[en.ptTag] || []).push(en); });
+      Object.values(_masterEntriesByPt).forEach(list => list.sort((a, b) => b.date.localeCompare(a.date) || Number(b.entryNum) - Number(a.entryNum)));
+    }
+    const list = _masterEntriesByPt[btn.dataset.pt] || [];
+    const row = document.createElement('tr');
+    row.className = 'master-entries-row ' + [...ptRow.classList].filter(c => c.startsWith('master-past-')).join(' ');
+    row.innerHTML = `<td colspan="10"><table class="monthly-table master-entries-table"><thead><tr><th>Date</th><th>System</th><th>Time</th><th>Playthrough Time</th><th>Playthrough Days</th><th>Status</th><th>Play Note</th></tr></thead><tbody>
+      ${list.map(en => `<tr><td class="text-center">${formatFullDate(en.date)}</td><td class="text-center">${escapeHTML(en.system)}</td><td class="text-center">${escapeHTML(en.time)}</td><td class="text-center">${escapeHTML(en.ptLifetime)}</td><td class="text-center">${en.ptLifetimeDays}</td><td class="text-center status-cell" style="background-color: ${getStatusColor(en.status)};">${escapeHTML(en.status)}</td><td class="text-left">${escapeHTML(en.note || '')}</td></tr>`).join('') || '<tr><td colspan="7">No entries found.</td></tr>'}
+    </tbody></table></td>`;
+    ptRow.after(row);
+    btn.textContent = `▾ ${list.length} ${list.length === 1 ? 'entry' : 'entries'}`; btn.setAttribute('aria-expanded', 'true');
+  }).catch(() => { btn.textContent = '▸ Entries'; }).finally(() => { btn.disabled = false; });
 }
