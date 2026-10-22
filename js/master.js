@@ -41,10 +41,10 @@ function initMasterPage() {
               ${Object.entries(MASTER_SORTS).map(([id, s]) => `<option value="${id}">Sort: ${s.label}</option>`).join('')}
             </select>
             <button type="button" id="master-reverse" class="spotlight-toggle-all" aria-pressed="false" title="Reverse the order">⇅ Reverse</button>
+            <button type="button" id="master-expand" class="spotlight-toggle-all" aria-pressed="false">▶ Expand all playthroughs</button>
             <select id="master-system" class="milestone-year" aria-label="System">${options(games.flatMap(g => g.systems), 'systems')}</select>
             <select id="master-genre" class="milestone-year" aria-label="Genre">${options(games.map(g => g.latest.genre), 'genres')}</select>
             <select id="master-decade" class="milestone-year" aria-label="Release decade">${options(games.map(g => masterDecade(g.latest.releaseYear)), 'release decades')}</select>
-            <label class="master-check"><input type="checkbox" id="master-expand"> Show every playthrough</label>
             <button type="button" id="master-reset" class="spotlight-toggle-all">Reset</button>
           </div>
           <div id="master-letters" class="master-letters"></div>
@@ -86,7 +86,10 @@ function setupMasterControls(games) {
 
   const sync = () => {
     $('master-search').value = state.q; $('master-sort').value = state.sort; $('master-system').value = state.system;
-    $('master-genre').value = state.genre; $('master-decade').value = state.decade; $('master-expand').checked = state.expand;
+    $('master-genre').value = state.genre; $('master-decade').value = state.decade;
+    $('master-expand').setAttribute('aria-pressed', String(state.expand));
+    $('master-expand').classList.toggle('active', state.expand);
+    $('master-expand').textContent = state.expand ? '▼ Collapse all playthroughs' : '▶ Expand all playthroughs';
     $('master-reverse').setAttribute('aria-pressed', String(state.reverse));
     $('master-reverse').classList.toggle('active', state.reverse);
     document.querySelectorAll('.master-status-buttons .milestone-type').forEach(b => b.classList.toggle('active', b.dataset.status === state.status));
@@ -105,7 +108,7 @@ function setupMasterControls(games) {
   $('master-sort').addEventListener('change', e => set('sort', e.target.value));
   $('master-reverse').addEventListener('click', () => set('reverse', !state.reverse));
   ['system', 'genre', 'decade'].forEach(k => $(`master-${k}`).addEventListener('change', e => set(k, e.target.value)));
-  $('master-expand').addEventListener('change', e => set('expand', e.target.checked));
+  $('master-expand').addEventListener('click', () => set('expand', !state.expand));
   $('master-reset').addEventListener('click', () => {
     Object.assign(state, { status: 'all', sort: 'name', reverse: false, q: '', system: 'all', genre: 'all', decade: 'all', expand: false });
     sync(); render();

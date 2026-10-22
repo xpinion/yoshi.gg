@@ -1661,7 +1661,7 @@ body.dark-theme .hof-mark.hof-goty em { color: #e6c766; }
 .master-filters { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; align-items: center; margin-bottom: 12px; }
 .master-filters .spotlight-filter { flex: 1 1 220px; max-width: 320px; }
 .master-filters .spotlight-toggle-all.active { background: var(--primary-green); border-color: var(--primary-green); color: #fff; }
-.master-check { display: inline-flex; align-items: center; gap: 6px; font-weight: 700; color: var(--text-main); cursor: pointer; }
+
 .master-letters { display: flex; flex-wrap: wrap; gap: 4px; justify-content: center; margin-bottom: 12px; }
 .master-letters a { min-width: 28px; padding: 4px 6px; border-radius: 6px; background: var(--item-bg); border: 1px solid var(--border-light); color: var(--text-main); font-weight: 800; text-align: center; text-decoration: none; }
 .master-letters a:hover { border-color: var(--primary-green); }
