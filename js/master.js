@@ -28,29 +28,25 @@ function initMasterPage() {
   const counts = Object.fromEntries(MASTER_STATUSES.map(s => [s.id, games.filter(g => s.has(g.latest.finalStatus)).length]));
 
   container.innerHTML = `
-    <section class="card-row grid-1">
-      <div class="card">
-        <div class="card-header"><h2>All Games</h2></div>
-        <div class="card-content">
-          <div class="milestone-type-buttons master-status-buttons">
-            ${MASTER_STATUSES.map(s => `<button type="button" class="milestone-type${s.id === 'all' ? ' active' : ''}" data-status="${s.id}">${s.label} <span>${counts[s.id]}</span></button>`).join('')}
-          </div>
-          <div class="master-filters">
-            <input type="search" id="master-search" class="spotlight-filter" placeholder="Filter by name…" aria-label="Filter by name">
-            <select id="master-sort" class="milestone-year" aria-label="Sort by">
-              ${Object.entries(MASTER_SORTS).map(([id, s]) => `<option value="${id}">Sort: ${s.label}</option>`).join('')}
-            </select>
-            <button type="button" id="master-reverse" class="spotlight-toggle-all" aria-pressed="false" title="Reverse the order">⇅ Reverse</button>
-            <button type="button" id="master-expand" class="spotlight-toggle-all" aria-pressed="false">▶ Expand all playthroughs</button>
-            <select id="master-system" class="milestone-year" aria-label="System">${options(games.flatMap(g => g.systems), 'systems')}</select>
-            <select id="master-genre" class="milestone-year" aria-label="Genre">${options(games.map(g => g.latest.genre), 'genres')}</select>
-            <select id="master-decade" class="milestone-year" aria-label="Release decade">${options(games.map(g => masterDecade(g.latest.releaseYear)), 'release decades')}</select>
-            <button type="button" id="master-reset" class="spotlight-toggle-all">Reset</button>
-          </div>
-          <div id="master-letters" class="master-letters"></div>
-          <div id="master-table"></div>
-        </div>
+    <section class="master-page">
+      <h1 class="master-title">All Games</h1>
+      <div class="milestone-type-buttons master-status-buttons">
+        ${MASTER_STATUSES.map(s => `<button type="button" class="milestone-type${s.id === 'all' ? ' active' : ''}" data-status="${s.id}">${s.label} <span>${counts[s.id]}</span></button>`).join('')}
       </div>
+      <div class="master-filters">
+        <input type="search" id="master-search" class="spotlight-filter" placeholder="Filter by name…" aria-label="Filter by name">
+        <select id="master-sort" class="milestone-year" aria-label="Sort by">
+          ${Object.entries(MASTER_SORTS).map(([id, s]) => `<option value="${id}">Sort: ${s.label}</option>`).join('')}
+        </select>
+        <button type="button" id="master-reverse" class="spotlight-toggle-all" aria-pressed="false" title="Reverse the order">⇅ Reverse</button>
+        <button type="button" id="master-expand" class="spotlight-toggle-all" aria-pressed="false">▶ Expand all playthroughs</button>
+        <select id="master-system" class="milestone-year" aria-label="System">${options(games.flatMap(g => g.systems), 'systems')}</select>
+        <select id="master-genre" class="milestone-year" aria-label="Genre">${options(games.map(g => g.latest.genre), 'genres')}</select>
+        <select id="master-decade" class="milestone-year" aria-label="Release decade">${options(games.map(g => masterDecade(g.latest.releaseYear)), 'release decades')}</select>
+        <button type="button" id="master-reset" class="spotlight-toggle-all">Reset</button>
+      </div>
+      <div id="master-letters" class="master-letters"></div>
+      <div id="master-table"></div>
     </section>`;
   setupMasterControls(games);
 }
