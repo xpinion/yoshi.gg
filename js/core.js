@@ -150,7 +150,8 @@ function escapeHTML(str) {
 // --- UPDATE: GLOBAL HEADER ---
 const NAV_GROUPS = [
   { label: 'Index', href: 'index.html' },
-  { label: 'Log', links: [['Monthly', 'monthly.html'], ['Yearly', 'yearly.html'], ['All Games', 'master.html'], ['Year in Review', 'review.html'], ['Timeline', 'timeline.html'], ['History', 'history.html'], ['Completions', 'completions.html']] },
+  { label: 'All Games', href: 'master.html' },
+  { label: 'Log', links: [['Monthly', 'monthly.html'], ['Yearly', 'yearly.html'], ['Year in Review', 'review.html'], ['Timeline', 'timeline.html'], ['History', 'history.html'], ['Completions', 'completions.html']] },
   { label: 'Collections', links: [['Systems', 'systems.html'], ['Franchise', 'franchise.html'], ['Genre', 'genre.html'], ['Release Year', 'releaseyear.html'], ['Partners', 'partner.html']] },
   { label: 'Records', links: [['Spotlight', 'spotlight.html'], ['Hall of Fame', 'halloffame.html'], ['Milestones', 'milestones.html'], ['Within Reach', 'reach.html'], ['GotY', 'goty.html']] },
   { label: 'Stats', links: [['Analysis', 'analysis.html'], ['Metrics', 'metrics.html'], ['Ratings', 'ratings.html'], ['Patterns', 'patterns.html'], ['Eras', 'eras.html'], ['Charts', 'charts.html'], ['Compare', 'compare.html'], ['Share Cards', 'card.html'], ['Data Checks', 'checks.html']] }

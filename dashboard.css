@@ -1371,8 +1371,15 @@ body.dark-theme .cal-l5 { fill: #9be9a8; }
 .theme-btn:hover { border-color: var(--primary-green); }
 .nav-menu-toggle { display: none; }
 
-@media (max-width: 1100px) {
+@media (max-width: 1220px) {
   .site-brand span { display: none; }
+}
+@media (max-width: 940px) and (min-width: 701px) {
+  .site-bar, .site-nav-panel { gap: 10px; }
+  .site-bar { padding: 10px 12px; }
+  .site-nav { gap: 0; }
+  .nav-link, .nav-group-button { padding: 8px 7px; font-size: 0.78rem; letter-spacing: 0; }
+  .site-search { width: 132px; padding: 8px; }
 }
 @media (max-width: 700px) {
   #global-header { margin: -16px -12px 20px; }
