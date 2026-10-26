@@ -1,4 +1,4 @@
-// master.js - The All Games page: every game ever played, one row per playthrough grouped under its game, like the Yearly tables.
+// master.js - The All Games page: every game ever played, one row per playthrough (latest first) grouped under its game, like the Yearly tables.
 
 const MASTER_SORTS = {
   name: { label: 'A–Z', cmp: (a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' }) },
@@ -39,7 +39,6 @@ function initMasterPage() {
           ${Object.entries(MASTER_SORTS).map(([id, s]) => `<option value="${id}">Sort: ${s.label}</option>`).join('')}
         </select>
         <button type="button" id="master-reverse" class="spotlight-toggle-all" aria-pressed="false" title="Reverse the order">⇅ Reverse</button>
-        <button type="button" id="master-expand" class="spotlight-toggle-all" aria-pressed="false">▶ Expand all playthroughs</button>
         <select id="master-system" class="milestone-year" aria-label="System">${options(games.flatMap(g => g.systems), 'systems')}</select>
         <select id="master-genre" class="milestone-year" aria-label="Genre">${options(games.map(g => g.latest.genre), 'genres')}</select>
         <select id="master-decade" class="milestone-year" aria-label="Release decade">${options(games.map(g => masterDecade(g.latest.releaseYear)), 'release decades')}</select>
@@ -71,7 +70,7 @@ function masterLetter(name) { const c = name.charAt(0).toUpperCase(); return /[A
 // Filters, sort and the URL (master.html?sort=time&status=completed links straight to a view)
 function setupMasterControls(games) {
   const $ = id => document.getElementById(id);
-  const state = { status: 'all', sort: 'name', reverse: false, q: '', system: 'all', genre: 'all', decade: 'all', expand: false };
+  const state = { status: 'all', sort: 'name', reverse: false, q: '', system: 'all', genre: 'all', decade: 'all' };
   const params = new URLSearchParams(window.location.search);
   Object.keys(state).forEach(k => {
     if (!params.has(k)) return;
@@ -83,9 +82,6 @@ function setupMasterControls(games) {
   const sync = () => {
     $('master-search').value = state.q; $('master-sort').value = state.sort; $('master-system').value = state.system;
     $('master-genre').value = state.genre; $('master-decade').value = state.decade;
-    $('master-expand').setAttribute('aria-pressed', String(state.expand));
-    $('master-expand').classList.toggle('active', state.expand);
-    $('master-expand').textContent = state.expand ? '▼ Collapse all playthroughs' : '▶ Expand all playthroughs';
     $('master-reverse').setAttribute('aria-pressed', String(state.reverse));
     $('master-reverse').classList.toggle('active', state.reverse);
     document.querySelectorAll('.master-status-buttons .milestone-type').forEach(b => b.classList.toggle('active', b.dataset.status === state.status));
@@ -104,9 +100,8 @@ function setupMasterControls(games) {
   $('master-sort').addEventListener('change', e => set('sort', e.target.value));
   $('master-reverse').addEventListener('click', () => set('reverse', !state.reverse));
   ['system', 'genre', 'decade'].forEach(k => $(`master-${k}`).addEventListener('change', e => set(k, e.target.value)));
-  $('master-expand').addEventListener('click', () => set('expand', !state.expand));
   $('master-reset').addEventListener('click', () => {
-    Object.assign(state, { status: 'all', sort: 'name', reverse: false, q: '', system: 'all', genre: 'all', decade: 'all', expand: false });
+    Object.assign(state, { status: 'all', sort: 'name', reverse: false, q: '', system: 'all', genre: 'all', decade: 'all' });
     sync(); render();
   });
   sync(); render();
@@ -160,34 +155,12 @@ function renderMasterTable(games, state) {
 
   shown.forEach((g, i) => {
     const letter = state.sort === 'name' && firstOf[masterLetter(g.name)] === i ? ` id="master-letter-${masterLetter(g.name) === '#' ? 'num' : masterLetter(g.name)}"` : '';
-    html += `<tr class="active-row">${ptCells(g, g.latest, letter)}</tr>`;
-    const past = g.pts.slice(1);
-    if (!past.length) return;
-    const groupId = `master-past-${i}`;
-    const style = state.expand ? 'opacity: 0.65;' : 'display: none; opacity: 0.65;';
-    html += `
-      <tr class="accordion-toggle-row" onclick="toggleMasterPast('${groupId}', this)" style="cursor: pointer; background-color: rgba(0,0,0,0.03);">
-      <td colspan="10" class="text-left" style="padding: 6px 12px; font-size: 0.85rem; color: #666;">
-      <span class="toggle-icon">${state.expand ? '▼' : '▶'}</span> <span class="master-past-label" data-count="${past.length}">${masterPastLabel(past.length, state.expand)}</span>
-      </td></tr>`;
-    past.forEach(pt => { html += `<tr class="inactive-row ${groupId}" style="${style}">${ptCells(g, pt, '')}</tr>`; });
+    g.pts.forEach((pt, j) => { html += `<tr class="active-row">${ptCells(g, pt, j === 0 ? letter : '')}</tr>`; });
   });
   html += `</tbody></table></div>`;
   const table = document.getElementById('master-table');
   table.innerHTML = html;
   if (!table.dataset.wired) { table.dataset.wired = '1'; table.addEventListener('click', toggleMasterEntries); }
-}
-
-function masterPastLabel(n, open) { return `${open ? 'Hide' : 'Show'} ${n} Past Playthrough${n !== 1 ? 's' : ''}`; }
-// Past playthroughs open and close like Yearly's; closing them also closes any entry lists they had open
-function toggleMasterPast(groupId, toggleRow) {
-  const rows = [...document.querySelectorAll(`tr.${groupId}`)];
-  const opening = rows.some(r => r.style.display === 'none');
-  rows.forEach(r => { r.style.display = opening ? 'table-row' : 'none'; });
-  if (!opening) document.querySelectorAll(`tr.master-entries-row.${groupId}`).forEach(closeMasterEntries);
-  toggleRow.querySelector('.toggle-icon').textContent = opening ? '▼' : '▶';
-  const label = toggleRow.querySelector('.master-past-label');
-  label.textContent = masterPastLabel(Number(label.dataset.count), opening);
 }
 
 // Every entry of one playthrough, newest first, in a row under it. The log loads on the first click.
@@ -212,7 +185,7 @@ function toggleMasterEntries(e) {
     }
     const list = _masterEntriesByPt[btn.dataset.pt] || [];
     const row = document.createElement('tr');
-    row.className = 'master-entries-row ' + [...ptRow.classList].filter(c => c.startsWith('master-past-')).join(' ');
+    row.className = 'master-entries-row';
     row.innerHTML = `<td colspan="10"><table class="monthly-table master-entries-table"><thead><tr><th>Date</th><th>System</th><th>Time</th><th>Playthrough Time</th><th>Playthrough Days</th><th>Status</th><th>Play Note</th></tr></thead><tbody>
       ${list.map(en => `<tr><td class="text-center">${formatFullDate(en.date)}</td><td class="text-center">${escapeHTML(en.system)}</td><td class="text-center">${escapeHTML(en.time)}</td><td class="text-center">${escapeHTML(en.ptLifetime)}</td><td class="text-center">${en.ptLifetimeDays}</td><td class="text-center status-cell" style="background-color: ${getStatusColor(en.status)};">${escapeHTML(en.status)}</td><td class="text-left">${escapeHTML(en.note || '')}</td></tr>`).join('') || '<tr><td colspan="7">No entries found.</td></tr>'}
     </tbody></table></td>`;
