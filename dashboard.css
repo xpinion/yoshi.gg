@@ -1681,3 +1681,8 @@ body.dark-theme .hof-mark.hof-goty em { color: #e6c766; }
 .master-entries-btn[aria-expanded="true"] { background: var(--primary-green); border-color: var(--primary-green); color: #fff; }
 .master-entries-row > td { padding: 6px 12px 14px 36px !important; background: var(--item-bg); }
 .master-entries-table { font-size: 0.85rem; }
+/* All Games: each game is a tbody; a heavier rule between games, the name cell spans its playthroughs */
+.master-table tbody.master-game + tbody.master-game > tr:first-child > td { border-top: 2px solid var(--text-main); }
+.master-table .master-game-cell { vertical-align: middle; }
+.master-run-count { display: inline-block; margin-left: 8px; padding: 1px 7px; border-radius: 999px; background: var(--primary-green); color: #fff; font-size: 0.75rem; font-weight: 800; vertical-align: 1px; }
+.master-entries-caption { margin: 0 0 6px; font-size: 0.8rem; font-weight: 800; color: var(--primary-green); }

@@ -135,47 +135,53 @@ function renderMasterTable(games, state) {
     return;
   }
 
-  const ptCells = (g, pt, anchor) => `
-    <td class="text-left"${anchor}><span class="hover-trigger" data-game="${escapeHTML(g.name)}">${escapeHTML(g.name)}</span></td>
+  // The game's name and lifetime cells span all its playthrough rows; a ×N badge marks games played more than once
+  const ptCells = (g, pt, first, anchor) => {
+    const span = g.pts.length > 1 ? ` rowspan="${g.pts.length}"` : '';
+    const badge = g.pts.length > 1 ? `<span class="master-run-count" title="${g.pts.length} playthroughs">×${g.pts.length}</span>` : '';
+    return `
+    ${first ? `<td class="text-left master-game-cell"${span}${anchor}><span class="hover-trigger" data-game="${escapeHTML(g.name)}">${escapeHTML(g.name)}</span>${badge}</td>` : ''}
     <td class="text-center">${escapeHTML(pt.systemDisplay || pt.system)}</td>
     <td class="text-center">${pt.finalPtLifetime}</td>
     <td class="text-center">${pt.finalPtLifetimeDays}</td>
-    <td class="text-center">${formatHHMM(g.seconds)}</td>
-    <td class="text-center">${g.days}</td>
+    ${first ? `<td class="text-center"${span}>${formatHHMM(g.seconds)}</td>
+    <td class="text-center"${span}>${g.days}</td>` : ''}
     <td class="text-center">${formatFullDate(pt.startDate)}</td>
     <td class="text-center">${formatFullDate(pt.lastDate)}</td>
     <td class="text-center status-cell" style="background-color: ${getStatusColor(pt.finalStatus)};">${pt.finalStatus}</td>
     <td class="text-left"><button type="button" class="master-entries-btn" data-pt="${escapeHTML(pt.ptTag)}" aria-expanded="false">▸ Entries</button>${escapeHTML(pt.finalNote)}</td>`;
+  };
 
   let html = `<div class="monthly-table-wrapper"><table class="monthly-table master-table"><thead>
   <tr><th rowspan="2">Videogame</th><th rowspan="2">System</th><th colspan="2">Playthrough Lifetime</th><th colspan="2">Game Lifetime</th><th rowspan="2">Date Started</th><th rowspan="2">Last Updated</th><th rowspan="2">Game Status</th><th rowspan="2">Playthrough Details</th></tr>
   <tr><th>Time</th><th>Days</th><th>Time</th><th>Days</th></tr>
   </thead><tbody>
-  <tr class="grand-total-row"><td colspan="2" class="text-left">${shown.length.toLocaleString()} game${shown.length !== 1 ? 's' : ''}${pct(shown.length)}</td><td colspan="2" class="text-center">${runs.toLocaleString()} playthroughs</td><td class="text-center">${formatHHMM(total)}</td><td colspan="5"></td></tr>`;
+  <tr class="grand-total-row"><td colspan="2" class="text-left">${shown.length.toLocaleString()} game${shown.length !== 1 ? 's' : ''}${pct(shown.length)}</td><td colspan="2" class="text-center">${runs.toLocaleString()} playthroughs</td><td class="text-center">${formatHHMM(total)}</td><td colspan="5"></td></tr></tbody>`;
 
   shown.forEach((g, i) => {
     const letter = state.sort === 'name' && firstOf[masterLetter(g.name)] === i ? ` id="master-letter-${masterLetter(g.name) === '#' ? 'num' : masterLetter(g.name)}"` : '';
-    g.pts.forEach((pt, j) => { html += `<tr class="active-row">${ptCells(g, pt, j === 0 ? letter : '')}</tr>`; });
+    // One tbody per game, so the spanned cells and any open entry lists stay inside the game's block
+    html += `<tbody class="master-game">${g.pts.map((pt, j) => `<tr class="active-row">${ptCells(g, pt, j === 0, j === 0 ? letter : '')}</tr>`).join('')}</tbody>`;
   });
-  html += `</tbody></table></div>`;
+  html += `</table></div>`;
   const table = document.getElementById('master-table');
   table.innerHTML = html;
   if (!table.dataset.wired) { table.dataset.wired = '1'; table.addEventListener('click', toggleMasterEntries); }
 }
 
-// Every entry of one playthrough, newest first, in a row under it. The log loads on the first click.
+// Every entry of one playthrough, newest first, in a row at the foot of its game's block (a row right under it would
+// break the spanned name and lifetime cells). The log loads on the first click.
 let _masterEntriesByPt = null;
-function closeMasterEntries(row) {
-  const btn = row.previousElementSibling && row.previousElementSibling.querySelector('.master-entries-btn');
-  if (btn) { btn.textContent = '▸ Entries'; btn.setAttribute('aria-expanded', 'false'); }
+function closeMasterEntries(row, btn) {
+  btn.textContent = '▸ Entries'; btn.setAttribute('aria-expanded', 'false');
   row.remove();
 }
 function toggleMasterEntries(e) {
   const btn = e.target.closest('.master-entries-btn');
   if (!btn) return;
-  const ptRow = btn.closest('tr');
-  const open = ptRow.nextElementSibling;
-  if (open && open.classList.contains('master-entries-row')) { closeMasterEntries(open); return; }
+  const block = btn.closest('tbody');
+  const open = [...block.querySelectorAll('tr.master-entries-row')].find(r => r.dataset.pt === btn.dataset.pt);
+  if (open) { closeMasterEntries(open, btn); return; }
   btn.textContent = '… Loading'; btn.disabled = true;
   loadData(['entries']).then(() => {
     if (!_masterEntriesByPt) {
@@ -184,12 +190,18 @@ function toggleMasterEntries(e) {
       Object.values(_masterEntriesByPt).forEach(list => list.sort((a, b) => b.date.localeCompare(a.date) || Number(b.entryNum) - Number(a.entryNum)));
     }
     const list = _masterEntriesByPt[btn.dataset.pt] || [];
+    const pt = rawData.playthroughHistory[btn.dataset.pt];
+    // Name the playthrough when the game has several, since the list sits below all of them
+    const several = block.querySelectorAll('.master-entries-btn').length > 1;
+    const run = pt && (String(pt.finalNote).match(/^Game \d+/) || [])[0];
+    const caption = several && pt ? `<div class="master-entries-caption">${[run, escapeHTML(pt.systemDisplay || pt.system), `${formatFullDate(pt.startDate)} – ${formatFullDate(pt.lastDate)}`].filter(Boolean).join(' · ')}</div>` : '';
     const row = document.createElement('tr');
     row.className = 'master-entries-row';
-    row.innerHTML = `<td colspan="10"><table class="monthly-table master-entries-table"><thead><tr><th>Date</th><th>System</th><th>Time</th><th>Playthrough Time</th><th>Playthrough Days</th><th>Status</th><th>Play Note</th></tr></thead><tbody>
+    row.dataset.pt = btn.dataset.pt;
+    row.innerHTML = `<td colspan="10">${caption}<table class="monthly-table master-entries-table"><thead><tr><th>Date</th><th>System</th><th>Time</th><th>Playthrough Time</th><th>Playthrough Days</th><th>Status</th><th>Play Note</th></tr></thead><tbody>
       ${list.map(en => `<tr><td class="text-center">${formatFullDate(en.date)}</td><td class="text-center">${escapeHTML(en.system)}</td><td class="text-center">${escapeHTML(en.time)}</td><td class="text-center">${escapeHTML(en.ptLifetime)}</td><td class="text-center">${en.ptLifetimeDays}</td><td class="text-center status-cell" style="background-color: ${getStatusColor(en.status)};">${escapeHTML(en.status)}</td><td class="text-left">${escapeHTML(en.note || '')}</td></tr>`).join('') || '<tr><td colspan="7">No entries found.</td></tr>'}
     </tbody></table></td>`;
-    ptRow.after(row);
+    block.append(row);
     btn.textContent = `▾ ${list.length} ${list.length === 1 ? 'entry' : 'entries'}`; btn.setAttribute('aria-expanded', 'true');
   }).catch(() => { btn.textContent = '▸ Entries'; }).finally(() => { btn.disabled = false; });
 }
