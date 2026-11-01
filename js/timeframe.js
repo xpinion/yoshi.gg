@@ -31,7 +31,7 @@ function buildTimeframeFeed(containerId, mode) {
     <section class="card-row grid-1" id="${mode}-${key}">
       <div class="card">
         <div class="card-header">
-          <h2>${displayTitle} Summary</h2>
+          <h2>${displayTitle} Summary${mode === 'monthly' && typeof openShareCard === 'function' ? ` ${shareButtonHtml(`data-share-month="${key}"`)}` : ''}</h2>
         </div>
         
         <!-- Future Home for Charts & Widgets! -->
@@ -55,6 +55,11 @@ function buildTimeframeFeed(containerId, mode) {
   });
 
   // A link to one period (monthly.html#monthly-2016-10) scrolls to it once the cards exist
+  mainContainer.addEventListener('click', e => {
+    const button = e.target.closest('.share-btn[data-share-month]');
+    if (button) openShareCard(buildMonthCard(button.dataset.shareMonth, widgetData));
+  });
+
   const target = window.location.hash && document.getElementById(decodeURIComponent(window.location.hash.slice(1)));
   if (target) target.scrollIntoView();
 
@@ -63,6 +68,37 @@ function buildTimeframeFeed(containerId, mode) {
     const delay = Math.min(index * 0.08, 1.5);
     card.style.animationDelay = `${delay}s`;
   });
+}
+
+// Share card for one month: its totals, and every game played in it by time (the first ten, then the rest as one row)
+function buildMonthCard(key, data) {
+  const t = data.totals[key];
+  const [year, month] = key.split('-').map(Number);
+  const daysInMonth = new Date(year, month, 0).getDate();
+  const gameSeconds = new Map();
+  rawData.allEntries.forEach(e => { if (e.date.startsWith(key)) gameSeconds.set(e.game, (gameSeconds.get(e.game) || 0) + timeStringToSeconds(e.time)); });
+  const completed = new Set(getSortedCompletions('All-Time').filter(pt => pt.displayDate.toISOString().startsWith(key)).map(pt => pt.gameName));
+  const games = [...gameSeconds].sort((a, b) => b[1] - a[1]);
+  const rows = games.slice(0, games.length > 11 ? 10 : 11).map(([name, sec]) => ({ left: name, right: completed.has(name) ? `Completed · ${formatTime(sec)}` : formatTime(sec) }));
+  const rest = games.slice(rows.length);
+  if (rest.length) rows.push({ left: `+ ${rest.length} more game${rest.length === 1 ? '' : 's'}`, right: formatTime(rest.reduce((a, [, sec]) => a + sec, 0)) });
+  const genreStats = (rawData.metrics.monthlyGenreStats || {})[key];
+  const topGenre = genreStats ? Object.entries(genreStats).sort((a, b) => b[1].totalSeconds - a[1].totalSeconds)[0] : null;
+  const today = getDataDate();
+  const inProgress = year === today.getFullYear() && month === today.getMonth() + 1;
+  return {
+    kicker: inProgress ? 'Monthly Summary · so far' : 'Monthly Summary',
+    title: `${MONTH_NAMES[month - 1]} ${year}`,
+    subtitle: topGenre ? `Top genre: ${topGenre[0]} (${formatTime(topGenre[1].totalSeconds)})` : '',
+    stats: [
+      { label: 'Time Played', value: formatTime(t.seconds) },
+      { label: 'Days Played', value: `${t.days.size}/${daysInMonth}` },
+      { label: 'Games', value: t.games.size },
+      { label: 'Completions', value: data.completions[key] || 0 }
+    ],
+    rows, tall: true,
+    footer: `yoshi.gg/monthly#monthly-${key}`
+  };
 }
 
 function renderTimeframeSummary(timeframeStr, mode, containerId) {

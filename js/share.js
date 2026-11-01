@@ -1,4 +1,4 @@
-// share.js - Share cards: a picture of a game profile, a year in review or a Spotlight list, drawn in the browser
+// share.js - Share cards: a picture of a game profile, a year in review, a month or a Spotlight list, drawn in the browser
 // and offered to download, copy or share. Pages that load this file show their "Share card" buttons.
 
 const SHARE_WIDTH = 1200, SHARE_HEIGHT = 630;
@@ -86,7 +86,8 @@ const MINI_PT = { head: 64, item: 82, more: 34 };
 // How tall a compact card is: the usual 630, plus room for its playthroughs (with at most maxRows rows above them)
 function miniCardHeight(card) {
   const pts = card.playthroughs;
-  if (!pts || !pts.items.length) return SHARE_HEIGHT;
+  // A tall card (a monthly summary) grows to fit all of its rows
+  if (!pts || !pts.items.length) return card.tall ? Math.max(SHARE_HEIGHT, 364 + (card.rows || []).length * 42 + 98) : SHARE_HEIGHT;
   const rowsBelowStats = Math.min((card.rows || []).length, card.maxRows || 99);
   return 364 + rowsBelowStats * 42 + 16 + MINI_PT.head + pts.items.length * MINI_PT.item + (pts.more ? MINI_PT.more : 0) + 104;
 }

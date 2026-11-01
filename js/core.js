@@ -8,7 +8,7 @@
 //   reach.js (Within Reach), review.js (Year in Review), partner.js, compare.js, ratings.js (also uses hubs)
 //   timeline.js, patterns.js (Seasonality, System Lifecycles), checks.js (Data Checks), charts.js (Charts)
 //   eras.js (Eras; uses charts.js), halloffame.js (Hall of Fame; uses eras.js)
-//   share.js      Share cards, loaded by the pages that offer them (game, review, spotlight)
+//   share.js      Share cards, loaded by the pages that offer them (game, review, spotlight, monthly)
 
 // Global State
 let rawData = null;
