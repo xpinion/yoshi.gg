@@ -8,7 +8,7 @@
 //   reach.js (Within Reach), review.js (Year in Review), partner.js, compare.js, ratings.js (also uses hubs)
 //   timeline.js, patterns.js (Seasonality, System Lifecycles), checks.js (Data Checks), charts.js (Charts)
 //   eras.js (Eras; uses charts.js), halloffame.js (Hall of Fame; uses eras.js)
-//   share.js      Share cards, loaded by the pages that offer them (game, review, spotlight, monthly)
+//   share.js      Share cards, loaded by the pages that offer them (game, review, spotlight, monthly, yearly)
 
 // Global State
 let rawData = null;
@@ -262,7 +262,7 @@ const PAGE_DATA = {
   'spotlight.html': ['lists'],
   'systems.html': ['entries', 'playthroughs', 'games'],
   'timeline.html': ['entries', 'playthroughs'],
-  'yearly.html': ['entries', 'playthroughs', 'games', 'genres']
+  'yearly.html': ['entries', 'playthroughs', 'games', 'genres', 'milestones']
 };
 
 // The function that draws each page. It lives in the page's own script file, loaded after this one.
