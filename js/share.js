@@ -285,17 +285,18 @@ function drawShareTables(canvas, card) {
   text(`as of ${formatFullDate(dataDateKey())}`, right, footerY, 600, 24, C.muted, 'right');
 }
 
-// A game or series profile. card: { kicker, title, subtitle, badge: { value, label }, footer, layout }, where layout
+// A game or series profile. card: { kicker, title, subtitle, badge: { value, label }, footer, layout, width }, where layout
 // is a list of rows and each row is one or more sections drawn side by side. Sections:
 //   { type: 'stats', items: [{ label, value, sub }] }
 //   { type: 'facts', title, items: [{ label, value }] }
-//   { type: 'table', title, columns: [{ label, width | flex, align, weight, color, size, maxLines }], rows: [[cell]] }
+//   { type: 'table', title, columns: [{ label, width | flex, align, weight, color, size, maxLines, group }], rows: [[cell]] }
+//       side-by-side columns with the same group get that label above their own
 //       a cell is text or { text, pill: [background, color], color, weight }
 //   { type: 'chips', title, groups: [{ label, chips: [text], gold }] }
 //   { type: 'bars', title, bars: [{ value, label }], maxLabel }
 // Sizes the canvas itself: everything is measured first, then drawn.
 function drawProfileCard(canvas, card) {
-  const C = SHARE_COLORS, WIDTH = 1800, edge = 32, colGap = 44, rowGap = 40;
+  const C = SHARE_COLORS, WIDTH = card.width || 1800, edge = 32, colGap = 44, rowGap = 40;
   const left = edge + 14 + 40, right = WIDTH - edge - 40, inner = right - left;
   let ctx = canvas.getContext('2d');
   const font = (weight, size) => { ctx.font = `${weight} ${size}px Inter, "Segoe UI", sans-serif`; };
@@ -370,7 +371,8 @@ function drawProfileCard(canvas, card) {
       } };
     },
     table(section, w) {
-      const pad = 10, HEAD = 40, lineH = 25;
+      const grouped = section.columns.some(c => c.group), GROUP_H = grouped ? 30 : 0;
+      const pad = 10, HEAD = 40 + GROUP_H, lineH = 25;
       const fixed = section.columns.reduce((sum, c) => sum + (c.width || 0), 0);
       const flexTotal = section.columns.reduce((sum, c) => sum + (c.flex || 0), 0) || 1;
       const widths = section.columns.map(c => c.width || (w - fixed) * (c.flex / flexTotal));
@@ -390,7 +392,16 @@ function drawProfileCard(canvas, card) {
         const xs = widths.map((cw, i) => x + widths.slice(0, i).reduce((a, b) => a + b, 0));
         const anchor = (i, align) => align === 'center' ? xs[i] + widths[i] / 2 : align === 'right' ? xs[i] + widths[i] - pad : xs[i] + pad;
         ctx.fillStyle = C.page; ctx.fillRect(x, y, w, HEAD);
-        section.columns.forEach((col, i) => fit(String(col.label).toUpperCase(), anchor(i, col.align || 'left'), y + 26, widths[i] - pad, 800, 14, 10, C.muted, col.align || 'left'));
+        // Group labels across their columns, with a line under each group
+        section.columns.forEach((col, i) => {
+          if (!col.group || (i > 0 && section.columns[i - 1].group === col.group)) return;
+          let end = i;
+          while (end + 1 < section.columns.length && section.columns[end + 1].group === col.group) end++;
+          const gx = xs[i], gw = xs[end] + widths[end] - gx;
+          fit(String(col.group).toUpperCase(), gx + gw / 2, y + 22, gw - pad, 900, 14, 10, C.green, 'center');
+          ctx.fillStyle = C.green; ctx.fillRect(gx + 6, y + GROUP_H - 2, gw - 12, 2);
+        });
+        section.columns.forEach((col, i) => fit(String(col.label).toUpperCase(), anchor(i, col.align || 'left'), y + GROUP_H + 26, widths[i] - pad, 800, 14, 10, C.muted, col.align || 'left'));
         y += HEAD;
         rows.forEach(row => {
           row.cells.forEach((cell, i) => {

@@ -123,8 +123,9 @@ function buildFullTimeframeCard(key, mode, data) {
   const highlights = monthHighlights(t, data, monthly ? 'month' : 'year');
   if (topGenre) highlights.push({ label: 'Top Genre', value: topGenre[0], sub: formatTime(topGenre[1].totalSeconds) });
 
-  // Every playthrough with time this month, the games in order of time
-  const games = new Map();
+  // Every playthrough with time this month, the games in order of time, as on the page: the time in the period, the
+  // playthrough's and game's lifetime totals as of their last session in it, dates, status and the latest note
+  const games = new Map(), gameLast = new Map();
   rawData.allEntries.forEach(e => {
     if (!e.date.startsWith(key)) return;
     if (!games.has(e.game)) games.set(e.game, new Map());
@@ -133,14 +134,17 @@ function buildFullTimeframeCard(key, mode, data) {
     pt.seconds += timeStringToSeconds(e.time); pt.days.add(e.date.slice(0, 10)); pt.systems.add(e.system);
     if (e.date >= pt.last.date) pt.last = e;
     pts.set(e.ptTag, pt);
+    if (!gameLast.has(e.game) || e.date >= gameLast.get(e.game).date) gameLast.set(e.game, e);
   });
-  const rows = [];
+  const total = { weight: 900 };
+  const rows = [[{ text: 'Grand Total', ...total }, '', { text: formatHHMM(t.seconds), ...total }, { text: `${t.days.size}/${daysInPeriod}`, ...total }, '', '', '', '', '', '', '', '']];
   [...games].sort((a, b) => t.gameSeconds.get(b[0]) - t.gameSeconds.get(a[0])).forEach(([game, pts]) => {
     [...pts].sort((a, b) => b[1].seconds - a[1].seconds).forEach(([tag, pt]) => {
       const history = rawData.playthroughHistory[tag] || {};
       const status = pt.last.status;
-      rows.push([game, [...pt.systems].join(', '), formatHHMM(pt.seconds), pt.days.size, formatFullDate(history.startDate || pt.last.date),
-        { text: status, pill: SHARE_STATUS_COLORS[status] || ['#ececec', '#555555'] }, pt.last.note || '']);
+      const last = gameLast.get(game);
+      rows.push([game, [...pt.systems].join(', '), formatHHMM(pt.seconds), pt.days.size, pt.last.ptLifetime, pt.last.ptLifetimeDays, last.gameLifetime, last.gameLifetimeDays,
+        formatFullDate(history.startDate || pt.last.date), formatFullDate(pt.last.date), { text: status, pill: SHARE_STATUS_COLORS[status] || ['#ececec', '#555555'] }, pt.last.note || '']);
     });
   });
 
@@ -164,9 +168,14 @@ function buildFullTimeframeCard(key, mode, data) {
     [{ type: 'stats', items: highlights.slice(4) }],
     [{ type: 'bars', title: monthly ? 'Hours by Day' : 'Hours by Month', axisLabel: v => `${Math.round(v / 3600)}h`, bars }],
     [{ type: 'table', title: `Games Played: ${t.games.size}`, columns: [
-      { label: 'Game', width: 380, weight: 800 }, { label: 'System', width: 120, align: 'center' }, { label: 'Time', width: 100, align: 'center', weight: 900, color: SHARE_COLORS.green },
-      { label: 'Days', width: 70, align: 'center' }, { label: 'Started', width: 140, align: 'center', size: 17 }, { label: 'Status', width: 170, align: 'center' },
-      { label: 'Playthrough Details', flex: 1, size: 16, maxLines: monthly ? 3 : 1 }
+      { label: 'Videogame', width: 330, weight: 800 }, { label: 'System', width: 100, align: 'center', size: 17 },
+      { label: 'Time', group: monthly ? 'Active Month' : 'Active Year', width: 90, align: 'center', weight: 900, color: SHARE_COLORS.green },
+      { label: 'Days', group: monthly ? 'Active Month' : 'Active Year', width: 75, align: 'center' },
+      { label: 'Time', group: 'Playthrough Lifetime', width: 115, align: 'center', weight: 800 }, { label: 'Days', group: 'Playthrough Lifetime', width: 95, align: 'center' },
+      { label: 'Time', group: 'Game Lifetime', width: 105, align: 'center', weight: 800 }, { label: 'Days', group: 'Game Lifetime', width: 85, align: 'center' },
+      { label: 'Date Started', width: 125, align: 'center', size: 17 }, { label: 'Last Updated', width: 125, align: 'center', size: 17 },
+      { label: 'Game Status', width: 160, align: 'center' },
+      { label: 'Playthrough Details', flex: 1, size: 16, maxLines: monthly ? 12 : 2 }
     ], rows }]
   ];
   if (all.length) layout.push([{ type: 'table', title: `Milestones: ${all.length}`, note: rest ? `+ ${rest} on the Milestones page` : '',
@@ -177,7 +186,7 @@ function buildFullTimeframeCard(key, mode, data) {
     kicker: inProgress ? `${kicker} · so far` : kicker,
     title: monthly ? `${MONTH_NAMES[month - 1]} ${year}` : key,
     subtitle: `${formatTime(t.seconds)} over ${t.days.size} of ${daysInPeriod} days · ${t.games.size} game${t.games.size === 1 ? '' : 's'}`,
-    layout, footer: `yoshi.gg/${mode}#${mode}-${key}`
+    layout, width: 2400, footer: `yoshi.gg/${mode}#${mode}-${key}`
   };
 }
 
