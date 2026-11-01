@@ -75,21 +75,20 @@ function buildMonthCard(key, data) {
   const t = data.totals[key];
   const [year, month] = key.split('-').map(Number);
   const daysInMonth = new Date(year, month, 0).getDate();
-  const gameSeconds = new Map();
-  rawData.allEntries.forEach(e => { if (e.date.startsWith(key)) gameSeconds.set(e.game, (gameSeconds.get(e.game) || 0) + timeStringToSeconds(e.time)); });
   const completed = new Set(getSortedCompletions('All-Time').filter(pt => pt.displayDate.toISOString().startsWith(key)).map(pt => pt.gameName));
-  const games = [...gameSeconds].sort((a, b) => b[1] - a[1]);
+  const games = [...t.gameSeconds].sort((a, b) => b[1] - a[1]);
   const rows = games.slice(0, games.length > 11 ? 10 : 11).map(([name, sec]) => ({ left: name, right: completed.has(name) ? `Completed · ${formatTime(sec)}` : formatTime(sec) }));
   const rest = games.slice(rows.length);
   if (rest.length) rows.push({ left: `+ ${rest.length} more game${rest.length === 1 ? '' : 's'}`, right: formatTime(rest.reduce((a, [, sec]) => a + sec, 0)) });
   const genreStats = (rawData.metrics.monthlyGenreStats || {})[key];
   const topGenre = genreStats ? Object.entries(genreStats).sort((a, b) => b[1].totalSeconds - a[1].totalSeconds)[0] : null;
   const today = getDataDate();
-  const inProgress = year === today.getFullYear() && month === today.getMonth() + 1;
+  const inProgress = year === today.getFullYear() && month === today.getMonth() + 1 && today.getDate() < daysInMonth;
+  const ranks = monthRankings(key, data);
   return {
     kicker: inProgress ? 'Monthly Summary · so far' : 'Monthly Summary',
     title: `${MONTH_NAMES[month - 1]} ${year}`,
-    subtitle: topGenre ? `Top genre: ${topGenre[0]} (${formatTime(topGenre[1].totalSeconds)})` : '',
+    subtitle: [`Hours: ${ranks.all.seconds.text}`, ranks.same.seconds.text, topGenre ? `Top genre: ${topGenre[0]}` : ''].filter(Boolean).join(' · '),
     stats: [
       { label: 'Time Played', value: formatTime(t.seconds) },
       { label: 'Days Played', value: `${t.days.size}/${daysInMonth}` },
@@ -217,22 +216,126 @@ function renderTimeframeSummary(timeframeStr, mode, containerId) {
 
 // Totals per day, per timeframe key, and completions per key, computed once for the whole feed
 function buildTimeframeWidgetData(mode) {
-  const daySeconds = new Map(), totals = {};
+  const daySeconds = new Map(), dayGames = new Map(), totals = {}, firstPlayed = new Map();
+  const add = (map, k, sec) => map.set(k, (map.get(k) || 0) + sec);
   rawData.allEntries.forEach(e => {
     const day = e.date.slice(0, 10);
     const key = mode === 'monthly' ? day.slice(0, 7) : day.slice(0, 4);
     const sec = timeStringToSeconds(e.time);
     daySeconds.set(day, (daySeconds.get(day) || 0) + sec);
-    const t = totals[key] || (totals[key] = { seconds: 0, days: new Set(), games: new Set() });
+    if (!dayGames.has(day)) dayGames.set(day, new Map());
+    add(dayGames.get(day), e.game, sec);
+    if (!firstPlayed.has(e.game) || day < firstPlayed.get(e.game)) firstPlayed.set(e.game, day);
+    const t = totals[key] || (totals[key] = { seconds: 0, days: new Set(), games: new Set(), gameSeconds: new Map(), systemSeconds: new Map(), newGames: new Set() });
     t.seconds += sec; t.days.add(day); t.games.add(e.game);
+    add(t.gameSeconds, e.game, sec); add(t.systemSeconds, e.system, sec);
   });
+  // Games played for the first time ever in each period
+  firstPlayed.forEach((day, game) => totals[mode === 'monthly' ? day.slice(0, 7) : day.slice(0, 4)].newGames.add(game));
   const completions = {};
   getSortedCompletions('All-Time').forEach(pt => {
     const d = pt.displayDate.toISOString().slice(0, 10);
     const key = mode === 'monthly' ? d.slice(0, 7) : d.slice(0, 4);
     completions[key] = (completions[key] || 0) + 1;
   });
-  return { daySeconds, totals, completions };
+  return { daySeconds, dayGames, totals, completions };
+}
+
+// Where a month ranks among every month of the log, and among the same month of every year ({ all, same, partial },
+// each with seconds, days, games and completions as { rank, text }). The month still in progress is measured against
+// the others up to the same day of the month.
+function monthRankings(key, data) {
+  const [year, month] = key.split('-').map(Number);
+  const today = dataDateKey(), partial = today.startsWith(key) && Number(today.slice(8, 10)) < new Date(year, month, 0).getDate();
+  const cutoff = partial ? today.slice(8, 10) : '31';
+  data.monthTables = data.monthTables || {};
+  // Each month's totals up to the cutoff day, built once per cutoff
+  if (!data.monthTables[cutoff]) {
+    const table = {};
+    const monthOf = k => table[k] || (table[k] = { seconds: 0, days: new Set(), games: new Set(), completions: 0 });
+    rawData.allEntries.forEach(e => {
+      if (e.date.slice(8, 10) > cutoff) return;
+      const t = monthOf(e.date.slice(0, 7));
+      t.seconds += timeStringToSeconds(e.time); t.days.add(e.date.slice(0, 10)); t.games.add(e.game);
+    });
+    getSortedCompletions('All-Time').forEach(pt => {
+      const d = pt.displayDate.toISOString();
+      if (d.slice(8, 10) <= cutoff) monthOf(d.slice(0, 7)).completions++;
+    });
+    data.monthTables[cutoff] = table;
+  }
+  const table = data.monthTables[cutoff];
+  const ordinal = n => n + (n % 100 >= 11 && n % 100 <= 13 ? 'th' : ({ 1: 'st', 2: 'nd', 3: 'rd' }[n % 10] || 'th'));
+  const monthName = MONTH_NAMES[Number(key.slice(5)) - 1];
+  const value = { seconds: t => t.seconds, days: t => t.days.size, games: t => t.games.size, completions: t => t.completions };
+  const rankAmong = (keys, noun) => {
+    const result = {};
+    Object.entries(value).forEach(([stat, of]) => {
+      const mine = table[key] ? of(table[key]) : 0;
+      const values = keys.map(k => of(table[k]));
+      const rank = 1 + values.filter(v => v > mine).length, tied = values.filter(v => v === mine).length > 1;
+      const place = rank === 1 ? 'Best' : ordinal(rank);
+      result[stat] = { rank, text: `${tied ? `Tied ${rank === 1 ? 'best' : place}` : place} of ${keys.length} ${noun}` };
+    });
+    return result;
+  };
+  const keys = Object.keys(table);
+  return { all: rankAmong(keys, 'months'), same: rankAmong(keys.filter(k => k.endsWith(key.slice(4))), `${monthName}s`), partial };
+}
+
+// A month's highlights: streak, biggest day, new games, top game, top system, busiest weekday and oldest game
+function monthHighlightsHtml(key, t, data) {
+  const fact = (label, value, sub) => `<div class="tf-stat"><span class="sys-widget-title">${label}</span><strong>${value}</strong>${sub ? `<span class="tf-sub">${sub}</span>` : ''}</div>`;
+  const shortDay = day => `${MONTH_NAMES[Number(day.slice(5, 7)) - 1].slice(0, 3)} ${Number(day.slice(8))}`;
+  const pct = sec => `${Math.round(sec / t.seconds * 100)}%`;
+  const facts = [];
+
+  const streak = longestDayStreak(t.days);
+  facts.push(fact('Longest Streak', `${streak.length} day${streak.length === 1 ? '' : 's'}`, streak.length > 1 ? `${shortDay(streak.start)} – ${shortDay(streak.end)}` : shortDay(streak.start)));
+
+  const [bigDay, bigSec] = [...t.days].map(d => [d, data.daySeconds.get(d) || 0]).sort((a, b) => b[1] - a[1])[0];
+  const [dayGame] = topOfMap(data.dayGames.get(bigDay), 1)[0];
+  const weekday = new Date(bigDay + 'T12:00:00Z').toLocaleDateString('en-US', { weekday: 'short', timeZone: 'UTC' });
+  facts.push(fact('Biggest Day', formatTime(bigSec), `${weekday} ${shortDay(bigDay)}, mostly ${escapeHTML(dayGame)}`));
+
+  const [topGame, topSec] = topOfMap(t.gameSeconds, 1)[0];
+  facts.push(fact('Game of the Month', `<span class="hover-trigger" data-game="${escapeHTML(topGame)}">${escapeHTML(topGame)}</span>`, `${formatTime(topSec)}, ${pct(topSec)} of the month`));
+
+  const returning = t.games.size - t.newGames.size;
+  facts.push(fact('New Games', t.newGames.size, `first played this month · ${returning} returning`));
+
+  const [topSystem, systemSec] = topOfMap(t.systemSeconds, 1)[0];
+  facts.push(fact('Top System', escapeHTML(topSystem), `${pct(systemSec)} of the hours${t.systemSeconds.size > 1 ? ` · ${t.systemSeconds.size} systems played` : ''}`));
+
+  const weekdays = new Array(7).fill(0);
+  t.days.forEach(d => { weekdays[new Date(d + 'T12:00:00Z').getUTCDay()] += data.daySeconds.get(d) || 0; });
+  const busiest = weekdays.indexOf(Math.max(...weekdays));
+  facts.push(fact('Busiest Weekday', `${['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][busiest]}s`, formatTime(weekdays[busiest])));
+
+  const released = new Map(metaGames.filter(g => /^\d{4}$/.test(g.releaseYear)).map(g => [g.name, g.releaseYear]));
+  const oldest = [...t.games].filter(g => released.has(g)).sort((a, b) => released.get(a) - released.get(b) || a.localeCompare(b))[0];
+  if (oldest) facts.push(fact('Oldest Game', released.get(oldest), `<span class="hover-trigger" data-game="${escapeHTML(oldest)}">${escapeHTML(oldest)}</span>`));
+
+  return `<div class="tf-stats tf-highlights">${facts.join('')}</div>`;
+}
+
+// The month's milestones: firsts, records, hour marks, counts and anniversaries in date order (up to eight, picked in that order), with the
+// ranking moves and anything else counted in one line that links to the month on the Milestones page
+const MONTH_MILESTONE_ORDER = ['first', 'record', 'hours', 'count', 'anniversary'];
+function monthMilestonesHtml(key) {
+  const all = (rawData.metrics.milestones || []).filter(m => String(m.date).startsWith(key));
+  if (!all.length) return '';
+  const notable = all.filter(m => MONTH_MILESTONE_ORDER.includes(m.type))
+    .sort((a, b) => MONTH_MILESTONE_ORDER.indexOf(a.type) - MONTH_MILESTONE_ORDER.indexOf(b.type) || String(a.date).localeCompare(String(b.date)));
+  const shown = notable.slice(0, 8).sort((a, b) => String(a.date).localeCompare(String(b.date)));
+  const rankings = all.filter(m => m.type === 'ranking').length, moreNotable = notable.length - shown.length;
+  const rest = [moreNotable ? `${moreNotable} more` : '', rankings ? `${rankings} ranking move${rankings === 1 ? '' : 's'}` : ''].filter(Boolean).join(' and ');
+  return `
+    <div class="tf-milestones">
+      <h3 class="tf-milestones-title">Milestones <span>${all.length}</span></h3>
+      <div class="tf-milestone-list">${shown.map(milestoneItemHtml).join('')}</div>
+      <a class="toc-link tf-milestones-more" href="milestones.html?month=${key}">${rest ? `+ ${rest}: ` : ''}all ${all.length} on the Milestones page →</a>
+    </div>`;
 }
 
 function renderTimeframeWidgets(key, mode, containerId, data) {
@@ -253,7 +356,7 @@ function renderTimeframeWidgets(key, mode, containerId, data) {
   };
   const labelFor = k => monthly ? `${MONTH_NAMES[Number(k.slice(5)) - 1].slice(0, 3)} ${k.slice(0, 4)}` : k;
   const today = getDataDate(); // the latest logged day stands in for today
-  const inProgress = monthly ? (year === today.getFullYear() && month === today.getMonth() + 1) : year === today.getFullYear();
+  const inProgress = monthly ? (year === today.getFullYear() && month === today.getMonth() + 1 && today.getDate() < new Date(year, month, 0).getDate()) : year === today.getFullYear();
   // Days into the period (1-based) as "MM-DD" or "DD", so a period in progress is compared at the same point
   const cutoff = inProgress ? (monthly ? String(today.getDate()).padStart(2, '0') : `${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`) : null;
   const secondsUpTo = (k) => {
@@ -273,7 +376,9 @@ function renderTimeframeWidgets(key, mode, containerId, data) {
 
   // Yearly: where this year ranks among every year of the log
   const ranks = monthly ? null : yearRankings(key);
-  const rank = k => ranks ? yearRankHtml(ranks[k], ranks.partial) : '';
+  const monthRanks = monthly ? monthRankings(key, data) : null;
+  const rank = k => ranks ? yearRankHtml(ranks[k], ranks.partial)
+    : yearRankHtml(monthRanks.all[k], false) + yearRankHtml(monthRanks.same[k], monthRanks.partial);
 
   // Projection for the period that's still in progress
   let projection = '';
@@ -318,5 +423,6 @@ function renderTimeframeWidgets(key, mode, containerId, data) {
       ${projection}
     </div>
     ${strip}
+    ${monthly ? monthHighlightsHtml(key, t, data) + monthMilestonesHtml(key) : ''}
   `;
 }

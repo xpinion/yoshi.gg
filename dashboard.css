@@ -1270,6 +1270,16 @@ details.toc-category-wrapper:not([open]) > summary .toc-category-title::before {
 .tf-stat .tf-genre { font-size: 1rem; }
 .tf-sub { font-size: 0.72rem; color: var(--text-muted); }
 .tf-compare { font-size: 0.72rem; font-weight: 800; }
+/* Monthly: the month's highlights, a smaller second row of stats, and its milestones */
+.tf-highlights { margin-top: 12px; }
+.tf-highlights strong { font-size: 1rem; overflow-wrap: anywhere; }
+.tf-milestones { margin-top: 16px; }
+.tf-milestones-title { font-size: 0.85rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-muted); margin-bottom: 10px; }
+.tf-milestones-title span { color: var(--primary-green); margin-left: 4px; }
+.tf-milestones-more { font-size: 0.85rem; margin-top: 6px; }
+.tf-milestone-list .milestone-item { display: flex; gap: 12px; padding-bottom: 10px; }
+.tf-milestone-list .milestone-date { flex: 0 0 auto; margin-bottom: 0; line-height: 1.4; }
+@media (max-width: 600px) { .tf-milestone-list .milestone-item { display: block; } }
 .tf-up { color: var(--primary-green); }
 .tf-down { color: #d7301f; }
 .tf-strip { display: flex; gap: 3px; margin-bottom: 6px; }

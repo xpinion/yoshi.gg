@@ -29,6 +29,8 @@ function initMilestonesPage() {
   const kindCounts = {};
   milestones.forEach(m => { if (typeOf(m) === 'ranking') kindCounts[rankingKindOf(m)] = (kindCounts[rankingKindOf(m)] || 0) + 1; });
   const years = [...new Set(milestones.map(m => new Date(m.date).getUTCFullYear()))].sort((a, b) => b - a);
+  // milestones.html?month=2026-10 (the Monthly page's link) shows one month until its button is cleared
+  let activeMonth = (new URLSearchParams(window.location.search).get('month') || '').match(/^\d{4}-\d{2}$/) ? new URLSearchParams(window.location.search).get('month') : null;
 
   container.innerHTML = `
     <div class="milestone-filters">
@@ -46,6 +48,7 @@ function initMilestonesPage() {
           ${years.map(y => `<option value="${y}">${y}</option>`).join('')}
         </select>
         <input type="search" id="milestone-search" class="spotlight-filter" placeholder="Search milestones: try Zelda, 1000 hours, Top 25…" aria-label="Search milestones">
+        ${activeMonth ? `<button type="button" class="milestone-type active" id="milestone-month" title="Show every month">${MONTH_NAMES[Number(activeMonth.slice(5)) - 1]} ${activeMonth.slice(0, 4)} ✕</button>` : ''}
         <span id="milestone-count" class="spotlight-filter-count"></span>
       </div>
     </div>
@@ -66,6 +69,7 @@ function initMilestonesPage() {
       (activeType === 'all' || typeOf(m) === activeType) &&
       (activeType !== 'ranking' || activeKind === 'all' || rankingKindOf(m) === activeKind) &&
       (year === 'all' || String(new Date(m.date).getUTCFullYear()) === year) &&
+      (!activeMonth || String(m.date).startsWith(activeMonth)) &&
       (!query || m.details.toLowerCase().includes(query)));
     count.textContent = `${shown.length} of ${milestones.length}`;
     list.innerHTML = shown.length ? shown.map(milestoneItemHtml).join('') : `<div class="loading-text">No milestones match.</div>`;
@@ -89,6 +93,8 @@ function initMilestonesPage() {
       render();
     });
   });
+  const monthButton = document.getElementById('milestone-month');
+  if (monthButton) monthButton.addEventListener('click', () => { activeMonth = null; monthButton.remove(); history.replaceState(null, '', 'milestones.html'); render(); });
   yearSelect.addEventListener('change', render);
   search.addEventListener('input', render);
   render();

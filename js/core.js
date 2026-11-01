@@ -252,7 +252,7 @@ const PAGE_DATA = {
   'master.html': ['playthroughs'],
   'metrics.html': ['entries', 'games', 'genres'],
   'milestones.html': ['milestones'],
-  'monthly.html': ['entries', 'playthroughs', 'games', 'genres'],
+  'monthly.html': ['entries', 'playthroughs', 'games', 'genres', 'milestones'],
   'partner.html': ['entries'],
   'patterns.html': ['entries', 'playthroughs'],
   'ratings.html': ['games'],
