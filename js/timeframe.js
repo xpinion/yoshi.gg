@@ -70,16 +70,14 @@ function buildTimeframeFeed(containerId, mode) {
   });
 }
 
-// Share card for one month: its totals, and every game played in it by time (the first ten, then the rest as one row)
+// Share card for one month: its totals, and every game played in it by time
 function buildMonthCard(key, data) {
   const t = data.totals[key];
   const [year, month] = key.split('-').map(Number);
   const daysInMonth = new Date(year, month, 0).getDate();
   const completed = new Set(getSortedCompletions('All-Time').filter(pt => pt.displayDate.toISOString().startsWith(key)).map(pt => pt.gameName));
   const games = [...t.gameSeconds].sort((a, b) => b[1] - a[1]);
-  const rows = games.slice(0, games.length > 11 ? 10 : 11).map(([name, sec]) => ({ left: name, right: completed.has(name) ? `Completed · ${formatTime(sec)}` : formatTime(sec) }));
-  const rest = games.slice(rows.length);
-  if (rest.length) rows.push({ left: `+ ${rest.length} more game${rest.length === 1 ? '' : 's'}`, right: formatTime(rest.reduce((a, [, sec]) => a + sec, 0)) });
+  const rows = games.map(([name, sec]) => ({ left: name, right: completed.has(name) ? `Completed · ${formatTime(sec)}` : formatTime(sec) }));
   const genreStats = (rawData.metrics.monthlyGenreStats || {})[key];
   const topGenre = genreStats ? Object.entries(genreStats).sort((a, b) => b[1].totalSeconds - a[1].totalSeconds)[0] : null;
   const today = getDataDate();
@@ -241,7 +239,8 @@ function buildTimeframeWidgetData(mode) {
   return { daySeconds, dayGames, totals, completions };
 }
 
-// Where a month ranks among every month of the log, and among the same month of every year ({ all, same, partial },
+// Where a month ranks among every month of the log (each month from January of the first logged year up to the
+// latest logged month, months without play counting as zero), and among the same month of every year ({ all, same, partial },
 // each with seconds, days, games and completions as { rank, text }). The month still in progress is measured against
 // the others up to the same day of the month.
 function monthRankings(key, data) {
@@ -279,7 +278,10 @@ function monthRankings(key, data) {
     });
     return result;
   };
-  const keys = Object.keys(table);
+  const keys = [], first = Number(rawData.allEntries.reduce((min, e) => e.date < min ? e.date : min, today).slice(0, 4));
+  for (let y = first, m = 1; `${y}-${String(m).padStart(2, '0')}` <= today.slice(0, 7); m === 12 ? (y++, m = 1) : m++) keys.push(`${y}-${String(m).padStart(2, '0')}`);
+  const empty = { seconds: 0, days: new Set(), games: new Set(), completions: 0 };
+  keys.forEach(k => { if (!table[k]) table[k] = empty; });
   return { all: rankAmong(keys, 'months'), same: rankAmong(keys.filter(k => k.endsWith(key.slice(4))), `${monthName}s`), partial };
 }
 
