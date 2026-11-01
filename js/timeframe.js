@@ -31,7 +31,7 @@ function buildTimeframeFeed(containerId, mode) {
     <section class="card-row grid-1" id="${mode}-${key}">
       <div class="card">
         <div class="card-header">
-          <h2>${displayTitle} Summary${mode === 'monthly' && typeof openShareCard === 'function' ? ` ${shareButtonHtml(`data-share-month="${key}"`)}` : ''}</h2>
+          <h2>${displayTitle} Summary${mode === 'monthly' && typeof openShareCard === 'function' ? ` ${shareButtonHtml(`data-share-month="${key}"`)}<button type="button" class="share-btn" data-share-month="${key}" data-share-mini="1">Mini card</button>` : ''}</h2>
         </div>
         
         <!-- Future Home for Charts & Widgets! -->
@@ -57,7 +57,7 @@ function buildTimeframeFeed(containerId, mode) {
   // A link to one period (monthly.html#monthly-2016-10) scrolls to it once the cards exist
   mainContainer.addEventListener('click', e => {
     const button = e.target.closest('.share-btn[data-share-month]');
-    if (button) openShareCard(buildMonthCard(button.dataset.shareMonth, widgetData));
+    if (button) openShareCard((button.dataset.shareMini ? buildMonthCard : buildFullMonthCard)(button.dataset.shareMonth, widgetData));
   });
 
   const target = window.location.hash && document.getElementById(decodeURIComponent(window.location.hash.slice(1)));
@@ -70,7 +70,7 @@ function buildTimeframeFeed(containerId, mode) {
   });
 }
 
-// Share card for one month: its totals, and every game played in it by time
+// Mini share card for one month: its totals, and every game played in it by time
 function buildMonthCard(key, data) {
   const t = data.totals[key];
   const [year, month] = key.split('-').map(Number);
@@ -95,6 +95,71 @@ function buildMonthCard(key, data) {
     ],
     rows, tall: true,
     footer: `yoshi.gg/monthly#monthly-${key}`
+  };
+}
+
+// The full share card for one month, drawn like a game profile: the totals with their ranks, the highlights, hours by
+// day, every playthrough played that month and the month's milestones
+function buildFullMonthCard(key, data) {
+  const t = data.totals[key];
+  const [year, month] = key.split('-').map(Number);
+  const daysInMonth = new Date(year, month, 0).getDate();
+  const ranks = monthRankings(key, data);
+  const rankSub = stat => `${ranks.all[stat].text} · ${ranks.same[stat].text}`;
+  const today = getDataDate();
+  const inProgress = year === today.getFullYear() && month === today.getMonth() + 1 && today.getDate() < daysInMonth;
+  const genreStats = (rawData.metrics.monthlyGenreStats || {})[key];
+  const topGenre = genreStats ? Object.entries(genreStats).sort((a, b) => b[1].totalSeconds - a[1].totalSeconds)[0] : null;
+  const highlights = monthHighlights(t, data);
+  if (topGenre) highlights.push({ label: 'Top Genre', value: topGenre[0], sub: formatTime(topGenre[1].totalSeconds) });
+
+  // Every playthrough with time this month, the games in order of time
+  const games = new Map();
+  rawData.allEntries.forEach(e => {
+    if (!e.date.startsWith(key)) return;
+    if (!games.has(e.game)) games.set(e.game, new Map());
+    const pts = games.get(e.game);
+    const pt = pts.get(e.ptTag) || { seconds: 0, days: new Set(), systems: new Set(), last: e };
+    pt.seconds += timeStringToSeconds(e.time); pt.days.add(e.date.slice(0, 10)); pt.systems.add(e.system);
+    if (e.date >= pt.last.date) pt.last = e;
+    pts.set(e.ptTag, pt);
+  });
+  const rows = [];
+  [...games].sort((a, b) => t.gameSeconds.get(b[0]) - t.gameSeconds.get(a[0])).forEach(([game, pts]) => {
+    pts.forEach((pt, tag) => {
+      const history = rawData.playthroughHistory[tag] || {};
+      const status = pt.last.status;
+      rows.push([game, [...pt.systems].join(', '), formatHHMM(pt.seconds), pt.days.size, formatFullDate(history.startDate || pt.last.date),
+        { text: status, pill: SHARE_STATUS_COLORS[status] || ['#ececec', '#555555'] }, pt.last.note || '']);
+    });
+  });
+
+  const { all, shown, rest } = monthMilestones(key);
+  const layout = [
+    [{ type: 'stats', items: [
+      { label: 'Time Played', value: formatTime(t.seconds), sub: rankSub('seconds') },
+      { label: 'Days Played', value: `${t.days.size}/${daysInMonth}`, sub: rankSub('days') },
+      { label: 'Games', value: String(t.games.size), sub: rankSub('games') },
+      { label: 'Completions', value: String(data.completions[key] || 0), sub: rankSub('completions') }
+    ] }],
+    [{ type: 'stats', items: highlights.slice(0, 4) }],
+    [{ type: 'stats', items: highlights.slice(4) }],
+    [{ type: 'bars', title: 'Hours by Day', axisLabel: v => `${Math.round(v / 3600)}h`,
+      bars: Array.from({ length: daysInMonth }, (_, i) => ({ value: data.daySeconds.get(`${key}-${String(i + 1).padStart(2, '0')}`) || 0, label: String(i + 1) })) }],
+    [{ type: 'table', title: `Games Played: ${t.games.size}`, columns: [
+      { label: 'Game', width: 380, weight: 800 }, { label: 'System', width: 120, align: 'center' }, { label: 'Time', width: 100, align: 'center', weight: 900, color: SHARE_COLORS.green },
+      { label: 'Days', width: 70, align: 'center' }, { label: 'Started', width: 140, align: 'center', size: 17 }, { label: 'Status', width: 170, align: 'center' },
+      { label: 'Playthrough Details', flex: 1, size: 16, maxLines: 3 }
+    ], rows }]
+  ];
+  if (all.length) layout.push([{ type: 'table', title: `Milestones: ${all.length}`, note: rest ? `+ ${rest} on the Milestones page` : '',
+    columns: [{ label: 'Date', width: 150, weight: 800, color: SHARE_COLORS.green }, { label: 'Milestone', flex: 1, maxLines: 3 }],
+    rows: shown.map(m => [formatFullDate(m.date), m.details]) }]);
+  return {
+    kicker: inProgress ? 'Monthly Summary · so far' : 'Monthly Summary',
+    title: `${MONTH_NAMES[month - 1]} ${year}`,
+    subtitle: `${formatTime(t.seconds)} over ${t.days.size} of ${daysInMonth} days · ${t.games.size} game${t.games.size === 1 ? '' : 's'}`,
+    layout, footer: `yoshi.gg/monthly#monthly-${key}`
   };
 }
 
@@ -285,53 +350,61 @@ function monthRankings(key, data) {
   return { all: rankAmong(keys, 'months'), same: rankAmong(keys.filter(k => k.endsWith(key.slice(4))), `${monthName}s`), partial };
 }
 
-// A month's highlights: streak, biggest day, new games, top game, top system, busiest weekday and oldest game
-function monthHighlightsHtml(key, t, data) {
-  const fact = (label, value, sub) => `<div class="tf-stat"><span class="sys-widget-title">${label}</span><strong>${value}</strong>${sub ? `<span class="tf-sub">${sub}</span>` : ''}</div>`;
+// A month's highlights: streak, biggest day, game of the month, new games, top system, busiest weekday and oldest game,
+// each { label, value, sub }. game names which of value or sub is a game ('value' or 'sub'), for the page's links.
+function monthHighlights(t, data) {
   const shortDay = day => `${MONTH_NAMES[Number(day.slice(5, 7)) - 1].slice(0, 3)} ${Number(day.slice(8))}`;
   const pct = sec => `${Math.round(sec / t.seconds * 100)}%`;
   const facts = [];
 
   const streak = longestDayStreak(t.days);
-  facts.push(fact('Longest Streak', `${streak.length} day${streak.length === 1 ? '' : 's'}`, streak.length > 1 ? `${shortDay(streak.start)} – ${shortDay(streak.end)}` : shortDay(streak.start)));
+  facts.push({ label: 'Longest Streak', value: `${streak.length} day${streak.length === 1 ? '' : 's'}`, sub: streak.length > 1 ? `${shortDay(streak.start)} – ${shortDay(streak.end)}` : shortDay(streak.start) });
 
   const [bigDay, bigSec] = [...t.days].map(d => [d, data.daySeconds.get(d) || 0]).sort((a, b) => b[1] - a[1])[0];
   const [dayGame] = topOfMap(data.dayGames.get(bigDay), 1)[0];
   const weekday = new Date(bigDay + 'T12:00:00Z').toLocaleDateString('en-US', { weekday: 'short', timeZone: 'UTC' });
-  facts.push(fact('Biggest Day', formatTime(bigSec), `${weekday} ${shortDay(bigDay)}, mostly ${escapeHTML(dayGame)}`));
+  facts.push({ label: 'Biggest Day', value: formatTime(bigSec), sub: `${weekday} ${shortDay(bigDay)}, mostly ${dayGame}` });
 
   const [topGame, topSec] = topOfMap(t.gameSeconds, 1)[0];
-  facts.push(fact('Game of the Month', `<span class="hover-trigger" data-game="${escapeHTML(topGame)}">${escapeHTML(topGame)}</span>`, `${formatTime(topSec)}, ${pct(topSec)} of the month`));
+  facts.push({ label: 'Game of the Month', value: topGame, game: 'value', sub: `${formatTime(topSec)}, ${pct(topSec)} of the month` });
 
   const returning = t.games.size - t.newGames.size;
-  facts.push(fact('New Games', t.newGames.size, `first played this month · ${returning} returning`));
+  facts.push({ label: 'New Games', value: String(t.newGames.size), sub: `first played this month · ${returning} returning` });
 
   const [topSystem, systemSec] = topOfMap(t.systemSeconds, 1)[0];
-  facts.push(fact('Top System', escapeHTML(topSystem), `${pct(systemSec)} of the hours${t.systemSeconds.size > 1 ? ` · ${t.systemSeconds.size} systems played` : ''}`));
+  facts.push({ label: 'Top System', value: topSystem, sub: `${pct(systemSec)} of the hours${t.systemSeconds.size > 1 ? ` · ${t.systemSeconds.size} systems played` : ''}` });
 
   const weekdays = new Array(7).fill(0);
   t.days.forEach(d => { weekdays[new Date(d + 'T12:00:00Z').getUTCDay()] += data.daySeconds.get(d) || 0; });
   const busiest = weekdays.indexOf(Math.max(...weekdays));
-  facts.push(fact('Busiest Weekday', `${['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][busiest]}s`, formatTime(weekdays[busiest])));
+  facts.push({ label: 'Busiest Weekday', value: `${['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][busiest]}s`, sub: formatTime(weekdays[busiest]) });
 
   const released = new Map(metaGames.filter(g => /^\d{4}$/.test(g.releaseYear)).map(g => [g.name, g.releaseYear]));
   const oldest = [...t.games].filter(g => released.has(g)).sort((a, b) => released.get(a) - released.get(b) || a.localeCompare(b))[0];
-  if (oldest) facts.push(fact('Oldest Game', released.get(oldest), `<span class="hover-trigger" data-game="${escapeHTML(oldest)}">${escapeHTML(oldest)}</span>`));
-
-  return `<div class="tf-stats tf-highlights">${facts.join('')}</div>`;
+  if (oldest) facts.push({ label: 'Oldest Game', value: released.get(oldest), sub: oldest, game: 'sub' });
+  return facts;
+}
+function monthHighlightsHtml(t, data) {
+  const show = (f, part) => f.game === part ? `<span class="hover-trigger" data-game="${escapeHTML(f[part])}">${escapeHTML(f[part])}</span>` : escapeHTML(f[part]);
+  return `<div class="tf-stats tf-highlights">${monthHighlights(t, data).map(f =>
+    `<div class="tf-stat"><span class="sys-widget-title">${f.label}</span><strong>${show(f, 'value')}</strong>${f.sub ? `<span class="tf-sub">${show(f, 'sub')}</span>` : ''}</div>`).join('')}</div>`;
 }
 
 // The month's milestones: firsts, records, hour marks, counts and anniversaries in date order (up to eight, picked in that order), with the
 // ranking moves and anything else counted in one line that links to the month on the Milestones page
 const MONTH_MILESTONE_ORDER = ['first', 'record', 'hours', 'count', 'anniversary'];
-function monthMilestonesHtml(key) {
+function monthMilestones(key) {
   const all = (rawData.metrics.milestones || []).filter(m => String(m.date).startsWith(key));
-  if (!all.length) return '';
   const notable = all.filter(m => MONTH_MILESTONE_ORDER.includes(m.type))
     .sort((a, b) => MONTH_MILESTONE_ORDER.indexOf(a.type) - MONTH_MILESTONE_ORDER.indexOf(b.type) || String(a.date).localeCompare(String(b.date)));
   const shown = notable.slice(0, 8).sort((a, b) => String(a.date).localeCompare(String(b.date)));
   const rankings = all.filter(m => m.type === 'ranking').length, moreNotable = notable.length - shown.length;
   const rest = [moreNotable ? `${moreNotable} more` : '', rankings ? `${rankings} ranking move${rankings === 1 ? '' : 's'}` : ''].filter(Boolean).join(' and ');
+  return { all, shown, rest };
+}
+function monthMilestonesHtml(key) {
+  const { all, shown, rest } = monthMilestones(key);
+  if (!all.length) return '';
   return `
     <div class="tf-milestones">
       <h3 class="tf-milestones-title">Milestones <span>${all.length}</span></h3>
@@ -425,6 +498,6 @@ function renderTimeframeWidgets(key, mode, containerId, data) {
       ${projection}
     </div>
     ${strip}
-    ${monthly ? monthHighlightsHtml(key, t, data) + monthMilestonesHtml(key) : ''}
+    ${monthly ? monthHighlightsHtml(t, data) + monthMilestonesHtml(key) : ''}
   `;
 }
