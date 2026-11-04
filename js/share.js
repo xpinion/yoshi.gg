@@ -1,5 +1,7 @@
 // share.js - Share cards: a picture of a game profile, a year in review, a month or a Spotlight list, drawn in the browser
 // and offered to download, copy or share. Pages that load this file show their "Share card" buttons.
+// Any other section of the site can be shared as it looks (makeSectionImage); js/core.js loads this file for that
+// on first use, with js/vendor/html-to-image.js.
 
 const SHARE_WIDTH = 1200, SHARE_HEIGHT = 630;
 const SHARE_COLORS = { page: '#f4f5f7', card: '#ffffff', green: '#2e7d32', greenSoft: '#e8f5e9', title: '#111111', text: '#222222', muted: '#888888', line: '#e6e6e6', gold: '#b7791f', goldSoft: '#fdf3d7' };
@@ -60,12 +62,15 @@ async function runShareAction(button, image, title) {
 }
 
 async function openShareCard(card) {
-  const image = await makeShareImage(card);
+  showShareImage(await makeShareImage(card), card.title, !!(card.tables || card.layout));
+}
+// The share dialog for an image from makeShareImage or makeSectionImage
+function showShareImage(image, title, wide) {
   const modal = document.createElement('div');
   modal.className = 'share-modal';
   modal.innerHTML = `
-    <div class="share-dialog${card.tables || card.layout ? ' share-wide' : ''}" role="dialog" aria-modal="true" aria-label="Share card">
-      <img src="${image.url}" alt="${escapeHTML(card.title)} share card" width="${image.canvas.width}" height="${image.canvas.height}">
+    <div class="share-dialog${wide ? ' share-wide' : ''}" role="dialog" aria-modal="true" aria-label="Share card">
+      <img src="${image.url}" alt="${escapeHTML(title)} share card" width="${image.canvas.width}" height="${image.canvas.height}">
       <div class="share-actions">
         ${shareActionButtonsHtml(image)}
         <button type="button" class="share-btn" data-share-action="close">Close</button>
@@ -75,10 +80,78 @@ async function openShareCard(card) {
   const onKey = e => { if (e.key === 'Escape') close(); };
   modal.addEventListener('click', e => {
     if (e.target === modal || e.target.dataset.shareAction === 'close') return close();
-    if (e.target.dataset.shareAction) runShareAction(e.target, image, card.title);
+    if (e.target.dataset.shareAction) runShareAction(e.target, image, title);
   });
   document.addEventListener('keydown', onKey);
   document.body.appendChild(modal);
+}
+
+// The page's Google font (Inter) as CSS with the font files inlined, so a section picture uses it: the picture
+// library can't read the cross-origin stylesheet itself. Only the latin subsets are fetched. Empty if it can't load.
+let _pageFontCSS = null;
+function pageFontCSS() {
+  if (_pageFontCSS) return _pageFontCSS;
+  return (_pageFontCSS = (async () => {
+    const link = document.querySelector('link[href*="fonts.googleapis.com"]');
+    if (!link) return '';
+    try {
+      const css = await (await fetch(link.href)).text();
+      const faces = css.split(/(?=\/\*)/).filter(block => /^\/\* latin(-ext)? \*\//.test(block)).join('');
+      const urls = [...new Set(faces.match(/https:[^)'"]+/g) || [])];
+      const inlined = await Promise.all(urls.map(async url => {
+        const blob = await (await fetch(url)).blob();
+        return new Promise(resolve => { const reader = new FileReader(); reader.onload = () => resolve([url, reader.result]); reader.readAsDataURL(blob); });
+      }));
+      return inlined.reduce((out, [url, data]) => out.split(url).join(data), faces);
+    } catch (error) { _pageFontCSS = null; return ''; }
+  })());
+}
+
+// A section (a .card) as it looks on the page, but whole: while it's captured, the card's height limit is lifted
+// (snapshot-mode) and so is every box inside it that scrolls (snapshot-unclip); boxes that clip on purpose stay
+// as they are. The site and date go under it. Returns the same { canvas, blob, url,
+// fileName, file } as makeShareImage. A section too big for one picture throws an Error with code 'too-big'.
+async function makeSectionImage(card, title) {
+  const css = getComputedStyle(document.body); // the theme's colors, light or dark
+  const style = card.getAttribute('style');
+  let shot, ratio;
+  card.classList.add('snapshot-mode');
+  const scrollers = [...card.querySelectorAll('*')].filter(el => {
+    const cs = getComputedStyle(el);
+    return /auto|scroll/.test(cs.overflowX + cs.overflowY) && (el.scrollHeight > el.clientHeight + 1 || el.scrollWidth > el.clientWidth + 1);
+  });
+  scrollers.forEach(el => el.classList.add('snapshot-unclip'));
+  try {
+    const width = Math.ceil(Math.max(card.getBoundingClientRect().width, card.scrollWidth));
+    card.style.width = `${width}px`; card.style.maxWidth = 'none';
+    const height = Math.ceil(card.scrollHeight);
+    // Sharp (2x) where it fits, smaller for long sections; past a point the picture would be unreadable
+    ratio = Math.min(2, 30000 / height, Math.sqrt(100e6 / (width * height)));
+    if (ratio < 0.6) throw Object.assign(new Error('Section too big for one picture'), { code: 'too-big' });
+    shot = await htmlToImage.toCanvas(card, {
+      width, height, pixelRatio: ratio, fontEmbedCSS: await pageFontCSS(), backgroundColor: getComputedStyle(card).backgroundColor,
+      filter: node => !(node.classList && node.classList.contains('share-btn'))
+    });
+  } finally {
+    card.classList.remove('snapshot-mode');
+    scrollers.forEach(el => el.classList.remove('snapshot-unclip'));
+    if (style === null) card.removeAttribute('style'); else card.setAttribute('style', style);
+  }
+  const pad = Math.round(24 * ratio), footerH = Math.round(48 * ratio);
+  const canvas = document.createElement('canvas');
+  canvas.width = shot.width + pad * 2; canvas.height = shot.height + pad * 2 + footerH;
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = css.backgroundColor || SHARE_COLORS.page; ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.drawImage(shot, pad, pad);
+  const page = (window.location.pathname.split('/').pop() || 'index.html').replace(/\.html$/, '');
+  ctx.font = `800 ${Math.round(16 * ratio)}px Inter, "Segoe UI", sans-serif`; ctx.fillStyle = css.getPropertyValue('--text-muted').trim() || SHARE_COLORS.muted;
+  ctx.textBaseline = 'alphabetic'; ctx.textAlign = 'left';
+  ctx.fillText(`yoshi.gg/${page === 'index' ? '' : page}${window.location.search}`, pad, canvas.height - pad - footerH / 4);
+  ctx.textAlign = 'right'; ctx.font = `600 ${Math.round(16 * ratio)}px Inter, "Segoe UI", sans-serif`;
+  ctx.fillText(`as of ${formatFullDate(dataDateKey())}`, canvas.width - pad, canvas.height - pad - footerH / 4);
+  const fileName = `${String(title).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'section'}.png`;
+  const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
+  return { canvas, blob, url: URL.createObjectURL(blob), fileName, file: typeof File === 'function' ? new File([blob], fileName, { type: 'image/png' }) : null };
 }
 
 // The playthrough section's sizes, shared by miniCardHeight and drawShareCard

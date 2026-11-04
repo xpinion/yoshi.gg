@@ -8,7 +8,8 @@
 //   reach.js (Within Reach), review.js (Year in Review), partner.js, compare.js, ratings.js (also uses hubs)
 //   timeline.js, patterns.js (Seasonality, System Lifecycles), checks.js (Data Checks), charts.js (Charts)
 //   eras.js (Eras; uses charts.js), halloffame.js (Hall of Fame; uses eras.js)
-//   share.js      Share cards, loaded by the pages that offer them (game, review, spotlight, monthly, yearly)
+//   share.js      Share cards, loaded by the pages that offer them (game, review, spotlight, monthly, yearly), and by
+//                 any page the first time one of its sections is shared (see SECTION SHARING below)
 
 // Global State
 let rawData = null;
@@ -799,7 +800,61 @@ function setupChartTips() {
   window.addEventListener('scroll', () => { tip.hidden = true; }, { passive: true });
 }
 
+// --- SECTION SHARING ---
+// Every section (.card) gets a Share button that saves it as a picture, unless it already has its own share card:
+// in its header when it has one, otherwise in its top corner. The stat tiles and a game's top card are left out,
+// since the page's own share card covers them. js/share.js and the picture library load on first use.
+const SECTION_SHARE_SKIP = '.hub-stat-card, .game-hero, .share-dialog';
+function addSectionShareButtons() {
+  document.querySelectorAll('.card:not([data-section-share])').forEach(card => {
+    card.dataset.sectionShare = '';
+    if (card.matches(SECTION_SHARE_SKIP) || card.querySelector('#card-actions')) return;
+    const header = card.querySelector('.card-header');
+    if (header && header.querySelector('.share-btn')) return;
+    const button = document.createElement('button');
+    button.type = 'button'; button.className = 'share-btn section-share-btn'; button.textContent = 'Share';
+    button.title = 'Share this section as a picture';
+    if (header) (header.querySelector('h2') || header).appendChild(button);
+    else { card.classList.add('has-corner-share'); card.appendChild(button); }
+  });
+}
+const _scriptLoads = {};
+function loadScript(src) {
+  return _scriptLoads[src] || (_scriptLoads[src] = new Promise((resolve, reject) => {
+    const script = document.createElement('script');
+    script.src = src; script.onload = resolve;
+    script.onerror = () => { delete _scriptLoads[src]; reject(new Error(`Could not load ${src}`)); };
+    document.head.appendChild(script);
+  }));
+}
+// The section's name for the file: its header without the button, or its first heading
+function sectionTitle(card) {
+  const heading = card.querySelector('.card-header h2, .card-header, h2, h3');
+  if (!heading) return document.title.split('|')[0].trim();
+  const copy = heading.cloneNode(true);
+  copy.querySelectorAll('button, select, input').forEach(el => el.remove());
+  return copy.textContent.replace(/\s+/g, ' ').trim() || document.title.split('|')[0].trim();
+}
+document.addEventListener('click', async e => {
+  const button = e.target.closest('.section-share-btn');
+  if (!button) return;
+  e.preventDefault(); e.stopPropagation();
+  const card = button.closest('.card'), label = button.textContent;
+  button.disabled = true; button.textContent = 'Making…';
+  try {
+    await loadScript('js/vendor/html-to-image.js');
+    if (typeof showShareImage !== 'function') await loadScript('js/share.js');
+    const title = sectionTitle(card);
+    showShareImage(await makeSectionImage(card, title), title, true);
+    button.textContent = label;
+  } catch (error) {
+    button.textContent = error.code === 'too-big' ? 'Too long: filter it first' : 'Could not share';
+    setTimeout(() => { button.textContent = label; }, 3000);
+  } finally { button.disabled = false; }
+}, true);
+
 new MutationObserver(() => {
+  addSectionShareButtons();
   document.querySelectorAll('table.monthly-table:not(.has-cell-labels)').forEach(labelTableCells);
   convertTitlesToTips(document);
 }).observe(document.documentElement, { childList: true, subtree: true });

@@ -1511,7 +1511,7 @@ section[data-tab][hidden] { display: none; }
 .share-btn:hover { border-color: var(--primary-green); color: var(--primary-green); }
 .share-primary { background: var(--primary-green); border-color: var(--primary-green); color: #fff; }
 .share-primary:hover { color: #fff; opacity: 0.9; }
-.spotlight-list-title .share-btn, .card-header h2 .share-btn { margin-left: 8px; font-size: 0.7rem; padding: 3px 9px; }
+.spotlight-list-title .share-btn, .card-header h2 .share-btn, .card-header > .section-share-btn { margin-left: 8px; font-size: 0.7rem; padding: 3px 9px; }
 .toc-flash td { animation: tocFlash 1.6s ease-out; }
 @keyframes tocFlash { from { box-shadow: inset 0 0 0 999px var(--highlight-green-bg), inset 0 3px 0 var(--primary-green), inset 0 -3px 0 var(--primary-green); } to { box-shadow: none; } }
 .share-modal { position: fixed; inset: 0; z-index: 3000; background: rgba(0, 0, 0, 0.7); display: flex; align-items: center; justify-content: center; padding: 16px; }
@@ -1521,6 +1521,12 @@ section[data-tab][hidden] { display: none; }
 /* The buttons stay in view while a tall card scrolls */
 .share-actions { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; position: sticky; bottom: 0; padding: 14px 0 16px; background: var(--card-bg); }
 .share-actions .share-btn { font-size: 0.9rem; padding: 9px 16px; }
+/* Sharing any section: a corner button on cards without a header, and the whole card while it's captured */
+.has-corner-share { position: relative; }
+.has-corner-share > .section-share-btn { position: absolute; top: 10px; right: 10px; font-size: 0.7rem; padding: 3px 9px; z-index: 1; }
+.snapshot-mode, .snapshot-unclip { max-height: none !important; overflow: visible !important; }
+.snapshot-mode, .snapshot-mode * { animation: none !important; -webkit-line-clamp: unset !important; }
+.snapshot-mode { opacity: 1 !important; }
 /* Share Cards page: the buttons sit above the card */
 .card-page-actions { position: static; padding: 6px 0 14px; }
 .card-preview img { display: block; width: 100%; height: auto; border-radius: 8px; border: 1px solid var(--border-table); }

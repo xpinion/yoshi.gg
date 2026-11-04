@@ -175,7 +175,7 @@ function buildFullTimeframeCard(key, mode, data) {
       { label: 'Time', group: 'Game Lifetime', width: 105, align: 'center', weight: 800 }, { label: 'Days', group: 'Game Lifetime', width: 85, align: 'center' },
       { label: 'Date Started', width: 125, align: 'center', size: 17 }, { label: 'Last Updated', width: 125, align: 'center', size: 17 },
       { label: 'Game Status', width: 160, align: 'center' },
-      { label: 'Playthrough Details', flex: 1, size: 16, maxLines: monthly ? 12 : 2 }
+      { label: 'Playthrough Details', flex: 1, size: 16, maxLines: 20 }
     ], rows }]
   ];
   if (all.length) layout.push([{ type: 'table', title: `Milestones: ${all.length}`, note: rest ? `+ ${rest} on the Milestones page` : '',
