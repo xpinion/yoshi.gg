@@ -231,14 +231,14 @@ function renderGlobalHeader() {
 // --- DATA LOADING ---
 // The data is split into one file per group in data/ (built by buildWebDataFiles in Integration.gs),
 // so a page only downloads the groups it shows.
-const DATA_GROUPS = ['core', 'entries', 'playthroughs', 'games', 'genres', 'analysis', 'lists', 'milestones'];
+const DATA_GROUPS = ['core', 'entries', 'playthroughs', 'games', 'genres', 'analysis', 'lists', 'milestones', 'podiums'];
 // Groups each page needs, counting everything its dropdowns can show. A page not listed loads them all.
 // If a page starts reading something new, add its group here (tools/usage.js lists what a page reads).
 // The hub pages (Systems, Franchise, Genre, Release Year) also fetch 'lists' after drawing, for their Spotlight records card.
 const PAGE_DATA = {
   'index.html': ['entries', 'playthroughs', 'games', 'genres'], // its other tabs load theirs: see INDEX_TAB_DATA
   'analysis.html': ['analysis'],
-  'card.html': ['entries', 'playthroughs', 'games', 'milestones', 'lists'],
+  'card.html': ['entries', 'playthroughs', 'games', 'milestones', 'lists', 'podiums'],
   'charts.html': ['entries'],
   'checks.html': ['entries', 'playthroughs'],
   'compare.html': ['entries', 'playthroughs'],
@@ -259,7 +259,7 @@ const PAGE_DATA = {
   'ratings.html': ['games'],
   'reach.html': ['entries', 'playthroughs', 'games', 'lists'],
   'releaseyear.html': ['entries', 'playthroughs', 'games'],
-  'review.html': ['entries', 'playthroughs', 'milestones'],
+  'review.html': ['entries', 'playthroughs', 'milestones', 'podiums'],
   'spotlight.html': ['lists'],
   'systems.html': ['entries', 'playthroughs', 'games'],
   'timeline.html': ['entries', 'playthroughs'],
@@ -742,6 +742,7 @@ function labelTableCells(table) {
 // Long playthrough notes show two lines, with a button to expand
 const NOTE_CLAMP_CHARS = 140;
 function clampLongNote(td) {
+  if (td.closest('.tf-table')) return; // the Monthly/Yearly summaries show notes in full
   if (td.textContent.trim().length <= NOTE_CLAMP_CHARS) return;
   td.innerHTML = `<div class="note-clamp">${td.innerHTML}</div><button type="button" class="note-toggle">more</button>`;
 }

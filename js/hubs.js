@@ -834,8 +834,8 @@ function buildAnalyticsHub(containerId, dataKey, titleLabel) {
                   <tr>
                     <th rowspan="2">Videogame</th>
                     <th rowspan="2">Systems Used</th>
-                    <th colspan="2">Playthrough Lifetime</th>
-                    <th colspan="2">Game Lifetime</th>
+                    <th colspan="2">Playthrough Life</th>
+                    <th colspan="2">Game Life</th>
                     <th rowspan="2">Date Started</th>
                     <th rowspan="2">Last Updated</th>
                     <th rowspan="2">Game Status</th>

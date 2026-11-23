@@ -153,7 +153,7 @@ function renderMasterTable(games, state) {
   };
 
   let html = `<div class="monthly-table-wrapper"><table class="monthly-table master-table"><thead>
-  <tr><th rowspan="2">Videogame</th><th rowspan="2">System</th><th colspan="2">Playthrough Lifetime</th><th colspan="2">Game Lifetime</th><th rowspan="2">Date Started</th><th rowspan="2">Last Updated</th><th rowspan="2">Game Status</th><th rowspan="2">Playthrough Details</th></tr>
+  <tr><th rowspan="2">Videogame</th><th rowspan="2">System</th><th colspan="2">Playthrough Life</th><th colspan="2">Game Life</th><th rowspan="2">Date Started</th><th rowspan="2">Last Updated</th><th rowspan="2">Game Status</th><th rowspan="2">Playthrough Details</th></tr>
   <tr><th>Time</th><th>Days</th><th>Time</th><th>Days</th></tr>
   </thead><tbody>
   <tr class="grand-total-row"><td colspan="2" class="text-left">${shown.length.toLocaleString()} game${shown.length !== 1 ? 's' : ''}${pct(shown.length)}</td><td colspan="2" class="text-center">${runs.toLocaleString()} playthroughs</td><td class="text-center">${formatHHMM(total)}</td><td colspan="5"></td></tr></tbody>`;

@@ -29,7 +29,7 @@ function buildTimeframeFeed(containerId, mode) {
 
     html += `
     <section class="card-row grid-1" id="${mode}-${key}">
-      <div class="card">
+      <div class="card tf-card">
         <div class="card-header">
           <h2>${displayTitle} Summary${typeof openShareCard === 'function' ? ` ${shareButtonHtml(`data-share-key="${key}"`)}${mode === 'monthly' ? `<button type="button" class="share-btn" data-share-key="${key}" data-share-mini="1">Mini card</button>` : ''}` : ''}</h2>
         </div>
@@ -40,6 +40,9 @@ function buildTimeframeFeed(containerId, mode) {
         <div class="card-content" id="${mode}-summary-${key}">
           <div class="loading-text">Loading Data...</div>
         </div>
+
+        <!-- Highlights and milestones, below the games -->
+        <div id="${mode}-extras-${key}" class="tf-extras"></div>
       </div>
     </section>
     `;
@@ -50,7 +53,7 @@ function buildTimeframeFeed(containerId, mode) {
   // 3. Populate each card with its specific data table
   const widgetData = buildTimeframeWidgetData(mode);
   keys.forEach(key => {
-    renderTimeframeWidgets(key, mode, `${mode}-widgets-${key}`, widgetData);
+    renderTimeframeWidgets(key, mode, `${mode}-widgets-${key}`, widgetData, `${mode}-extras-${key}`);
     renderTimeframeSummary(key, mode, `${mode}-summary-${key}`);
   });
 
@@ -171,8 +174,8 @@ function buildFullTimeframeCard(key, mode, data) {
       { label: 'Videogame', width: 330, weight: 800 }, { label: 'System', width: 100, align: 'center', size: 17 },
       { label: 'Time', group: monthly ? 'Active Month' : 'Active Year', width: 90, align: 'center', weight: 900, color: SHARE_COLORS.green },
       { label: 'Days', group: monthly ? 'Active Month' : 'Active Year', width: 75, align: 'center' },
-      { label: 'Time', group: 'Playthrough Lifetime', width: 115, align: 'center', weight: 800 }, { label: 'Days', group: 'Playthrough Lifetime', width: 95, align: 'center' },
-      { label: 'Time', group: 'Game Lifetime', width: 105, align: 'center', weight: 800 }, { label: 'Days', group: 'Game Lifetime', width: 85, align: 'center' },
+      { label: 'Time', group: 'Playthrough Life', width: 115, align: 'center', weight: 800 }, { label: 'Days', group: 'Playthrough Life', width: 95, align: 'center' },
+      { label: 'Time', group: 'Game Life', width: 105, align: 'center', weight: 800 }, { label: 'Days', group: 'Game Life', width: 85, align: 'center' },
       { label: 'Date Started', width: 125, align: 'center', size: 17 }, { label: 'Last Updated', width: 125, align: 'center', size: 17 },
       { label: 'Game Status', width: 160, align: 'center' },
       { label: 'Playthrough Details', flex: 1, size: 16, maxLines: 20 }
@@ -247,9 +250,15 @@ function renderTimeframeSummary(timeframeStr, mode, containerId) {
   }
 
   const activeTitle = mode === 'monthly' ? 'Active Month' : 'Active Year';
+  // A thin bar under each playthrough's time showing its share of the period's hours
+  const shareBar = sec => {
+    const pct = totalSecondsInTf ? sec / totalSecondsInTf * 100 : 0;
+    const label = pct >= 1 || !pct ? `${Math.round(pct)}%` : '<1%';
+    return `<div class="tf-share" data-tip="${label} of the ${mode === 'monthly' ? 'month' : 'year'}'s hours"><div class="tf-share-track"><i style="width: ${pct.toFixed(1)}%;"></i></div><span>${label}</span></div>`;
+  };
 
-  let html = `<div class="monthly-table-wrapper"><table class="monthly-table"><thead>
-  <tr><th rowspan="2">Videogame</th><th rowspan="2">System</th><th colspan="2">${activeTitle}</th><th colspan="2">Playthrough Lifetime</th><th colspan="2">Game Lifetime</th><th rowspan="2">Date Started</th><th rowspan="2">Last Updated</th><th rowspan="2">Game Status</th><th rowspan="2">Playthrough Details</th></tr>
+  let html = `<div class="monthly-table-wrapper"><table class="monthly-table tf-table"><thead>
+  <tr><th rowspan="2" class="tf-col-game">Videogame</th><th rowspan="2">System</th><th colspan="2">${activeTitle}</th><th colspan="2">Playthrough Life</th><th colspan="2">Game Life</th><th rowspan="2">Date Started</th><th rowspan="2">Last Updated</th><th rowspan="2">Game Status</th><th rowspan="2" class="tf-col-note">Playthrough Details</th></tr>
   <tr><th>Time</th><th>Days</th><th>Time</th><th>Days</th><th>Time</th><th>Days</th></tr>
   </thead><tbody>`;
 
@@ -262,7 +271,7 @@ function renderTimeframeSummary(timeframeStr, mode, containerId) {
       const ptHistory = rawData.playthroughHistory[ptTag];
       const sysStr = Array.from(ptLocal.timeframeSystems).join(', ');
       const bgColor = getStatusColor(ptHistory.finalStatus);
-      html += `<tr class="active-row"><td class="text-left"><span class="hover-trigger" data-game="${escapeHTML(game.name)}">${escapeHTML(game.name)}</span></td><td class="text-center">${escapeHTML(sysStr)}</td><td class="text-center">${formatHHMM(ptLocal.timeframeTime)}</td><td class="text-center">${ptLocal.timeframeDays.size}</td><td class="text-center">${ptLocal.lastPtLifetime}</td><td class="text-center">${ptLocal.lastPtLifetimeDays}</td><td class="text-center">${game.latestGameLifetime}</td><td class="text-center">${game.latestGameLifetimeDays}</td><td class="text-center">${formatFullDate(ptHistory.startDate)}</td><td class="text-center">${formatFullDate(ptLocal.lastDate)}</td><td class="text-center status-cell" style="background-color: ${bgColor};">${ptLocal.lastStatus}</td><td class="text-left">${escapeHTML(ptLocal.latestNote)}</td></tr>`;
+      html += `<tr class="active-row"><td class="text-left"><span class="hover-trigger" data-game="${escapeHTML(game.name)}">${escapeHTML(game.name)}</span></td><td class="text-center tf-system">${escapeHTML(sysStr)}</td><td class="text-center tf-time-cell">${formatHHMM(ptLocal.timeframeTime)}${shareBar(ptLocal.timeframeTime)}</td><td class="text-center">${ptLocal.timeframeDays.size}</td><td class="text-center">${ptLocal.lastPtLifetime}</td><td class="text-center">${ptLocal.lastPtLifetimeDays}</td><td class="text-center">${game.latestGameLifetime}</td><td class="text-center">${game.latestGameLifetimeDays}</td><td class="text-center">${formatFullDate(ptHistory.startDate)}</td><td class="text-center">${formatFullDate(ptLocal.lastDate)}</td><td class="text-center status-cell" style="background-color: ${bgColor};">${ptLocal.lastStatus}</td><td class="text-left">${escapeHTML(ptLocal.latestNote)}</td></tr>`;
     });
 
     const allGamePlaythroughs = Object.keys(rawData.playthroughHistory).filter(tag => rawData.playthroughHistory[tag].gameName === game.name);
@@ -447,7 +456,16 @@ function monthMilestonesHtml(key) {
     </div>`;
 }
 
-function renderTimeframeWidgets(key, mode, containerId, data) {
+// One short rank line for a month's stat tile ("49th overall · 2nd Nov"), with the full wording as its hover tip
+function monthRankShortHtml(ranks, stat, key) {
+  const short = r => `${/^Tied/.test(r.text) ? 'tied ' : ''}${r.rank === 1 ? 'Best' : r.text.replace(/^Tied /, '').split(' ')[0]}`;
+  const all = ranks.all[stat], same = ranks.same[stat];
+  const tip = `${all.text} · ${same.text}${ranks.partial ? ' at this point' : ''}`;
+  const best = all.rank === 1 || same.rank === 1;
+  return `<span class="tf-rank${best ? ' tf-rank-best' : ''}" data-tip="${tip}">${short(all)} overall · ${short(same)} ${MONTH_NAMES[Number(key.slice(5)) - 1].slice(0, 3)}</span>`;
+}
+
+function renderTimeframeWidgets(key, mode, containerId, data, extrasId) {
   const container = document.getElementById(containerId);
   const t = data.totals[key];
   if (!container || !t) return;
@@ -479,15 +497,17 @@ function renderTimeframeWidgets(key, mode, containerId, data) {
     const otherSeconds = inProgress ? secondsUpTo(k) : other.seconds;
     const diff = t.seconds - otherSeconds;
     const cls = diff >= 0 ? 'tf-up' : 'tf-down';
-    return `<span class="tf-compare ${cls}">${diff >= 0 ? '▲' : '▼'} ${formatTime(Math.abs(diff))} vs ${labelFor(k)}${inProgress ? ' at this point' : ''}</span>`;
+    const full = `${diff >= 0 ? '▲' : '▼'} ${formatTime(Math.abs(diff))} vs ${labelFor(k)}${inProgress ? ' at this point' : ''}`;
+    if (!monthly) return `<span class="tf-compare ${cls}">${full}</span>`;
+    const short = k.slice(0, 4) === key.slice(0, 4) ? labelFor(k).slice(0, 3) : `${labelFor(k).slice(0, 3)} '${k.slice(2, 4)}`;
+    return `<span class="tf-compare ${cls}" data-tip="${full}">${diff >= 0 ? '▲' : '▼'} ${formatTime(Math.abs(diff))} vs ${short}</span>`;
   };
   const comparisons = monthly ? [compare(shiftKey(-1)), compare(shiftKey(-12))] : [compare(shiftKey(-1))];
 
   // Yearly: where this year ranks among every year of the log
   const ranks = monthly ? null : yearRankings(key);
   const monthRanks = monthly ? monthRankings(key, data) : null;
-  const rank = k => ranks ? yearRankHtml(ranks[k], ranks.partial)
-    : yearRankHtml(monthRanks.all[k], false) + yearRankHtml(monthRanks.same[k], monthRanks.partial);
+  const rank = k => ranks ? yearRankHtml(ranks[k], ranks.partial) : monthRankShortHtml(monthRanks, k, key);
 
   // Projection for the period that's still in progress
   let projection = '';
@@ -532,6 +552,7 @@ function renderTimeframeWidgets(key, mode, containerId, data) {
       ${projection}
     </div>
     ${strip}
-    ${monthly ? monthHighlightsHtml(t, data) + monthMilestonesHtml(key) : ''}
   `;
+  const extras = extrasId && document.getElementById(extrasId);
+  if (extras && monthly) extras.innerHTML = monthHighlightsHtml(t, data) + monthMilestonesHtml(key);
 }

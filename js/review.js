@@ -167,8 +167,169 @@ function reviewBodyHtml(year) {
         <div class="card-content">${highlights.length ? highlights.map(milestoneItemHtml).join('') : '<div class="loading-text">Nothing this year.</div>'}</div>
       </div>
     </section>
+
+    ${spotlightMedalsHtml(year, inProgress)}
   `;
 }
+
+// --- SPOTLIGHT MEDALS ---
+// Gold, silver and bronze for every Spotlight list the year placed on, from rawData.metrics.spotlightPodiums (one per
+// list, in Spotlight's order; built by buildListPodium in DataAggregator.gs). Rows are
+// [place, name, context, value, start, end, detail, tied, who].
+// Sections that start open; the long per-genre, per-system and other metadata sections start closed
+const MEDAL_OPEN_CATEGORIES = ['Playtime & Activity', 'Co-Op & Multiplayer', 'Streaks & Habits', 'Completions & Abandons', 'Holidays', 'Best of Each Month', 'Best of Each Season'];
+const MEDAL_NAMES = ['', 'gold', 'silver', 'bronze'];
+const MEDAL_TABLE_SHOWN = 15;
+const ALLTIME_PODIUMS_SHOWN = 12;
+
+function medalHtml(place, big = false) {
+  return place >= 1 && place <= 3
+    ? `<span class="medal medal-${MEDAL_NAMES[place]}${big ? ' medal-big' : ''}" title="${['', '1st', '2nd', '3rd'][place]} place">${place}</span>`
+    : `<span class="medal medal-none" title="${ordinalText(place)} place">${place || '-'}</span>`;
+}
+function ordinalText(n) {
+  return n + (n % 100 >= 11 && n % 100 <= 13 ? 'th' : ({ 1: 'st', 2: 'nd', 3: 'rd' }[n % 10] || 'th'));
+}
+
+function spotlightMedalsHtml(year, inProgress) {
+  const medals = spotlightMedals(year);
+  if (!medals) return '';
+  const soFar = inProgress ? ' so far' : '';
+  const { podiums, lists, tables, counts, slugs } = medals;
+  if (!lists.length) return '';
+  const kinds = MEDAL_KIND_ORDER.filter(k => tables[k] && tables[k].size);
+  const medalTableHtml = kind => {
+    const rows = sortedMedalRows(tables[kind]);
+    let place = 0;
+    const html = rows.map((t, i) => {
+      const prev = rows[i - 1];
+      if (!prev || prev.medals.join() !== t.medals.join()) place = i + 1;
+      const total = t.medals[1] + t.medals[2] + t.medals[3];
+      return `<tr class="${i >= MEDAL_TABLE_SHOWN ? 'medal-extra' : ''}" data-tip="${escapeHTML(t.lists.slice(0, 12).join('\n') + (t.lists.length > 12 ? `\n+ ${t.lists.length - 12} more` : ''))}">
+        <td class="medal-table-rank">${place}</td>
+        <td class="medal-table-name">${kind === 'Games' ? `<span class="hover-trigger" data-game="${escapeHTML(t.who)}">${escapeHTML(t.who)}</span>` : escapeHTML(t.who)}</td>
+        <td class="medal-count">${t.medals[1] || ''}</td><td class="medal-count">${t.medals[2] || ''}</td><td class="medal-count">${t.medals[3] || ''}</td>
+        <td class="medal-total">${total}</td></tr>`;
+    }).join('');
+    return `<div class="medal-table-panel" data-kind="${kind}"${kind === kinds[0] ? '' : ' hidden'}>
+      <table class="medal-table"><thead><tr><th></th><th>${kind === 'Games' ? 'Game' : kind.replace(/s$/, '').replace(/Serie$/, 'Series')}</th>
+        <th>${medalHtml(1)}</th><th>${medalHtml(2)}</th><th>${medalHtml(3)}</th><th>Total</th></tr></thead><tbody>${html}</tbody></table>
+      ${rows.length > MEDAL_TABLE_SHOWN ? `<button type="button" class="medal-more" data-more="${rows.length - MEDAL_TABLE_SHOWN}">Show all ${rows.length}</button>` : ''}
+    </div>`;
+  };
+
+  // All-time podiums: entries from this year in the top three of a list's all-time side. An entry counts when it ended
+  // this year and either started this year or lasted at most 120 days (a winter, a streak over New Year), so lifetime
+  // totals that merely include this year don't
+  const dayOf = text => /^\d{4}\/\d{2}\/\d{2}$/.test(text) ? Date.parse(text.replace(/\//g, '-')) : NaN;
+  const allTime = [];
+  podiums.forEach((p, i) => (p.a || []).forEach(r => {
+    const start = dayOf(String(r[4])), end = dayOf(String(r[5]));
+    if (!String(r[5]).startsWith(year) || !(r[0] >= 1 && r[0] <= 3)) return;
+    if (String(r[4]).startsWith(year) || (end - start) / 86400000 <= 120) allTime.push({ p, slug: slugs[i], row: r });
+  }));
+  allTime.sort((a, b) => a.row[0] - b.row[0] || a.p.t.localeCompare(b.p.t));
+
+  const isRecord = (p, r) => r[0] === 1 && p.a && p.a.some(a => a[0] === 1 && a[1] === r[1] && String(a[3]) === String(r[3]));
+  const nameHtml = (p, r) => {
+    const name = r[8] && p.k === 'Games' ? `<span class="hover-trigger" data-game="${escapeHTML(r[8])}">${escapeHTML(r[1])}</span>` : escapeHTML(r[1]);
+    return `${name}${r[7] > 3 ? ` <span class="podium-tied">and ${r[7] - 1} more tied</span>` : r[7] ? ' <span class="podium-tied">tied</span>' : ''}`;
+  };
+  const podiumCard = p => {
+    if (p.annual) {
+      const r = p.rows[0];
+      return `<div class="podium-card podium-annual${r[0] <= 3 ? ` podium-place-${r[0]}` : ''}">
+        <a class="podium-title toc-link" href="spotlight.html#${p.slug}">${escapeHTML(p.t)}</a>
+        <div class="podium-row">${medalHtml(r[0])}<div class="podium-text"><span class="podium-name">${r[7] ? 'Tied ' : ''}${ordinalText(r[0])} of ${p.n} years${soFar}</span>
+          ${r[6] || r[1] ? `<span class="podium-sub">${escapeHTML(r[6] || r[1])}</span>` : ''}</div>
+          <span class="podium-value">${escapeHTML(String(r[3]))}${isRecord(p, r) ? ' <span class="podium-star" title="Also the all-time record">★</span>' : ''}</span></div>
+      </div>`;
+    }
+    return `<div class="podium-card">
+      <a class="podium-title toc-link" href="spotlight.html#${p.slug}">${escapeHTML(p.t)}</a>
+      ${p.rows.map(r => `<div class="podium-row">${medalHtml(r[0])}<div class="podium-text"><span class="podium-name">${nameHtml(p, r)}${r[2] && !/^\d+ Games?$/.test(r[2]) && r[2] !== '-' ? ` <span class="podium-context">${escapeHTML(r[2])}</span>` : ''}</span>
+          ${r[6] ? `<span class="podium-sub">${escapeHTML(r[6])}</span>` : r[4] && r[4] !== '-' && !p.k ? `<span class="podium-sub">${escapeHTML(r[4] === r[5] ? r[4] : `${r[4]} – ${r[5]}`)}</span>` : ''}</div>
+        <span class="podium-value">${escapeHTML(String(r[3]))}${isRecord(p, r) ? ' <span class="podium-star" title="Also the all-time record">★</span>' : ''}</span></div>`).join('')}
+    </div>`;
+  };
+
+  const categories = [];
+  lists.forEach(p => {
+    let c = categories.find(c => c.name === p.c);
+    if (!c) categories.push(c = { name: p.c, lists: [] });
+    c.lists.push(p);
+  });
+
+  return `
+    <section class="card-row grid-1">
+      <div class="card" style="max-height: none;" id="spotlight-medals">
+        <div class="card-header"><h2>Spotlight Medals${soFar ? ` <span class="goty-gap-count">so far</span>` : ''}</h2></div>
+        <div class="card-content">
+          <div class="medal-summary">
+            <div class="medal-summary-item">${medalHtml(1, true)}<strong>${counts[1]}</strong><span>gold</span></div>
+            <div class="medal-summary-item">${medalHtml(2, true)}<strong>${counts[2]}</strong><span>silver</span></div>
+            <div class="medal-summary-item">${medalHtml(3, true)}<strong>${counts[3]}</strong><span>bronze</span></div>
+            <div class="medal-summary-note">across ${lists.length} of ${podiums.length} Spotlight lists with a ${year} entry</div>
+          </div>
+          ${allTime.length ? `
+          <h3 class="medal-heading">All-Time Podiums <span>${allTime.length}</span></h3>
+          <p class="medal-note">Entries from ${year} that rank in the top three of a list's all-time side.</p>
+          <div class="alltime-podiums">${allTime.map(({ p, slug, row }, i) => `
+            <a class="alltime-podium alltime-place-${row[0]}${i >= ALLTIME_PODIUMS_SHOWN ? ' alltime-extra' : ''}" href="spotlight.html#${slug}">
+              ${medalHtml(row[0], true)}
+              <span class="alltime-text">
+                <span class="alltime-list">${escapeHTML(p.t)}</span>
+                <strong title="${escapeHTML(row[1])}">${escapeHTML(row[1])}</strong>
+                <span class="alltime-value">${escapeHTML(String(row[3]))} <span>#${row[0]} all-time</span></span>
+              </span>
+            </a>`).join('')}</div>
+          ${allTime.length > ALLTIME_PODIUMS_SHOWN ? `<button type="button" class="medal-more alltime-more" data-count="${allTime.length}">Show all ${allTime.length}</button>` : ''}` : ''}
+          ${kinds.length ? `
+          <h3 class="medal-heading">Medal Table</h3>
+          <p class="medal-note">Each counted once per list, at its best place. Hover a row for its lists.</p>
+          <div class="medal-tabs" role="tablist">${kinds.map((k, i) => `<button type="button" class="medal-tab${i ? '' : ' active'}" data-kind="${k}">${k} <span>${tables[k].size}</span></button>`).join('')}</div>
+          ${kinds.map(medalTableHtml).join('')}` : ''}
+        </div>
+      </div>
+    </section>
+
+    <section class="card-row grid-1">
+      <div class="card" style="max-height: none;">
+        <div class="card-header"><h2>Every Spotlight Podium <span class="goty-gap-count">${lists.length} lists</span></h2></div>
+        <div class="card-content">
+          ${categories.map(c => `
+          <details class="toc-category-wrapper medal-category"${MEDAL_OPEN_CATEGORIES.includes(c.name) ? ' open' : ''}>
+            <summary><h3 class="toc-category-title">${escapeHTML(c.name)} <span class="toc-category-count">${c.lists.length}</span></h3></summary>
+            <div class="podium-grid">${c.lists.map(podiumCard).join('')}</div>
+          </details>`).join('')}
+        </div>
+      </div>
+    </section>`;
+}
+
+// Medal table tabs and "show all", wired once for the page
+document.addEventListener('click', e => {
+  const tab = e.target.closest('.medal-tab');
+  if (tab) {
+    const card = tab.closest('.card');
+    card.querySelectorAll('.medal-tab').forEach(t => t.classList.toggle('active', t === tab));
+    card.querySelectorAll('.medal-table-panel').forEach(panel => { panel.hidden = panel.dataset.kind !== tab.dataset.kind; });
+    return;
+  }
+  const allTimeMore = e.target.closest('.alltime-more');
+  if (allTimeMore) {
+    const grid = allTimeMore.previousElementSibling;
+    const open = grid.classList.toggle('alltime-show-all');
+    allTimeMore.textContent = open ? 'Show fewer' : `Show all ${allTimeMore.dataset.count}`;
+    return;
+  }
+  const more = e.target.closest('.medal-more');
+  if (more) {
+    const panel = more.closest('.medal-table-panel');
+    const open = panel.classList.toggle('medal-show-all');
+    more.textContent = open ? 'Show fewer' : `Show all ${panel.querySelectorAll('tbody tr').length}`;
+  }
+});
 
 // The years whose mix of genres and systems looks most like this one: each year as its share of hours by genre and
 // by system, compared by cosine similarity (100% would be an identical mix)
