@@ -129,6 +129,8 @@ function initGamePage() {
       </div>
     </section>
 
+    <section class="card-row grid-1" id="game-medals" hidden></section>
+
     <section class="card-row grid-1">
       <div class="card">
         <div class="card-header"><h2>Playthroughs <span class="goty-gap-count">${playthroughs.length}</span></h2></div>
@@ -163,6 +165,8 @@ function initGamePage() {
   `;
   renderGameHistory(gameName);
   setupGameProfileSearch(allGames);
+  // Spotlight medals arrive after the page is drawn, so the podium data doesn't slow the profile down
+  loadData(['podiums']).then(() => renderGameMedals(gameName)).catch(() => {});
 
   const shareButton = document.getElementById('game-share');
   if (shareButton) shareButton.addEventListener('click', () => openShareCard(buildGameCard(gameName)));
@@ -299,4 +303,36 @@ function renderGameHistory(gameName) {
 
   html += `</tbody></table></div>`;
   container.innerHTML = html;
+}
+
+// The game's Spotlight medals: its trophy case of every list it placed top three in, year by year
+function renderGameMedals(gameName) {
+  const section = document.getElementById('game-medals');
+  const medals = section && gameMedals(gameName);
+  if (!medals || !medals.length) return;
+  const counts = [0, 0, 0, 0];
+  medals.forEach(m => counts[m.place]++);
+  const years = [...new Set(medals.map(m => m.year))];
+  // Where the game ranks on the all-time medal table
+  const career = careerMedals();
+  const order = career && career.tables.Games ? sortedMedalRows(career.tables.Games) : [];
+  const rank = order.findIndex(t => t.who === gameName) + 1;
+  section.innerHTML = `
+    <div class="card" style="max-height: none;">
+      <div class="card-header"><h2>Spotlight Medals <span class="goty-gap-count">${medals.length}</span></h2></div>
+      <div class="card-content">
+        <div class="medal-summary">
+          ${[1, 2, 3].map(p => `<div class="medal-summary-item">${medalHtml(p, true)}<strong>${counts[p]}</strong><span>${MEDAL_NAMES[p]}</span></div>`).join('')}
+          <div class="medal-summary-note">${rank ? `#${rank} of ${order.length} games on the <a class="toc-link" href="review.html#all-time-medals">all-time medal table</a> · ` : ''}medals in ${years.length} year${years.length === 1 ? '' : 's'}</div>
+        </div>
+        <div class="game-medal-years">${years.map(year => {
+          const mine = medals.filter(m => m.year === year);
+          return `<div class="game-medal-year">
+            <a class="game-medal-year-label toc-link" href="review.html?year=${year}#spotlight-medals">${year}</a>
+            <div class="game-medal-list">${mine.map(m => `<a class="game-medal" href="spotlight.html#${m.slug}" data-tip="${escapeHTML(`${['', '1st', '2nd', '3rd'][m.place]} in ${m.list}, ${year}: ${m.value}`)}">${medalHtml(m.place)}<span>${escapeHTML(m.list.replace(/^Top 25 /, ''))}</span></a>`).join('')}</div>
+          </div>`;
+        }).join('')}</div>
+      </div>
+    </div>`;
+  section.hidden = false;
 }

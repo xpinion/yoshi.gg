@@ -27,6 +27,16 @@ function initPatternsPage() {
       </div>
     </section>
     <section class="card-row grid-1">
+      <div class="card" style="max-height: none;" id="traditions">
+        <div class="card-header">
+          <h2>Traditions:
+            <select id="traditions-kind" class="header-dropdown">${TRADITION_KINDS.map(k => `<option value="${k.id}">${k.label}</option>`).join('')}</select>
+          </h2>
+        </div>
+        <div class="card-content" id="traditions-content"></div>
+      </div>
+    </section>
+    <section class="card-row grid-1">
       <div class="card" style="max-height: none;">
         <div class="card-header"><h2>System Lifecycles</h2></div>
         <div class="card-content">${systemLifecyclesHtml()}</div>
@@ -38,6 +48,79 @@ function initPatternsPage() {
   const render = () => { document.getElementById('seasonality-content').innerHTML = seasonalityHtml(SEASONALITY_KINDS.find(k => k.id === select.value)); };
   select.addEventListener('change', render);
   render();
+  const traditionSelect = document.getElementById('traditions-kind');
+  const renderTraditions = () => { document.getElementById('traditions-content').innerHTML = traditionsHtml(TRADITION_KINDS.find(k => k.id === traditionSelect.value)); };
+  traditionSelect.addEventListener('change', renderTraditions);
+  renderTraditions();
+}
+
+// --- TRADITIONS: a game or series played in the same month for years in a row (Madden every September...) ---
+// A tradition is a run of at least TRADITION_MIN_YEARS back-to-back years with play in that month. It's still going if
+// it was kept this year, or kept last year and this year's month hasn't passed yet. Each name shows its best month;
+// the note counts its other months with a run as long.
+const TRADITION_MIN_YEARS = 3, TRADITIONS_SHOWN = 25;
+const TRADITION_KINDS = [
+  { id: 'series', label: 'Series', of: e => e.series },
+  { id: 'game', label: 'Games', of: e => e.game, isGame: true },
+  { id: 'genre', label: 'Genres', of: e => e.genre },
+  { id: 'system', label: 'Systems', of: e => e.system }
+];
+function findTraditions(kind) {
+  const today = dataDateKey(), thisYear = Number(today.slice(0, 4)), thisMonth = Number(today.slice(5, 7));
+  const played = {}; // name → month → year → seconds
+  rawData.allEntries.forEach(e => {
+    const name = kind.of(e);
+    if (!name || name === 'Unknown' || name === 'N/A' || name === 'ZZNONE') return;
+    const month = Number(e.date.slice(5, 7)), year = Number(e.date.slice(0, 4));
+    const byMonth = played[name] || (played[name] = {});
+    const byYear = byMonth[month] || (byMonth[month] = {});
+    byYear[year] = (byYear[year] || 0) + timeStringToSeconds(e.time);
+  });
+  const living = new Map(), past = new Map();
+  const better = (a, b) => !b || a.length > b.length || (a.length === b.length && a.seconds > b.seconds);
+  Object.entries(played).forEach(([name, months]) => Object.entries(months).forEach(([month, byYear]) => {
+    month = Number(month);
+    const years = Object.keys(byYear).map(Number).sort((a, b) => a - b);
+    let start = 0;
+    for (let i = 1; i <= years.length; i++) {
+      if (i < years.length && years[i] === years[i - 1] + 1) continue;
+      const run = years.slice(start, i);
+      start = i;
+      if (run.length < TRADITION_MIN_YEARS) continue;
+      const last = run[run.length - 1];
+      const t = { name, month, length: run.length, first: run[0], last, seconds: run.reduce((sum, y) => sum + byYear[y], 0) };
+      if (last === thisYear) t.status = { text: `Kept in ${thisYear}`, cls: 'kept' };
+      else if (last === thisYear - 1 && month > thisMonth) t.status = { text: `Due in ${MONTH_NAMES[month - 1]}`, cls: 'due' };
+      else if (last === thisYear - 1 && month === thisMonth) t.status = { text: 'Due this month', cls: 'due' };
+      else t.status = { text: `Ended ${last + 1}`, cls: 'ended' };
+      const map = t.status.cls === 'ended' ? past : living;
+      const cur = map.get(name);
+      if (better(t, cur)) map.set(name, { ...t, others: cur && cur.length === t.length ? cur.others + 1 : 0 });
+      else if (cur.length === t.length) cur.others++;
+    }
+  }));
+  const sorted = map => [...map.values()].sort((a, b) => b.length - a.length || b.seconds - a.seconds || a.name.localeCompare(b.name));
+  return { living: sorted(living), past: sorted(past).filter(t => !living.has(t.name)) };
+}
+function traditionsHtml(kind) {
+  const { living, past } = findTraditions(kind);
+  const table = (rows, empty) => rows.length ? `<div class="monthly-table-wrapper"><table class="monthly-table tradition-table"><thead><tr>
+      <th>#</th><th>${kind.label.replace(/s$/, '').replace(/Serie$/, 'Series')}</th><th>Every</th><th>Years in a Row</th><th>Run</th><th>Time in Those Months</th><th>Status</th></tr></thead><tbody>
+      ${rows.slice(0, TRADITIONS_SHOWN).map((t, i) => `<tr>
+        <td class="text-center">${i + 1}</td>
+        <td class="text-left"><strong${kind.isGame ? ` class="hover-trigger" data-game="${escapeHTML(t.name)}"` : ''}>${escapeHTML(t.name)}</strong>${t.others ? ` <span class="tradition-others">+${t.others} other month${t.others === 1 ? '' : 's'} as long</span>` : ''}</td>
+        <td class="text-center">${MONTH_NAMES[t.month - 1]}</td>
+        <td class="text-center"><strong>${t.length}</strong></td>
+        <td class="text-center">${t.first}–${t.last}</td>
+        <td class="text-center">${formatTime(t.seconds)}</td>
+        <td class="text-center"><span class="tradition-status tradition-${t.status.cls}">${t.status.text}</span></td>
+      </tr>`).join('')}</tbody></table></div>` : `<div class="loading-text">${empty}</div>`;
+  return `
+    <p class="medal-note">Played in the same month for at least ${TRADITION_MIN_YEARS} years in a row. Each ${kind.label.toLowerCase().replace(/s$/, '').replace(/serie$/, 'series')} shows its longest run.</p>
+    <h3 class="medal-heading">Still Going <span>${living.length}</span></h3>
+    ${table(living, 'No traditions still going.')}
+    <h3 class="medal-heading">Past Traditions <span>${past.length}</span></h3>
+    ${table(past, 'None yet.')}`;
 }
 
 // Each cell: the share of all the time ever played in that calendar month that went to the row's genre (or system,

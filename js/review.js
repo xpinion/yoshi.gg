@@ -12,7 +12,10 @@ function initReviewPage() {
         <select id="review-year" class="header-dropdown card-title-lg">${years.map(y => `<option value="${y}">${y}</option>`).join('')}</select>
         in Review
       </h2>
-      ${typeof openShareCard === 'function' ? `<div class="share-row">${shareButtonHtml('id="review-share"')}</div>` : ''}
+      <div class="share-row">
+        <button type="button" class="story-play-btn" id="review-story">▶ Play the story</button>
+        ${typeof openShareCard === 'function' ? shareButtonHtml('id="review-share"') : ''}
+      </div>
     </div>
     <div id="review-body" class="page-stack"></div>
   `;
@@ -25,6 +28,7 @@ function initReviewPage() {
   select.addEventListener('change', () => { history.replaceState(null, '', `?year=${select.value}`); render(); });
   render();
 
+  document.getElementById('review-story').addEventListener('click', () => openYearStory(select.value));
   const shareButton = document.getElementById('review-share');
   if (shareButton) shareButton.addEventListener('click', () => openShareCard(buildGroupCard('year', select.value)));
 }
@@ -168,8 +172,99 @@ function reviewBodyHtml(year) {
       </div>
     </section>
 
+    ${timeCapsuleHtml(year, inProgress)}
+
     ${spotlightMedalsHtml(year, inProgress)}
+
+    ${careerMedalsHtml(year)}
   `;
+}
+
+// --- TIME CAPSULE: the log as it stood on December 31 of the year (or today, for the year in progress), against now ---
+const CAPSULE_GAMES = 10, CAPSULE_OTHERS = 5;
+function timeCapsuleHtml(year, inProgress) {
+  const cutoff = inProgress ? dataDateKey() : `${year}-12-31`;
+  const then = summarizeEntries(rawData.allEntries.filter(e => e.date.slice(0, 10) <= cutoff));
+  const now = inProgress ? null : summarizeEntries(rawData.allEntries);
+  const completionsThen = getSortedCompletions('All-Time').filter(pt => pt.displayDate.toISOString().slice(0, 10) <= cutoff).length;
+  const completionsNow = getSortedCompletions('All-Time').length;
+  const rankIn = map => { const order = topOfMap(map, map.size).map(([name]) => name); return name => order.indexOf(name) + 1; };
+  const growth = (a, b, show) => now ? `<span class="tf-sub">now ${show(b)} (+${show(b - a)})</span>` : '';
+  const stat = (label, value, extra) => `<div class="tf-stat"><span class="sys-widget-title">${label}</span><strong>${value}</strong>${extra}</div>`;
+  const plain = v => v.toLocaleString('en-US');
+
+  // A top list as it stood then, with where each one ranks now
+  const topList = (title, map, nowMap, limit, isGame) => {
+    const nowRank = nowMap ? rankIn(nowMap) : null;
+    const rows = topOfMap(map, limit).map(([name, sec], i) => {
+      let move = '';
+      if (nowRank) {
+        const r = nowRank(name), diff = (i + 1) - r;
+        move = diff > 0 ? `<span class="capsule-move capsule-up" title="#${r} now">▲ #${r}</span>` : diff < 0 ? `<span class="capsule-move capsule-down" title="#${r} now">▼ #${r}</span>` : `<span class="capsule-move" title="Still #${r}">=</span>`;
+      }
+      return `<li><span class="capsule-rank">${i + 1}</span><span class="capsule-name${isGame ? ' hover-trigger' : ''}"${isGame ? ` data-game="${escapeHTML(name)}"` : ''}>${escapeHTML(name)}</span><span class="capsule-time">${formatTime(sec)}</span>${move}</li>`;
+    }).join('');
+    // Names that are in the top now but weren't then
+    const newcomers = nowMap ? topOfMap(nowMap, limit).map(([name]) => name).filter(name => !topOfMap(map, limit).some(([n]) => n === name)) : [];
+    return `<div class="capsule-list"><h3 class="medal-heading">${title}</h3><ol>${rows}</ol>
+      ${newcomers.length ? `<p class="medal-note">In the top ${limit} now, not then: ${newcomers.map(escapeHTML).join(', ')}</p>` : ''}</div>`;
+  };
+
+  return `
+    <section class="card-row grid-1">
+      <div class="card" style="max-height: none;" id="time-capsule">
+        <div class="card-header"><h2>Time Capsule <span class="goty-gap-count">${inProgress ? `the log so far, ${formatFullDate(cutoff)}` : `the log on December 31, ${year}`}</span></h2></div>
+        <div class="card-content">
+          <p class="medal-note">${inProgress ? `This year's capsule seals on December 31. Here's how the whole log stands today.` : `How the whole log stood at the end of ${year}${now ? `, and how it has changed since (now = ${formatFullDate(dataDateKey())})` : ''}.`}</p>
+          <div class="tf-stats">
+            ${stat('Lifetime Hours', formatTime(then.seconds), growth(then.seconds, now ? now.seconds : 0, formatTime))}
+            ${stat('Days Played', plain(then.days.size), growth(then.days.size, now ? now.days.size : 0, plain))}
+            ${stat('Games Played', plain(then.games.size), growth(then.games.size, now ? now.games.size : 0, plain))}
+            ${stat('Completions', plain(completionsThen), growth(completionsThen, completionsNow, plain))}
+            ${stat('Systems', plain(then.systems.size), growth(then.systems.size, now ? now.systems.size : 0, plain))}
+          </div>
+          <div class="capsule-grid">
+            ${topList(`Most Played Games, ${inProgress ? 'today' : `end of ${year}`}`, then.games, now && now.games, CAPSULE_GAMES, true)}
+            <div>
+              ${topList('Top Systems', then.systems, now && now.systems, CAPSULE_OTHERS, false)}
+              ${topList('Top Series', then.series, now && now.series, CAPSULE_OTHERS, false)}
+            </div>
+            ${topList('Top Genres', then.genres, now && now.genres, CAPSULE_OTHERS, false)}
+          </div>
+        </div>
+      </div>
+    </section>`;
+}
+
+// --- ALL-TIME MEDALS: Spotlight medals over every year, and each year's most decorated game ---
+function careerMedalsHtml(year) {
+  const career = careerMedals();
+  if (!career || !career.leaders.length) return '';
+  const leaderRows = career.leaders.map(({ year: y, row }) => `
+    <tr${y === year ? ' class="medal-leader-current"' : ''}>
+      <td class="medal-table-rank"><a class="toc-link" href="review.html?year=${y}#spotlight-medals">${y}</a></td>
+      <td class="medal-table-name"><span class="hover-trigger" data-game="${escapeHTML(row.who)}">${escapeHTML(row.who)}</span></td>
+      <td class="medal-count">${row.medals[1] || ''}</td><td class="medal-count">${row.medals[2] || ''}</td><td class="medal-count">${row.medals[3] || ''}</td>
+    </tr>`).join('');
+  return `
+    <section class="card-row grid-1">
+      <div class="card" style="max-height: none;" id="all-time-medals">
+        <div class="card-header"><h2>All-Time Medal Table <span class="goty-gap-count">every year</span></h2></div>
+        <div class="card-content">
+          <div class="career-medals">
+            <div>
+              <p class="medal-note">Every year's Spotlight podiums added up. Each list and year counts once per name, at its best place. Hover a row for its years.</p>
+              ${medalTablesHtml(career.tables, t => `Medals in ${t.years.size} year${t.years.size === 1 ? '' : 's'}: ${[...t.years].sort().join(', ')}`, { label: 'Years', of: t => t.years.size })}
+            </div>
+            <div>
+              <h3 class="medal-heading">Most Decorated Game by Year</h3>
+              <table class="medal-table medal-leaders"><thead><tr><th>Year</th><th>Game</th><th>${medalHtml(1)}</th><th>${medalHtml(2)}</th><th>${medalHtml(3)}</th></tr></thead>
+                <tbody>${leaderRows}</tbody></table>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>`;
 }
 
 // --- SPOTLIGHT MEDALS ---
@@ -178,17 +273,35 @@ function reviewBodyHtml(year) {
 // [place, name, context, value, start, end, detail, tied, who].
 // Sections that start open; the long per-genre, per-system and other metadata sections start closed
 const MEDAL_OPEN_CATEGORIES = ['Playtime & Activity', 'Co-Op & Multiplayer', 'Streaks & Habits', 'Completions & Abandons', 'Holidays', 'Best of Each Month', 'Best of Each Season'];
-const MEDAL_NAMES = ['', 'gold', 'silver', 'bronze'];
 const MEDAL_TABLE_SHOWN = 15;
 const ALLTIME_PODIUMS_SHOWN = 12;
 
-function medalHtml(place, big = false) {
-  return place >= 1 && place <= 3
-    ? `<span class="medal medal-${MEDAL_NAMES[place]}${big ? ' medal-big' : ''}" title="${['', '1st', '2nd', '3rd'][place]} place">${place}</span>`
-    : `<span class="medal medal-none" title="${ordinalText(place)} place">${place || '-'}</span>`;
-}
-function ordinalText(n) {
-  return n + (n % 100 >= 11 && n % 100 <= 13 ? 'th' : ({ 1: 'st', 2: 'nd', 3: 'rd' }[n % 10] || 'th'));
+// Tabs (Games, Series, Systems...) of medal tables. tables: { kind: Map(who → { who, medals }) }; tipOf(row) is the
+// row's hover text; extra adds a column: { label, of: row => text }
+function medalTablesHtml(tables, tipOf, extra = null) {
+  const kinds = MEDAL_KIND_ORDER.filter(k => tables[k] && tables[k].size);
+  if (!kinds.length) return '';
+  const panel = kind => {
+    const rows = sortedMedalRows(tables[kind]);
+    let place = 0;
+    const html = rows.map((t, i) => {
+      const prev = rows[i - 1];
+      if (!prev || prev.medals.join() !== t.medals.join()) place = i + 1;
+      const total = t.medals[1] + t.medals[2] + t.medals[3];
+      return `<tr class="${i >= MEDAL_TABLE_SHOWN ? 'medal-extra' : ''}" data-tip="${escapeHTML(tipOf(t))}">
+        <td class="medal-table-rank">${place}</td>
+        <td class="medal-table-name">${kind === 'Games' ? `<span class="hover-trigger" data-game="${escapeHTML(t.who)}">${escapeHTML(t.who)}</span>` : escapeHTML(t.who)}</td>
+        <td class="medal-count">${t.medals[1] || ''}</td><td class="medal-count">${t.medals[2] || ''}</td><td class="medal-count">${t.medals[3] || ''}</td>
+        <td class="medal-total">${total}</td>${extra ? `<td class="medal-extra-col">${extra.of(t)}</td>` : ''}</tr>`;
+    }).join('');
+    return `<div class="medal-table-panel" data-kind="${kind}"${kind === kinds[0] ? '' : ' hidden'}>
+      <table class="medal-table"><thead><tr><th></th><th>${kind === 'Games' ? 'Game' : kind.replace(/s$/, '').replace(/Serie$/, 'Series')}</th>
+        <th>${medalHtml(1)}</th><th>${medalHtml(2)}</th><th>${medalHtml(3)}</th><th>Total</th>${extra ? `<th>${extra.label}</th>` : ''}</tr></thead><tbody>${html}</tbody></table>
+      ${rows.length > MEDAL_TABLE_SHOWN ? `<button type="button" class="medal-more">Show all ${rows.length}</button>` : ''}
+    </div>`;
+  };
+  return `<div class="medal-tabs" role="tablist">${kinds.map((k, i) => `<button type="button" class="medal-tab${i ? '' : ' active'}" data-kind="${k}">${k} <span>${tables[k].size}</span></button>`).join('')}</div>
+    ${kinds.map(panel).join('')}`;
 }
 
 function spotlightMedalsHtml(year, inProgress) {
@@ -197,27 +310,6 @@ function spotlightMedalsHtml(year, inProgress) {
   const soFar = inProgress ? ' so far' : '';
   const { podiums, lists, tables, counts, slugs } = medals;
   if (!lists.length) return '';
-  const kinds = MEDAL_KIND_ORDER.filter(k => tables[k] && tables[k].size);
-  const medalTableHtml = kind => {
-    const rows = sortedMedalRows(tables[kind]);
-    let place = 0;
-    const html = rows.map((t, i) => {
-      const prev = rows[i - 1];
-      if (!prev || prev.medals.join() !== t.medals.join()) place = i + 1;
-      const total = t.medals[1] + t.medals[2] + t.medals[3];
-      return `<tr class="${i >= MEDAL_TABLE_SHOWN ? 'medal-extra' : ''}" data-tip="${escapeHTML(t.lists.slice(0, 12).join('\n') + (t.lists.length > 12 ? `\n+ ${t.lists.length - 12} more` : ''))}">
-        <td class="medal-table-rank">${place}</td>
-        <td class="medal-table-name">${kind === 'Games' ? `<span class="hover-trigger" data-game="${escapeHTML(t.who)}">${escapeHTML(t.who)}</span>` : escapeHTML(t.who)}</td>
-        <td class="medal-count">${t.medals[1] || ''}</td><td class="medal-count">${t.medals[2] || ''}</td><td class="medal-count">${t.medals[3] || ''}</td>
-        <td class="medal-total">${total}</td></tr>`;
-    }).join('');
-    return `<div class="medal-table-panel" data-kind="${kind}"${kind === kinds[0] ? '' : ' hidden'}>
-      <table class="medal-table"><thead><tr><th></th><th>${kind === 'Games' ? 'Game' : kind.replace(/s$/, '').replace(/Serie$/, 'Series')}</th>
-        <th>${medalHtml(1)}</th><th>${medalHtml(2)}</th><th>${medalHtml(3)}</th><th>Total</th></tr></thead><tbody>${html}</tbody></table>
-      ${rows.length > MEDAL_TABLE_SHOWN ? `<button type="button" class="medal-more" data-more="${rows.length - MEDAL_TABLE_SHOWN}">Show all ${rows.length}</button>` : ''}
-    </div>`;
-  };
-
   // All-time podiums: entries from this year in the top three of a list's all-time side. An entry counts when it ended
   // this year and either started this year or lasted at most 120 days (a winter, a streak over New Year), so lifetime
   // totals that merely include this year don't
@@ -284,11 +376,10 @@ function spotlightMedalsHtml(year, inProgress) {
               </span>
             </a>`).join('')}</div>
           ${allTime.length > ALLTIME_PODIUMS_SHOWN ? `<button type="button" class="medal-more alltime-more" data-count="${allTime.length}">Show all ${allTime.length}</button>` : ''}` : ''}
-          ${kinds.length ? `
+          ${Object.keys(tables).length ? `
           <h3 class="medal-heading">Medal Table</h3>
           <p class="medal-note">Each counted once per list, at its best place. Hover a row for its lists.</p>
-          <div class="medal-tabs" role="tablist">${kinds.map((k, i) => `<button type="button" class="medal-tab${i ? '' : ' active'}" data-kind="${k}">${k} <span>${tables[k].size}</span></button>`).join('')}</div>
-          ${kinds.map(medalTableHtml).join('')}` : ''}
+          ${medalTablesHtml(tables, t => t.lists.slice(0, 12).join('\n') + (t.lists.length > 12 ? `\n+ ${t.lists.length - 12} more` : ''))}` : ''}
         </div>
       </div>
     </section>
@@ -372,4 +463,142 @@ function similarYearsHtml(year) {
         </div>
       </div>
     </section>`;
+}
+
+// --- YEAR STORY: the year as full-screen slides, tapped or swiped through (or played on a timer) ---
+const STORY_SLIDE_MS = 6500;
+function yearStorySlides(year) {
+  const entries = rawData.allEntries.filter(e => e.date.startsWith(year));
+  if (!entries.length) return [];
+  const sum = summarizeEntries(entries);
+  const inProgress = dataDateKey().startsWith(year);
+  const ranks = yearRankings(year);
+  const firstPlayed = {};
+  rawData.allEntries.forEach(e => { if (!firstPlayed[e.game]) firstPlayed[e.game] = e.date.slice(0, 4); });
+  const newGames = [...sum.games.keys()].filter(g => firstPlayed[g] === year).length;
+  const games = topOfMap(sum.games, 5);
+  const [topGame, topSec] = games[0];
+  const dayTotals = {};
+  entries.forEach(e => { const d = e.date.slice(0, 10); dayTotals[d] = (dayTotals[d] || 0) + timeStringToSeconds(e.time); });
+  const [bigDay, bigSec] = Object.entries(dayTotals).sort((a, b) => b[1] - a[1])[0];
+  const bigDayGames = topOfMap(summarizeEntries(entries.filter(e => e.date.startsWith(bigDay))).games, 3).map(([g]) => g);
+  const streak = longestDayStreak(sum.days);
+  const months = MONTH_NAMES.map((name, m) => ({ name: name.slice(0, 3), full: name, sec: sum.byMonth[`${year}-${String(m + 1).padStart(2, '0')}`] || 0 }));
+  const bestMonth = months.reduce((a, b) => b.sec > a.sec ? b : a);
+  const maxMonth = Math.max(1, bestMonth.sec);
+  const [topGenre, genreSec] = topOfMap(sum.genres, 1)[0] || ['-', 0];
+  const [topSystem, systemSec] = topOfMap(sum.systems, 1)[0] || ['-', 0];
+  const completions = getSortedCompletions(year);
+  const bestCompletion = completions.map(pt => ({ pt, score: getGameScore(pt.gameName) })).filter(c => c.score !== null).sort((a, b) => b.score - a.score)[0];
+  const medals = spotlightMedals(year);
+  const pct = sec => `${Math.round(sec / sum.seconds * 100)}%`;
+  const label = text => `<div class="story-label">${text}</div>`;
+  const big = text => `<div class="story-big">${text}</div>`;
+  const line = text => `<div class="story-line">${text}</div>`;
+  const e = escapeHTML;
+
+  const slides = [
+    { theme: 'green', html: `${label(inProgress ? 'So far, your year in games' : 'Your year in games')}<div class="story-year">${year}</div>${line('Tap to begin')}` },
+    { theme: 'dark', html: `${label('You played for')}${big(formatTime(sum.seconds))}${line(`across ${sum.days.size} days`)}${line(`<span class="story-chip">${e(ranks.seconds.text)}${ranks.partial ? ' at this point' : ''}</span>`)}` },
+    { theme: 'purple', html: `${label('You picked up')}${big(`${sum.games.size} games`)}${line(`${newGames} of them for the first time, ${sum.games.size - newGames} old friends`)}` },
+    { theme: 'gold', html: `${label('Your game of the year, by the clock')}<div class="story-title">${e(topGame)}</div>${big(formatTime(topSec))}${line(`${pct(topSec)} of everything you played`)}` },
+    { theme: 'dark', html: `${label('Your top five')}<ol class="story-bars">${games.map(([g, sec], i) => `<li style="--w: ${(sec / games[0][1] * 100).toFixed(1)}%; --d: ${i * 0.12}s"><span>${e(g)}</span><strong>${formatTime(sec)}</strong></li>`).join('')}</ol>` },
+    { theme: 'orange', html: `${label('Your biggest day')}${big(formatTime(bigSec))}${line(new Date(bigDay + 'T12:00:00Z').toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', timeZone: 'UTC' }))}${line(`mostly ${e(bigDayGames.join(', '))}`)}` },
+    { theme: 'blue', html: `${label('Your longest streak')}${big(`${streak.length} day${streak.length === 1 ? '' : 's'}`)}${line(`in a row, ${formatFullDate(streak.start)} to ${formatFullDate(streak.end)}`)}` },
+    { theme: 'dark', html: `${label(`Your busiest month was ${bestMonth.full}`)}<div class="story-months">${months.map((m, i) => `<div style="--h: ${(m.sec / maxMonth * 100).toFixed(1)}%; --d: ${i * 0.06}s"${m === bestMonth ? ' class="best"' : ''}><i></i><span>${m.name[0]}</span></div>`).join('')}</div>${line(formatTime(bestMonth.sec))}` },
+    { theme: 'purple', html: `${label('Your genre')}<div class="story-title">${e(topGenre)}</div>${line(`${pct(genreSec)} of your hours`)}${label('Your system')}<div class="story-title">${e(topSystem)}</div>${line(`${pct(systemSec)} of your hours`)}` },
+    { theme: 'green', html: `${label('You finished')}${big(`${completions.length} game${completions.length === 1 ? '' : 's'}`)}${bestCompletion ? line(`the best of them: ${e(bestCompletion.pt.gameName)} (${formatScore(bestCompletion.score)})`) : ''}${line(`<span class="story-chip">${e(ranks.completions.text)}</span>`)}` }
+  ];
+  if (medals && medals.lists.length) {
+    const leader = medals.tables.Games ? sortedMedalRows(medals.tables.Games)[0] : null;
+    slides.push({ theme: 'gold', html: `${label('On the Spotlight lists you won')}<div class="story-medals">${[1, 2, 3].map(p => `<div>${medalHtml(p, true)}<strong>${medals.counts[p]}</strong></div>`).join('')}</div>${leader ? line(`most decorated: ${e(leader.who)}, ${leader.medals[1]} gold`) : ''}` });
+  }
+  slides.push({ theme: 'dark', end: true, html: `<div class="story-year">${year}</div>${line(`${formatTime(sum.seconds)} · ${sum.games.size} games · ${completions.length} finished`)}${line(`Game of the year: ${e(topGame)}`)}
+    <div class="story-end-actions"><button type="button" class="story-btn" data-story="restart">Watch again</button><a class="story-btn" href="#spotlight-medals" data-story="close">See the details</a></div>` });
+  return slides;
+}
+
+function openYearStory(year) {
+  const slides = yearStorySlides(year);
+  if (!slides.length) return;
+  const overlay = document.createElement('div');
+  overlay.className = 'story-overlay';
+  overlay.setAttribute('role', 'dialog');
+  overlay.setAttribute('aria-label', `${year} story`);
+  overlay.innerHTML = `
+    <div class="story-frame">
+      <div class="story-progress">${slides.map(() => '<span><i></i></span>').join('')}</div>
+      <button type="button" class="story-close" aria-label="Close">✕</button>
+      <div class="story-slide"></div>
+      <button type="button" class="story-pause" aria-label="Pause">❚❚</button>
+    </div>`;
+  document.body.appendChild(overlay);
+  document.body.classList.add('story-open');
+  const frame = overlay.querySelector('.story-frame'), slideEl = overlay.querySelector('.story-slide');
+  const bars = [...overlay.querySelectorAll('.story-progress i')];
+  const pauseBtn = overlay.querySelector('.story-pause');
+  const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  let index = 0, timer = null, paused = reduceMotion, started = 0, remaining = STORY_SLIDE_MS;
+
+  const close = () => { clearTimeout(timer); overlay.remove(); document.body.classList.remove('story-open'); document.removeEventListener('keydown', onKey); };
+  const schedule = () => {
+    clearTimeout(timer);
+    const bar = bars[index];
+    if (paused || slides[index].end) { bar.style.transition = 'none'; return; }
+    started = Date.now();
+    bar.style.transition = `width ${remaining}ms linear`;
+    requestAnimationFrame(() => { bar.style.width = '100%'; });
+    timer = setTimeout(() => go(1), remaining);
+  };
+  const show = i => {
+    index = Math.max(0, Math.min(slides.length - 1, i));
+    remaining = STORY_SLIDE_MS;
+    bars.forEach((bar, n) => { bar.style.transition = 'none'; bar.style.width = n < index ? '100%' : '0'; });
+    frame.dataset.theme = slides[index].theme;
+    slideEl.innerHTML = `<div class="story-content">${slides[index].html}</div>`;
+    schedule();
+  };
+  const go = step => {
+    if (index + step >= slides.length) return;
+    show(index + step);
+  };
+  const togglePause = () => {
+    paused = !paused;
+    pauseBtn.textContent = paused ? '▶' : '❚❚';
+    pauseBtn.setAttribute('aria-label', paused ? 'Play' : 'Pause');
+    const bar = bars[index];
+    if (paused) {
+      clearTimeout(timer);
+      remaining = Math.max(0, remaining - (Date.now() - started));
+      bar.style.transition = 'none';
+      bar.style.width = `${(1 - remaining / STORY_SLIDE_MS) * 100}%`;
+    } else schedule();
+  };
+  const onKey = e => {
+    if (e.key === 'Escape') close();
+    else if (e.key === 'ArrowRight' || e.key === ' ') { e.preventDefault(); go(1); }
+    else if (e.key === 'ArrowLeft') go(-1);
+  };
+  document.addEventListener('keydown', onKey);
+  overlay.addEventListener('click', e => {
+    if (e.target.closest('.story-close')) return close();
+    if (e.target.closest('.story-pause')) return togglePause();
+    const action = e.target.closest('[data-story]');
+    if (action) { if (action.dataset.story === 'restart') show(0); else close(); return; }
+    if (e.target.closest('.hover-trigger')) return;
+    if (!frame.contains(e.target)) return close();
+    const rect = frame.getBoundingClientRect();
+    go(e.clientX < rect.left + rect.width / 3 ? -1 : 1);
+  });
+  // Swipes on touch screens
+  let touchX = null;
+  frame.addEventListener('touchstart', e => { touchX = e.touches[0].clientX; }, { passive: true });
+  frame.addEventListener('touchend', e => {
+    if (touchX === null) return;
+    const dx = e.changedTouches[0].clientX - touchX;
+    touchX = null;
+    if (Math.abs(dx) > 50) { e.preventDefault(); go(dx < 0 ? 1 : -1); }
+  });
+  if (reduceMotion) { pauseBtn.textContent = '▶'; pauseBtn.setAttribute('aria-label', 'Play'); }
+  show(0);
 }

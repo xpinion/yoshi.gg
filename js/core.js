@@ -569,6 +569,91 @@ function spotlightSlugs(lists) {
 }
 
 
+// --- SPOTLIGHT MEDALS (the 'podiums' data group) ---
+const MEDAL_NAMES = ['', 'gold', 'silver', 'bronze'];
+
+function medalHtml(place, big = false) {
+  return place >= 1 && place <= 3
+    ? `<span class="medal medal-${MEDAL_NAMES[place]}${big ? ' medal-big' : ''}" title="${['', '1st', '2nd', '3rd'][place]} place">${place}</span>`
+    : `<span class="medal medal-none" title="${ordinalText(place)} place">${place || '-'}</span>`;
+}
+function ordinalText(n) {
+  return n + (n % 100 >= 11 && n % 100 <= 13 ? 'th' : ({ 1: 'st', 2: 'nd', 3: 'rd' }[n % 10] || 'th'));
+}
+
+// A year's Spotlight medals, from rawData.metrics.spotlightPodiums (the 'podiums' data group; built by buildListPodium
+// in DataAggregator.gs). Rows are [place, name, context, value, start, end, detail, tied, who]. Returns the lists with a
+// row that year ({ ...podium, slug, rows }), the medal table for each kind (Map of who → { who, medals: [, gold, silver,
+// bronze], lists }) counting each game, series and so on once per list at its best place, the gold/silver/bronze totals
+// across every list, and every list's Spotlight slug. null when the podium data isn't loaded.
+const MEDAL_KIND_ORDER = ['Games', 'Series', 'Systems', 'Genres', 'Developers', 'Publishers', 'Release Years'];
+function spotlightMedals(year) {
+  const podiums = rawData.metrics && rawData.metrics.spotlightPodiums;
+  if (!podiums) return null;
+  const slugs = spotlightSlugs(podiums.map(p => ({ titleLeft: p.t })));
+  const lists = podiums.map((p, i) => ({ ...p, slug: slugs[i], rows: (p.y[year] || []).filter(r => r[0] >= 1) })).filter(p => p.rows.length);
+  const tables = {}, counts = [0, 0, 0, 0];
+  lists.forEach(p => p.rows.forEach(r => { if (r[0] <= 3) counts[r[0]]++; }));
+  lists.filter(p => p.k && !p.annual).forEach(p => {
+    const best = new Map();
+    p.rows.forEach(r => { if (r[8] && r[0] <= 3 && (!best.has(r[8]) || r[0] < best.get(r[8]))) best.set(r[8], r[0]); });
+    const table = tables[p.k] || (tables[p.k] = new Map());
+    best.forEach((place, who) => {
+      const t = table.get(who) || { who, medals: [0, 0, 0, 0], lists: [] };
+      t.medals[place]++;
+      t.lists.push(`${['', '🥇', '🥈', '🥉'][place]} ${p.t}`);
+      table.set(who, t);
+    });
+  });
+  return { podiums, lists, tables, counts, slugs };
+}
+// A medal table's rows, most golds first, then silvers, then bronzes
+function sortedMedalRows(table) {
+  return [...table.values()].sort((a, b) => b.medals[1] - a.medals[1] || b.medals[2] - a.medals[2] || b.medals[3] - a.medals[3] || a.who.localeCompare(b.who));
+}
+
+// Medals over every year: the career medal table for each kind (each list and year counted once per name, at its best
+// place), and each year's leading game. { tables: { kind: Map(who → { who, medals, years: Set }) }, leaders: [{ year, row }] }
+function careerMedals() {
+  const podiums = rawData.metrics && rawData.metrics.spotlightPodiums;
+  if (!podiums) return null;
+  const tables = {}, byYear = {};
+  podiums.filter(p => p.k && !p.annual).forEach(p => Object.entries(p.y).forEach(([year, rows]) => {
+    const best = new Map();
+    rows.forEach(r => { if (r[8] && r[0] >= 1 && r[0] <= 3 && (!best.has(r[8]) || r[0] < best.get(r[8]))) best.set(r[8], r[0]); });
+    const table = tables[p.k] || (tables[p.k] = new Map());
+    best.forEach((place, who) => {
+      const t = table.get(who) || { who, medals: [0, 0, 0, 0], years: new Set(), lists: [] };
+      t.medals[place]++;
+      t.years.add(year);
+      table.set(who, t);
+      if (p.k === 'Games') {
+        const y = byYear[year] || (byYear[year] = new Map());
+        const g = y.get(who) || { who, medals: [0, 0, 0, 0], lists: [] };
+        g.medals[place]++;
+        y.set(who, g);
+      }
+    });
+  }));
+  const leaders = Object.keys(byYear).sort().reverse().map(year => ({ year, row: sortedMedalRows(byYear[year])[0], tally: byYear[year] }));
+  return { tables, leaders };
+}
+// Every medal one game won: [{ year, place, list, slug, value }], newest year first, then by place
+function gameMedals(game) {
+  const podiums = rawData.metrics && rawData.metrics.spotlightPodiums;
+  if (!podiums) return null;
+  const slugs = spotlightSlugs(podiums.map(p => ({ titleLeft: p.t })));
+  const medals = [];
+  podiums.forEach((p, i) => {
+    if (p.k !== 'Games' || p.annual) return;
+    Object.entries(p.y).forEach(([year, rows]) => {
+      const mine = rows.filter(r => r[8] === game && r[0] >= 1 && r[0] <= 3).sort((a, b) => a[0] - b[0])[0];
+      if (mine) medals.push({ year, place: mine[0], list: p.t, slug: slugs[i], value: mine[3] });
+    });
+  });
+  return medals.sort((a, b) => b.year.localeCompare(a.year) || a.place - b.place || a.list.localeCompare(b.list));
+}
+
 // --- MULTIPLAYER PARTNERS ---
 // The people with their own multiplayer lists, as set in the Apps Script config: [{ name, noteNames }]
 function getPartners() { return rawData.partners || []; }

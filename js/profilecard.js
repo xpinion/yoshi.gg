@@ -354,37 +354,6 @@ function miniCard(card) {
   };
 }
 
-// A year's Spotlight medals, from rawData.metrics.spotlightPodiums (the 'podiums' data group; built by buildListPodium
-// in DataAggregator.gs). Rows are [place, name, context, value, start, end, detail, tied, who]. Returns the lists with a
-// row that year ({ ...podium, slug, rows }), the medal table for each kind (Map of who → { who, medals: [, gold, silver,
-// bronze], lists }) counting each game, series and so on once per list at its best place, the gold/silver/bronze totals
-// across every list, and every list's Spotlight slug. null when the podium data isn't loaded.
-const MEDAL_KIND_ORDER = ['Games', 'Series', 'Systems', 'Genres', 'Developers', 'Publishers', 'Release Years'];
-function spotlightMedals(year) {
-  const podiums = rawData.metrics && rawData.metrics.spotlightPodiums;
-  if (!podiums) return null;
-  const slugs = spotlightSlugs(podiums.map(p => ({ titleLeft: p.t })));
-  const lists = podiums.map((p, i) => ({ ...p, slug: slugs[i], rows: (p.y[year] || []).filter(r => r[0] >= 1) })).filter(p => p.rows.length);
-  const tables = {}, counts = [0, 0, 0, 0];
-  lists.forEach(p => p.rows.forEach(r => { if (r[0] <= 3) counts[r[0]]++; }));
-  lists.filter(p => p.k && !p.annual).forEach(p => {
-    const best = new Map();
-    p.rows.forEach(r => { if (r[8] && r[0] <= 3 && (!best.has(r[8]) || r[0] < best.get(r[8]))) best.set(r[8], r[0]); });
-    const table = tables[p.k] || (tables[p.k] = new Map());
-    best.forEach((place, who) => {
-      const t = table.get(who) || { who, medals: [0, 0, 0, 0], lists: [] };
-      t.medals[place]++;
-      t.lists.push(`${['', '🥇', '🥈', '🥉'][place]} ${p.t}`);
-      table.set(who, t);
-    });
-  });
-  return { podiums, lists, tables, counts, slugs };
-}
-// A medal table's rows, most golds first, then silvers, then bronzes
-function sortedMedalRows(table) {
-  return [...table.values()].sort((a, b) => b.medals[1] - a.medals[1] || b.medals[2] - a.medals[2] || b.medals[3] - a.medals[3] || a.who.localeCompare(b.who));
-}
-
 function buildGroupCard(kind, name) {
   const info = CARD_KINDS[kind];
   const entries = info ? cardEntries(kind, name) : [];

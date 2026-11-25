@@ -209,6 +209,7 @@ function initSpotlightPage() {
   <div class="card-row grid-1">
     <h2 class="page-title">Spotlight Archive Directory</h2>
   </div>
+  ${spotlightRecentHtml(lists, slugs)}
 
   <div class="spotlight-tools">
     <input type="search" id="spotlight-filter" class="spotlight-filter" placeholder="Filter lists: try hiatus, Zelda, January…" aria-label="Filter Spotlight lists">
@@ -313,4 +314,44 @@ function setupSpotlightFilter(container, lists) {
   container.querySelectorAll('.spotlight-toggle-all').forEach(button => {
     button.addEventListener('click', () => groups.forEach(group => { group.open = button.dataset.open === 'true'; }));
   });
+}
+
+// --- RECENTLY CHANGED: records that changed hands, or were raised by their holder, in the last RECENT_DAYS days of the log ---
+const RECENT_DAYS = 30, RECENT_RAISED_SHOWN = 24;
+function spotlightRecentHtml(lists, slugs) {
+  const latest = dataDateKey();
+  const cutoff = new Date(Date.parse(latest) - RECENT_DAYS * 86400000).toISOString().slice(0, 10);
+  const taken = [], raised = [];
+  lists.forEach((list, i) => {
+    const timeline = (list.wrp && list.wrp.timeline) || [];
+    timeline.forEach((event, n) => {
+      if (n > 0 && event.date >= cutoff) taken.push({ list, slug: slugs[i], event, current: n === timeline.length - 1 });
+    });
+    const last = timeline[timeline.length - 1];
+    if (last && last.date < cutoff && last.extendedDate && last.extendedDate >= cutoff) raised.push({ list, slug: slugs[i], event: last });
+  });
+  if (!taken.length && !raised.length) return '';
+  taken.sort((a, b) => b.event.date.localeCompare(a.event.date) || a.list.titleLeft.localeCompare(b.list.titleLeft));
+  raised.sort((a, b) => b.event.extendedDate.localeCompare(a.event.extendedDate));
+  const day = d => formatFullDate(d);
+  return `
+  <section class="card-row grid-1">
+    <div class="card" style="max-height: none;" id="spotlight-recent">
+      <div class="card-header"><h2>Recently Changed <span class="goty-gap-count">last ${RECENT_DAYS} days, to ${day(latest)}</span></h2></div>
+      <div class="card-content">
+        ${taken.length ? `<h3 class="medal-heading">New Record Holders <span>${taken.length}</span></h3>
+        <div class="recent-grid">${taken.map(({ list, slug, event, current }) => `
+          <a class="recent-card${current ? '' : ' recent-lost'}" href="#${slug}">
+            <span class="recent-list">${escapeHTML(list.titleLeft)}</span>
+            <strong>${escapeHTML(event.champion)}</strong>
+            <span class="recent-detail">took it from ${escapeHTML(event.dethroned || '-')} · ${escapeHTML(event.takeoverValue)}${event.peakValue ? `, now ${escapeHTML(event.peakValue)}` : ''}</span>
+            <span class="recent-date">${day(event.date)}${current ? '' : ' · since broken again'}</span>
+          </a>`).join('')}</div>` : ''}
+        ${raised.length ? `<h3 class="medal-heading">Records Raised by Their Holder <span>${raised.length}</span></h3>
+        <div class="recent-chips">${raised.slice(0, RECENT_RAISED_SHOWN).map(({ list, slug, event }) => `
+          <a class="recent-chip" href="#${slug}" data-tip="${escapeHTML(`${list.titleLeft}: ${event.champion} raised it to ${event.peakValue} on ${day(event.extendedDate)}`)}"><span>${escapeHTML(list.titleLeft.replace(/^Top 25 /, ''))}</span> <strong>${escapeHTML(event.peakValue)}</strong></a>`).join('')}
+          ${raised.length > RECENT_RAISED_SHOWN ? `<span class="recent-more">+ ${raised.length - RECENT_RAISED_SHOWN} more</span>` : ''}</div>` : ''}
+      </div>
+    </div>
+  </section>`;
 }
