@@ -6,7 +6,7 @@ const SEASONALITY_KINDS = [
   { id: 'system', label: 'Systems', valueOf: e => e.system },
   { id: 'series', label: 'Franchises', valueOf: e => e.series }
 ];
-const SEASONALITY_ROWS = 15;
+const SEASONALITY_ROWS = 25;
 // Systems with less total time than this are left off the lifecycle chart
 const LIFECYCLE_MIN_HOURS = 20;
 
@@ -21,6 +21,7 @@ function initPatternsPage() {
         <div class="card-header">
           <h2>Seasonality:
             <select id="seasonality-kind" class="header-dropdown">${SEASONALITY_KINDS.map(k => `<option value="${k.id}">${k.label}</option>`).join('')}</select>
+            <select id="seasonality-by" class="header-dropdown"><option value="month">by Month</option><option value="year">by Year</option></select>
           </h2>
         </div>
         <div class="card-content" id="seasonality-content"></div>
@@ -45,8 +46,10 @@ function initPatternsPage() {
     ${abandonPatternsHtml()}
   `;
   const select = document.getElementById('seasonality-kind');
-  const render = () => { document.getElementById('seasonality-content').innerHTML = seasonalityHtml(SEASONALITY_KINDS.find(k => k.id === select.value)); };
+  const bySelect = document.getElementById('seasonality-by');
+  const render = () => { document.getElementById('seasonality-content').innerHTML = seasonalityHtml(SEASONALITY_KINDS.find(k => k.id === select.value), bySelect.value); };
   select.addEventListener('change', render);
+  bySelect.addEventListener('change', render);
   render();
   const traditionSelect = document.getElementById('traditions-kind');
   const renderTraditions = () => { document.getElementById('traditions-content').innerHTML = traditionsHtml(TRADITION_KINDS.find(k => k.id === traditionSelect.value)); };
@@ -123,40 +126,50 @@ function traditionsHtml(kind) {
     ${table(past, 'None yet.')}`;
 }
 
-// Each cell: the share of all the time ever played in that calendar month that went to the row's genre (or system,
-// or franchise). Shading is relative to the row's own best month, so every row shows when it peaks.
-function seasonalityHtml(kind) {
-  const monthTotals = Array(12).fill(0);
+// Each cell: the share of all the time ever played in that calendar month (by = 'month'), or in that year (by = 'year'),
+// that went to the row's genre (or system, or franchise). Shading is relative to the row's own best column, so every
+// row shows when it peaks.
+function seasonalityHtml(kind, by = 'month') {
+  const byYear = by === 'year';
+  const firstYear = Number(rawData.allEntries[0].date.slice(0, 4)), lastYear = Number(dataDateKey().slice(0, 4));
+  const columns = byYear
+    ? Array.from({ length: lastYear - firstYear + 1 }, (_, i) => ({ key: String(firstYear + i), label: `'${String(firstYear + i).slice(2)}`, name: String(firstYear + i) }))
+    : MONTH_NAMES.map((name, m) => ({ key: String(m + 1).padStart(2, '0'), label: name.slice(0, 3), name }));
+  const index = new Map(columns.map((c, i) => [c.key, i]));
+  const columnOf = e => index.get(byYear ? e.date.slice(0, 4) : e.date.slice(5, 7));
+  const totals = Array(columns.length).fill(0);
   const items = new Map();
   let allSeconds = 0;
   rawData.allEntries.forEach(e => {
-    const m = Number(e.date.slice(5, 7)) - 1, sec = timeStringToSeconds(e.time);
-    monthTotals[m] += sec;
+    const c = columnOf(e), sec = timeStringToSeconds(e.time);
+    if (c === undefined) return;
+    totals[c] += sec;
     allSeconds += sec;
     const val = kind.valueOf(e);
     if (!val || val === 'N/A' || val === 'ZZNONE') return;
-    const item = items.get(val) || { name: val, total: 0, months: Array(12).fill(0) };
+    const item = items.get(val) || { name: val, total: 0, cells: Array(columns.length).fill(0) };
     item.total += sec;
-    item.months[m] += sec;
+    item.cells[c] += sec;
     items.set(val, item);
   });
   const rows = [...items.values()].sort((a, b) => b.total - a.total).slice(0, SEASONALITY_ROWS);
   const page = { genre: 'genre.html', system: 'systems.html', series: 'franchise.html' }[kind.id];
+  const across = byYear ? '' : ' across all years';
 
   return `
-    <div class="goty-gap-subtitle">The ${rows.length} most played ${kind.label.toLowerCase()}. Each cell is the share of that calendar month's play time, across every year, and the shading shows where each row peaks.</div>
+    <div class="goty-gap-subtitle">The ${rows.length} most played ${kind.label.toLowerCase()}. Each cell is the share of that ${byYear ? 'year' : 'calendar month'}'s play time${byYear ? '' : ', across every year'}, and the shading shows where each row peaks.</div>
     <div class="monthly-table-wrapper">
-      <table class="season-table">
-        <thead><tr><th></th>${MONTH_NAMES.map(n => `<th>${n.slice(0, 3)}</th>`).join('')}<th>All Year</th><th>Peak</th></tr></thead>
+      <table class="season-table${byYear ? ' season-by-year' : ''}">
+        <thead><tr><th></th>${columns.map(c => `<th>${c.label}</th>`).join('')}<th>${byYear ? 'All Years' : 'All Year'}</th><th>Peak</th></tr></thead>
         <tbody>${rows.map(item => {
-          const shares = item.months.map((sec, m) => sec / Math.max(1, monthTotals[m]));
+          const shares = item.cells.map((sec, c) => sec / Math.max(1, totals[c]));
           const max = Math.max(...shares), overall = item.total / allSeconds;
           const peak = shares.indexOf(max);
           return `<tr>
             <th class="season-name"><a href="${page}?item=${encodeURIComponent(item.name)}">${escapeHTML(item.name)}</a></th>
-            ${shares.map((share, m) => `<td style="background: rgba(46, 125, 50, ${(0.08 + 0.92 * (share / max)).toFixed(2)}); color: ${share / max > 0.55 ? '#fff' : 'var(--text-title)'};" title="${escapeHTML(item.name)} in ${MONTH_NAMES[m]}: ${formatTime(item.months[m])} across all years, ${(share * 100).toFixed(1)}% of ${MONTH_NAMES[m]}'s play time (${(share / overall).toFixed(2)}× its usual share)">${(share * 100).toFixed(0)}%</td>`).join('')}
+            ${shares.map((share, c) => `<td style="background: rgba(46, 125, 50, ${(0.08 + 0.92 * (share / max)).toFixed(2)}); color: ${share / max > 0.55 ? '#fff' : 'var(--text-title)'};" title="${escapeHTML(item.name)} in ${columns[c].name}: ${formatTime(item.cells[c])}${across}, ${(share * 100).toFixed(1)}% of ${columns[c].name}'s play time (${(share / overall).toFixed(2)}× its usual share)">${(share * 100).toFixed(0)}%</td>`).join('')}
             <td class="season-total">${(overall * 100).toFixed(1)}%</td>
-            <td class="season-total">${MONTH_NAMES[peak].slice(0, 3)} <span class="hub-sub">${(max / overall).toFixed(1)}×</span></td>
+            <td class="season-total">${byYear ? columns[peak].name : columns[peak].label} <span class="hub-sub">${(max / overall).toFixed(1)}×</span></td>
           </tr>`;
         }).join('')}
         </tbody>
