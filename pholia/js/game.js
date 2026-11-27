@@ -428,10 +428,20 @@
       p.update(dt, this);
       for (const e of this.enemies) e.update(dt, this);
       // enemy contact: pounce or get hurt
-      for (const e of this.enemies) {
-        if (e.dead || p.dead || e.harmless || !E().overlap(p, e)) continue;
-        if (p.vy > 0 && p.prevBottom - p.vy * dt <= e.y + 8 || (p.vy > 0 && p.y + p.h - e.y < 14)) { e.hit(e.hp, p.cx, this, 'stomp'); p.pounce(); }
-        else if (p.dashT > 0) { e.hit(1, p.cx, this); }
+      // Decide stomps BEFORE bouncing, so landing on a pile of enemies squishes all of them.
+      const falling = p.vy > 0, touching = this.enemies.filter((e) => !e.dead && !p.dead && !e.harmless && E().overlap(p, e));
+      const stomped = touching.filter((e) => falling && (p.prevBottom - p.vy * dt <= e.y + 8 || p.y + p.h - e.y < 14));
+      // if Pholia is coming down on any of them, the others in the pile get squished too
+      if (stomped.length) {
+        // the pile = anything under or right beside Pholia's paws, standing on the same ground
+        const paws = { x: p.x - 10, y: p.y + p.h - 8, w: p.w + 20, h: 30 };
+        const pile = this.enemies.filter((e) => !e.dead && !e.harmless && (stomped.includes(e) || (E().overlap(paws, e) && Math.abs((e.y + e.h) - (stomped[0].y + stomped[0].h)) < 24)));
+        for (const e of pile) e.hit(e.hp, p.cx, this, 'stomp');
+        p.pounce(); p.invuln = Math.max(p.invuln, 0.12);
+      }
+      for (const e of touching) {
+        if (e.dead || p.dead) continue;
+        if (p.dashT > 0) e.hit(1, p.cx, this);
         else this.hurtPlayer(this.enemyDamage(), e.x + e.w / 2);
       }
       this.enemies = this.enemies.filter((e) => !e.dead);
