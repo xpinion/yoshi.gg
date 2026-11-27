@@ -211,7 +211,7 @@
       if (this.dead) return;
       if (this.invuln > 0 && Math.floor(this.invuln * 14) % 2 === 0) return;
       let pose = 'stand';
-      if (this.ducking) pose = 'duck';
+      if (this.ducking) pose = Math.abs(this.vx) > 15 ? 'crawl' : 'duck';
       else if (this.dashT > 0) pose = 'dash';
       else if (!this.onGround) pose = this.vy < 0 ? 'jump' : 'fall';
       else if (Math.abs(this.vx) > 20) pose = 'run';
@@ -266,9 +266,11 @@
     { r: ['mole', 'burrow', 60], R: ['guardmole', 'walk', 50], c: ['beetle', 'walk', 130] },
   ];
   // Each enemy look has its own attack. wind = warning time (they shake + "!"), cd = cooldown.
+  // is there solid ground under the spot 'dist' pixels in front of the enemy?
+  const groundAhead = (e, game, dist) => { const t = TS(), x = e.x + e.w / 2 + e.facing * dist, ty = Math.floor((e.y + e.h + 4) / t); const L = game.level; return L.isSolid(Math.floor(x / t), ty) || L.isOneWay(Math.floor(x / t), ty); };
   const near = (e, p, dx, dy = 60) => Math.abs(p.cx - (e.x + e.w / 2)) < dx && Math.abs((p.y + p.h) - (e.y + e.h)) < dy;
   const ATTACKS = {
-    rat: { cd: 2.2, wind: 0.35, when: (e, p) => near(e, p, 120), go: (e) => { e.vx = e.facing * 280; e.vy = -260; e.act = 0.45; } },
+    rat: { cd: 2.2, wind: 0.35, when: (e, p, game) => near(e, p, 120) && groundAhead(e, game, 70) && groundAhead(e, game, 120), go: (e) => { e.vx = e.facing * 280; e.vy = -260; e.act = 0.45; } },
     bigrat: { cd: 3, wind: 0.5, when: (e, p) => near(e, p, 240), go: (e) => { e.act = 0.9; e.charge = 300; } },
     roach: { cd: 2.5, wind: 0.25, when: (e, p) => near(e, p, 200), go: (e) => { e.act = 0.5; e.charge = 260; } },
     bigflea: { cd: 0, wind: 0, land: (e, game) => { for (const d of [-1, 1]) game.projectiles.push(new EnemyShot(e.x + e.w / 2, e.y + e.h - 10, d * 220, 0, 'wave', 0)); } },
@@ -325,6 +327,7 @@
         if (Math.abs(this.x - p.x) < C().WIDTH * 0.75) { this.awake = true; game.tip(this.tipKey); }
         else return;
       }
+      if (this.ai !== 'swim' && this.ai !== 'fly' && (L.rectTouches(this.x + 2, this.y + this.h - 6, this.w - 4, 6, '~') || L.rectTouches(this.x + 2, this.y + this.h / 2, this.w - 4, 2, 'w'))) return this.dissolve(game);
       if (this.updateAttack(dt, game)) return;
       if (this.stun > 0) { this.stun -= dt; this.vx *= 0.9; if (this.ai !== 'fly' && this.ai !== 'swim') this.vy += C().GRAVITY * dt; game.level.moveBody(this, dt); return; }
       if (this.ai === 'fly') return this.updateFly(dt, game);
@@ -387,7 +390,7 @@
         if (this.windT <= 0) { atk.go(this, game, p); this.atkCd = atk.cd; if (this.ai === 'fly') return false; }
         return this.ai !== 'fly' && this.ai !== 'swim';
       }
-      if (atk.when && this.atkCd <= 0 && atk.when(this, p)) {
+      if (atk.when && this.atkCd <= 0 && atk.when(this, p, game)) {
         if (this.ai !== 'fly') this.facing = p.cx < this.x + this.w / 2 ? -1 : 1;
         this.windT = atk.wind; this.vx = 0;
         if (atk.wind === 0) { atk.go(this, game, p); this.atkCd = atk.cd; }
@@ -419,6 +422,14 @@
       this.y = this.homeY + Math.sin(this.t * 2) * 10;
       const ahead = this.facing > 0 ? this.x + this.w + 2 : this.x - 2;
       if (L.tile(Math.floor(ahead / TS()), Math.floor((this.y + this.h / 2) / TS())) !== 'w' || Math.abs(this.x - this.homeX) > 200) this.facing *= -1;
+    }
+    // fell into sludge or deep water: gone with a splash (no coins)
+    dissolve(game) {
+      this.dead = true;
+      const inWater = game.level.rectTouches(this.x, this.y, this.w, this.h, 'w');
+      A().sfx('crumble');
+      game.particles.burst(this.x + this.w / 2, this.y + this.h / 2, inWater ? '#bfe6ff' : '#8fce5a', 12, 160);
+      game.particles.add({ kind: 'poof', x: this.x + this.w / 2, y: this.y + this.h / 2, life: 0.4, r: 16 });
     }
     hit(dmg, fromX, game, how) {
       if (this.dead || this.under) return;

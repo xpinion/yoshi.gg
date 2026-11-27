@@ -96,7 +96,8 @@
   // Side-view cat. (x, y) = point between the feet. Faces right when facing = 1.
   function cat(ctx, x, y, who, o = {}) {
     const c = CATS[who] || CATS.pholia;
-    const facing = o.facing || 1, s = o.scale || 1, t = o.t || 0, pose = o.pose || 'stand';
+    const facing = o.facing || 1, s = o.scale || 1, t = o.t || 0;
+    let pose = o.pose || 'stand';
     const sd = (o.seed || who.length * 31) * 7;
     ctx.save();
     ctx.translate(x, y);
@@ -107,6 +108,9 @@
     let legSwing = 0, tailWave = Math.sin(t * 3) * 4;
     if (pose === 'run') { legSwing = Math.sin(t * 18) * 7; bodyY += Math.abs(Math.sin(t * 18)) * -2; }
     if (pose === 'duck') { bodyY = -10; bodyRy = 8; bodyRx = 20; headY = -17; headX = 19; }
+    // crawl: belly low, alternating steps, little side-to-side wiggle
+    if (pose === 'duck') { pose = 'crawl'; o = { ...o, still: true }; }  // still crouch = crawl pose, not moving
+    if (pose === 'crawl') { const k = o.still ? 0 : 1; bodyY = -12 + Math.sin(t * 22) * 0.8 * k; bodyRy = 7; bodyRx = 21; headX = 21; headY = -14 + Math.sin(t * 11) * 0.6 * k; legSwing = Math.sin(t * 11) * 8 * k; }
     if (pose === 'jump') { legSwing = 5; }
     if (pose === 'fall') { legSwing = -4; }
     if (pose === 'dash') { bodyRx = 22; bodyRy = 9; headX = 21; legSwing = 9; tailWave = -6; }
@@ -115,6 +119,7 @@
     // tail
     const tailPts = pose === 'sit'
       ? [-10, -6, -28, -4, -26, -18]
+      : pose === 'crawl' ? [-bodyRx + 2, bodyY, -bodyRx - 14, bodyY - 3 + Math.sin(t * 6) * 2, -bodyRx - 22, bodyY + 1 + Math.sin(t * 6) * 3]
       : [-bodyRx + 2, bodyY - 2, -bodyRx - 14, bodyY - 6 + tailWave, -bodyRx - 10, bodyY - 24 + tailWave];
     curve(ctx, tailPts[0], tailPts[1], tailPts[2], tailPts[3], tailPts[4], tailPts[5], sd + 1, 7.5, INK);
     curve(ctx, tailPts[0], tailPts[1], tailPts[2], tailPts[3], tailPts[4], tailPts[5], sd + 1, 4.5, c.tail);
@@ -130,6 +135,15 @@
       const ly = pose === 'duck' ? -4 : -10;
       legs.forEach(([lx, sw], i) => {
         const back = i < 2;
+        if (pose === 'crawl') {
+          // bent legs: shoulder -> raised elbow -> paw; the paw lifts while stepping forward
+          const lift = o.still ? 0 : Math.max(0, Math.sin(t * 11 + (i % 2 ? Math.PI : 0))) * 3;
+          const pts = [[lx, bodyY + 3], [lx + sw * 0.5 + (lx > 0 ? 7 : -7), bodyY + 2], [lx + sw * 1.2, -1 - lift]];
+          line(ctx, pts, sd + 10 + i, 7, INK);
+          line(ctx, pts, sd + 10 + i, 4.2, back ? shade(legColor, -18) : legColor);
+          dot(ctx, lx + sw * 1.2, -1 - lift, 2.8, pawColor);
+          return;
+        }
         const fx = lx + sw * (pose === 'jump' ? 0.5 : 1), fy = pose === 'jump' ? -4 : 0;
         line(ctx, [[lx, bodyY + 4], [fx, fy + ly + 8]], sd + 10 + i, 7.5, INK);
         line(ctx, [[lx, bodyY + 4], [fx, fy + ly + 8]], sd + 10 + i, 4.5, back ? shade(legColor, -18) : legColor);
@@ -157,9 +171,10 @@
     fillStroke(ctx, null, 2.4);
 
     // head
-    const ear = (dx) => poly(ctx, [[headX + dx - 6, headY - 6], [headX + dx - 2, headY - 17], [headX + dx + 4, headY - 7]], sd + 40 + dx, c.base, 2.2, 0.6);
+    const flat = pose === 'crawl' || pose === 'duck';  // ears flattened back while low
+    const ear = (dx) => poly(ctx, flat ? [[headX + dx - 6, headY - 5], [headX + dx - 11, headY - 13], [headX + dx + 3, headY - 8]] : [[headX + dx - 6, headY - 6], [headX + dx - 2, headY - 17], [headX + dx + 4, headY - 7]], sd + 40 + dx, c.base, 2.2, 0.6);
     ear(-4); ear(6);
-    poly(ctx, [[headX + 4, headY - 7.5], [headX + 4.8, headY - 13], [headX + 7.5, headY - 8]], sd + 44, c.ear, 0, 0.3);
+    if (!flat) poly(ctx, [[headX + 4, headY - 7.5], [headX + 4.8, headY - 13], [headX + 7.5, headY - 8]], sd + 44, c.ear, 0, 0.3);
     ctx.save();
     blobPath(ctx, headX, headY, 11, 10, sd + 5);
     ctx.fillStyle = c.base; ctx.fill(); ctx.clip();
