@@ -126,6 +126,41 @@
     },
   };
 
+  // ------------------------------------------------------------ stage: any background + actors
+  const BG_BIOME = { wasteland: 1, trees: 2, swamp: 3, tunnels: 4 };
+  function stage(ctx, w, h, t, sc) {
+    const Dr = D();
+    if (sc.bg === 'sewer') sewerBack(ctx, w, h);
+    else if (sc.bg === 'cave') caveBack(ctx, w, h);
+    else if (sc.bg === 'village') { sky(ctx, w, h, '#9fd4f0', '#e8f4d8'); sun(ctx, w - 60, 55, 28); ground(ctx, w, h, h * 0.75, '#8fc66a', 1); house(ctx, w * 0.15, h * 0.76, 0.8, '#f1d8a8', 10); house(ctx, w * 0.82, h * 0.76, 0.85, '#d8c4e8', 20); }
+    else if (sc.bg === 'night') {
+      sky(ctx, w, h, '#1a2040', '#3a3a60'); Dr.blob(ctx, w * 0.8, 60, 26, 26, 3, '#f8f0c8', 2);
+      for (let i = 0; i < 30; i++) { ctx.globalAlpha = 0.5 + Math.sin(t * 2 + i) * 0.4; Dr.dot(ctx, (i * 97) % w, (i * 53) % (h * 0.6), 1.5, '#fff'); } ctx.globalAlpha = 1;
+      ground(ctx, w, h, h * 0.75, '#3a5a3a', 1); house(ctx, w * 0.2, h * 0.76, 0.8, '#7a6a8a', 10);
+    } else if (BG_BIOME[sc.bg]) {
+      ctx.save(); ctx.scale(w / PM.CONFIG.WIDTH, h / PM.CONFIG.HEIGHT); PM.BIOME_THEMES[BG_BIOME[sc.bg]].drawBg(ctx, { x: 0, y: 0 }, t); ctx.restore();
+      ground(ctx, w, h, h * 0.9, PM.BIOME_THEMES[BG_BIOME[sc.bg]].brick, 4);
+    }
+    for (const a of sc.actors || []) {
+      const x = (a.x || 0.5) * w, y = (a.y || 0.85) * h, s = (a.s || 1) * Math.min(1, w / 640), f = a.f || 1;
+      ctx.save();
+      if (CAT_IDS.includes(a.a)) Dr.cat(ctx, x, y, a.a, { pose: a.pose || 'stand', eyes: a.eyes, scale: s, facing: f, t });
+      else if (a.a === 'flea') { ctx.translate(x, y); ctx.scale(s * 0.8, s * 0.8); Dr.giantFlea(ctx, 0, 0, { facing: f, t, dizzy: a.eyes === 'x', tired: a.eyes === 'x' }); }
+      else if (a.a === 'birdqueen') { ctx.translate(x, y); ctx.scale(s * 0.8, s * 0.8); Dr.birdQueen(ctx, 0, 0, { facing: f, t, pinned: a.eyes === 'x' }); }
+      else if (a.a === 'serpent') { const tr = []; for (let i = 0; i < 14; i++) tr.push({ x: x - 160 + i * 10, y: y - Math.sin(i * 0.5 + t * 2) * 12 }); Dr.serpent(ctx, { x: x - 10, y: y - 30 }, tr.reverse(), { t, dizzy: a.eyes === 'x', facing: 1 }); }
+      else if (a.a === 'molequeen') Dr.moleQueen(ctx, x, y, { t, scale: s * 1.3, facing: f });
+      else if (a.a === 'ratking') Dr.ratKing(ctx, x, y, { t, facing: f });
+      else if (a.a === 'gerald') Dr.rock(ctx, x, y, s);
+      else if (a.a === 'can') { Dr.rect(ctx, x - 50, y - 70, 100, 70, 41, '#a8b0b8', 3); Dr.blob(ctx, x, y - 70, 50, 10, 42, '#c8d0d8', 2.5); Dr.text(ctx, 'BEANS', x, y - 30, { size: 18, align: 'center', color: '#a02a2a' }); }
+      else if (a.a === 'nest') { Dr.blob(ctx, x, y, 80, 26, 43, '#8a6a3a', 3); for (let i = 0; i < 8; i++) Dr.line(ctx, [[x - 70 + i * 20, y - 10], [x - 60 + i * 20, y + 14]], 44 + i, 2, '#5a3a1a'); }
+      else if (a.a === 'bubble') { ctx.globalAlpha = 0.35; Dr.blob(ctx, x, y, 80, 80, 45, '#bfe6ff', 3); ctx.globalAlpha = 1; Dr.curve(ctx, x - 40, y - 50, x - 20, y - 65, x, y - 70, 46, 3, '#fff'); }
+      else if (a.a === 'hole') Dr.blob(ctx, x, y, 70, 16, 47, '#1a0f0a', 3);
+      else if (a.a === 'wand') { ctx.translate(x, y); ctx.rotate(0.4); Dr.item(ctx, 'wand', -14, 0, s, t); ctx.rotate(-0.9); Dr.line(ctx, [[14, -10], [26, 4]], 48, 3 * s, '#c59a64'); }
+      else if (a.a === 'confetti') { const cols = ['#ff6fae', '#ffd84a', '#6fd0ff', '#b086e8', '#8ae06a']; for (let i = 0; i < 40; i++) { ctx.fillStyle = cols[i % 5]; ctx.save(); ctx.translate((i * 71 + Math.sin(t + i) * 20) % w, ((i * 37 + t * 60) % (h * 0.8))); ctx.rotate(t * 3 + i); ctx.fillRect(-4, -2, 8, 4); ctx.restore(); } }
+      ctx.restore();
+    }
+  }
+
   // ------------------------------------------------------------ player
   class Cutscene {
     constructor(pages, onDone) {
@@ -159,42 +194,43 @@
       pg.forEach((p, i) => {
         const x = m + i * (pw + gap), y = m;
         if (i >= this.shown) { Dr.rect(ctx, x, y, pw, ph, 210 + i, 'rgba(255,255,255,0.35)', 2.5, 1.2); Dr.text(ctx, '...', x + pw / 2, y + ph / 2, { size: 40, align: 'center', color: '#c8b8a0' }); return; }
+        // Layout: caption strip on top, speech strip at the bottom, scene in between,
+        // so text never covers what the characters are doing.
+        const capLines = p.caption ? Dr.wrap(ctx, p.caption, pw - 40, 17) : [];
+        const capH = p.caption ? 20 + capLines.length * 21 : 0;
+        const speechAll = (p.speech || []).map((sp) => { const lines = Dr.wrap(ctx, sp.text, pw - 110, 17); return { ...sp, lines, bh: 32 + lines.length * 21 }; });
+        const speechH = speechAll.reduce((a, sp) => a + sp.bh + 8, 0) + (speechAll.length ? 6 : 0);
+        const sceneTop = y + capH, sceneH = Math.max(120, ph - capH - speechH);
         Dr.rect(ctx, x + 5, y + 6, pw, ph, 200 + i, 'rgba(0,0,0,0.25)', 0);
+        Dr.rect(ctx, x, y, pw, ph, 205 + i, '#f8eedb', 0);
         ctx.save();
-        ctx.beginPath(); ctx.rect(x, y, pw, ph); ctx.clip();
-        ctx.translate(x, y);
-        (SCENES[p.scene] || (() => {}))(ctx, pw, ph, this.t);
+        ctx.beginPath(); ctx.rect(x, sceneTop, pw, sceneH); ctx.clip();
+        ctx.translate(x, sceneTop);
+        if (typeof p.scene === 'object') stage(ctx, pw, sceneH, this.t, p.scene);
+        else (SCENES[p.scene] || (() => {}))(ctx, pw, sceneH, this.t);
         ctx.restore();
+        Dr.rect(ctx, x, sceneTop, pw, sceneH, 215 + i, null, 3, 1);
         Dr.rect(ctx, x, y, pw, ph, 210 + i, null, 4, 1.2);
-        // text
-        const isCur = i === this.shown - 1;
-        let budget = isCur ? this.chars : 9999;
+        // text (types out)
+        let budget = i === this.shown - 1 ? this.chars : 9999;
         if (p.caption) {
-          const txt = p.caption.slice(0, Math.max(0, budget)); budget -= p.caption.length;
-          const lines = Dr.wrap(ctx, p.caption, pw - 40, 17);
-          Dr.rect(ctx, x + 10, y + 10, pw - 20, 14 + lines.length * 21, 220 + i, '#ffe58a', 2.5, 0.8);
-          let shownTxt = txt;
-          lines.forEach((l, li) => { const part = shownTxt.slice(0, l.length); shownTxt = shownTxt.slice(l.length + 1); Dr.text(ctx, part, x + 20, y + 31 + li * 21, { size: 17 }); });
+          let shownTxt = p.caption.slice(0, Math.max(0, budget)); budget -= p.caption.length;
+          Dr.rect(ctx, x + 8, y + 6, pw - 16, capH - 10, 220 + i, '#ffe58a', 2.5, 0.8);
+          capLines.forEach((l, li) => { const part = shownTxt.slice(0, l.length); shownTxt = shownTxt.slice(l.length + 1); Dr.text(ctx, part, x + 18, y + 27 + li * 21, { size: 17 }); });
         }
-        let by = y + ph - 10;
-        const speech = (p.speech || []).map((s) => {
-          const t = s.text.slice(0, Math.max(0, budget)); budget -= s.text.length; return { ...s, shownText: t };
+        let by = sceneTop + sceneH + 8;
+        speechAll.forEach((sp, si) => {
+          let rest = sp.text.slice(0, Math.max(0, budget)); budget -= sp.text.length;
+          const bh = sp.bh, bx = x + 10, bw = pw - 20, top = by;
+          by += bh + 8;
+          if (!rest.length) return;
+          Dr.panel(ctx, bx, top, bw, bh, 230 + si, '#ffffff');
+          if (CAT_IDS.includes(sp.who)) Dr.catFace(ctx, bx + 34, top + bh / 2 + 4, 21, sp.who, { mood: sp.who === 'bobby' ? 'sassy' : 'normal' });
+          else { Dr.blob(ctx, bx + 34, top + bh / 2 + 2, 22, 22, 240, sp.who === 'molequeen' ? '#5a3d5c' : '#7d7378', 2); Dr.text(ctx, sp.who === 'molequeen' ? '♛' : '♚', bx + 34, top + bh / 2 + 10, { size: 22, color: '#f5c542', align: 'center' }); }
+          const name = (PM.STORY.friends[sp.who] || {}).name || NAMES[sp.who] || sp.who;
+          Dr.text(ctx, name, bx + 66, top + 20, { size: 14, color: (PM.STORY.friends[sp.who] || {}).color || '#7d3b5c' });
+          sp.lines.forEach((l, li) => { const part = rest.slice(0, l.length); rest = rest.slice(l.length + 1); Dr.text(ctx, part, bx + 66, top + 41 + li * 21, { size: 17 }); });
         });
-        for (let si = speech.length - 1; si >= 0; si--) {
-          const s = speech[si];
-          if (!s.shownText.length) { by -= 0; continue; }
-          const lines = Dr.wrap(ctx, s.text, pw - 110, 17);
-          const bh = 32 + lines.length * 21;
-          by -= bh + 8;
-          const bx = x + 12, bw = pw - 24;
-          Dr.panel(ctx, bx, by, bw, bh, 230 + si, '#ffffff');
-          if (CAT_IDS.includes(s.who)) Dr.catFace(ctx, bx + 34, by + bh / 2 + 4, 21, s.who, { mood: s.who === 'bobby' ? 'sassy' : 'normal' });
-          else { Dr.blob(ctx, bx + 34, by + bh / 2 + 2, 22, 22, 240, s.who === 'molequeen' ? '#5a3d5c' : '#7d7378', 2); Dr.text(ctx, s.who === 'molequeen' ? '♛' : '♚', bx + 34, by + bh / 2 + 10, { size: 22, color: '#f5c542', align: 'center' }); }
-          const name = (PM.STORY.friends[s.who] || {}).name || NAMES[s.who] || s.who;
-          Dr.text(ctx, name, bx + 66, by + 20, { size: 14, color: (PM.STORY.friends[s.who] || {}).color || '#7d3b5c' });
-          let rest = s.shownText;
-          lines.forEach((l, li) => { const part = rest.slice(0, l.length); rest = rest.slice(l.length + 1); Dr.text(ctx, part, bx + 66, by + 41 + li * 21, { size: 17 }); });
-        }
       });
       Dr.text(ctx, 'ENTER / SPACE: continue     ESC: skip', w - 20, h - 10, { size: 14, align: 'right', color: '#7a6a5a' });
     }

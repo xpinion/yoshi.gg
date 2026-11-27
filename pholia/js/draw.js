@@ -441,15 +441,16 @@
   }
 
   function text(ctx, str, x, y, o = {}) {
-    ctx.font = `${o.bold === false ? '' : 'bold '}${Math.round((o.size || 18) * FONT_SCALE)}px ${o.font || 'PatrickHand, "Comic Sans MS", cursive'}`;
+    ctx.font = `${Math.round((o.size || 18) * FONT_SCALE)}px ${o.font || 'PatrickHand, "Comic Sans MS", cursive'}`;
     ctx.textAlign = o.align || 'left';
     ctx.textBaseline = o.baseline || 'alphabetic';
     if (o.outline) { ctx.lineWidth = o.outline; ctx.strokeStyle = o.outlineColor || INK; ctx.lineJoin = 'round'; ctx.strokeText(str, x, y); }
     ctx.fillStyle = o.color || INK;
     ctx.fillText(str, x, y);
+    if (o.bold !== false) { ctx.lineWidth = Math.max(0.6, (o.size || 18) * 0.045); ctx.strokeStyle = o.color || INK; ctx.strokeText(str, x, y); }
   }
   function wrap(ctx, str, maxW, size = 18) {
-    ctx.font = `bold ${Math.round(size * FONT_SCALE)}px PatrickHand, "Comic Sans MS", cursive`;
+    ctx.font = `${Math.round(size * FONT_SCALE)}px PatrickHand, "Comic Sans MS", cursive`;
     const out = [];
     for (const para of String(str).split('\n')) {
       let line = '';

@@ -27,15 +27,17 @@ PM.STORY = {
     rat: "Tiny rats! They work for the Rat King. Pounce on them or swipe them with U. They sometimes drop coins and power-ups!",
     bigrat: "That's a chunky rat. It takes two hits. Maybe three if it had a big lunch.",
     drip: "Watch out for the dripping pipes. That sludge drips on a schedule — time your run!",
+    trap: "A RAT TRAP! It's in your paws now. Hold I and let go to throw it. Wait until the Rat King is dizzy!",
+    ratdizzy: "He's seeing stars! NOW — throw the trap at him!",
     hat: "A hat from Chalice gives you an extra ARMOR heart — it's the blue one. Fashion AND protection!",
   },
 
   // Clyde explains boss & mini-boss fights
   clyde: {
     digby_pre: "Clyde here! I'm hearing a DRILL up ahead. That's one of the Mole Queen's workers — Foreman Digby. He charges with his drill and gets stuck in the wall. When he's stuck, SWIPE him! Jump on his hard hat when he's not charging.",
-    ratking_pre: "Clyde again. Okay, listen up. The Rat King is big, but he's not bright. He'll chase you around, then he'll crouch down and wiggle — that means he's about to RAM. Get out of the way and make sure he slams right into a rat trap!",
-    ratking_p2: "The traps are on a conveyor belt now! Watch where they're going and time your dodge so the trap is between you and him.",
-    ratking_p3: "No more trap on the floor! Swipe the trap (U) to push it where you want, then lure him into it. He rams twice now, so stay on your paws!",
+    ratking_pre: "Clyde again. Okay, listen up. The Rat King is big, but he's not bright. He'll chase you around, then crouch and wiggle — that means he's about to RAM. Dodge so he bonks into the wall and gets dizzy. Then pick up a rat trap and THROW it at him (hold I, let go)!",
+    ratking_p2: "The next trap is up on the left ledge! Grab it, and watch out for his little rat buddies!",
+    ratking_p3: "Last trap is on the RIGHT ledge. He rams twice in a row now, and he won't stay dizzy as long. Be quick!",
   },
 
   // Tommy's lines get sillier as the game goes on (one per level, in order)

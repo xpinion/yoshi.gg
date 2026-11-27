@@ -19,6 +19,11 @@
       biomeStart: null,     // snapshot used when all 9 lives are lost
       shopVisited: [],
       introSeen: false,
+      checkpoint: null,
+      hard: false,
+      scuba: false,
+      beaten: [],           // level numbers completed (for the level select)
+      replayReturn: null,   // when replaying an old level: the level to go back to          // Hard Mode: no checkpoints     // {level, x, y, coins, item} once a checkpoint flag is touched
       updated: Date.now(),
     };
   }
@@ -34,6 +39,12 @@
       try { localStorage.setItem(KEY + slot, JSON.stringify(data)); } catch (e) { /* storage full / private mode */ }
     },
     erase(slot) { localStorage.removeItem(KEY + slot); },
+    // Unlocks are shared by every slot in this browser (e.g. Hard Mode after beating the game)
+    unlocked(name) { try { return !!(JSON.parse(localStorage.getItem('pholias-mission-unlocks')) || {})[name]; } catch (e) { return false; } },
+    unlock(name) {
+      let u = {}; try { u = JSON.parse(localStorage.getItem('pholias-mission-unlocks')) || {}; } catch (e) { /* ignore */ }
+      u[name] = true; try { localStorage.setItem('pholias-mission-unlocks', JSON.stringify(u)); } catch (e) { /* ignore */ }
+    },
     summary(slot) {
       const s = this.load(slot);
       if (!s) return null;

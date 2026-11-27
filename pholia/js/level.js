@@ -6,6 +6,9 @@
 //   B  cracked brick (swipe to break)            C  crate (swipe for coins)
 //   o  coin             L  secret golden bell (extra life)
 //   P  Pholia start     E  exit                  S  sign
+//   K  checkpoint flag (put one before each major boss)
+//   w  water (swim with the scuba suit)  t  tree trunk (background)
+//   U  scuba suit    W  kitty wand    e  eel (swims in water)
 //   r  tiny rat         R  chunky rat            c  roach
 //   d  dripping pipe    M  moving platform (sideways)   V  moving platform (up/down)
 //   |  invisible stop marker for moving platforms
@@ -16,7 +19,7 @@ PM.LEVELS = PM.LEVELS || {};
   const T = () => PM.CONFIG.TILE;
   const D = () => PM.Draw;
   const SOLID = new Set(['#', 'x', 'B', 'C']);
-  const ENTITY_CHARS = new Set(['o', 'L', 'P', 'E', 'S', 'r', 'R', 'c', 'd', 'M', 'V']);
+  const ENTITY_CHARS = new Set(['o', 'L', 'P', 'E', 'S', 'K', 'U', 'W', 'e', 'r', 'R', 'c', 'd', 'M', 'V']);
 
   class Level {
     constructor(num, data) {
@@ -141,11 +144,13 @@ PM.LEVELS = PM.LEVELS || {};
       for (let y = 0; y < this.h; y++) for (let x = 0; x < this.w; x++) {
         const ch = this.rows[y][x];
         const px = x * t, py = y * t, sd = x * 131 + y * 17;
+        if (ch === '=' && (this.tile(x, y - 1) === 't' || this.tile(x, y + 1) === 't')) PM.drawTrunk(g, px, py, sd, this.tile(x - 1, y + 1) === 't', this.tile(x + 1, y + 1) === 't');
         if (ch === '#') {
           g.fillStyle = theme.brick; g.fillRect(px, py, t, t);
           const r = Dr.rng(sd);
           g.strokeStyle = theme.mortar; g.lineWidth = 1.5;
-          for (let row = 0; row < 2; row++) {
+          if (theme.pattern) PM.drawTilePattern(g, theme, px, py, r, x, y);
+          else for (let row = 0; row < 2; row++) {
             g.beginPath(); g.moveTo(px, py + row * 16 + 16 + (r() - 0.5)); g.lineTo(px + t, py + row * 16 + 16 + (r() - 0.5)); g.stroke();
             const off = (row + y) % 2 ? 0 : 16;
             g.beginPath(); g.moveTo(px + off + (r() - 0.5) * 2, py + row * 16); g.lineTo(px + off + (r() - 0.5) * 2, py + row * 16 + 16); g.stroke();
@@ -165,6 +170,10 @@ PM.LEVELS = PM.LEVELS || {};
           if (below !== '#' && y < this.h - 1) edge(px, py + t, px + t, py + t);
           if (lft !== '#' && x > 0) edge(px, py, px, py + t);
           if (rgt !== '#' && x < this.w - 1) edge(px + t, py, px + t, py + t);
+        } else if (ch === 't') {
+          PM.drawTrunk(g, px, py, sd, this.tile(x - 1, y) === 't', this.tile(x + 1, y) === 't');
+        } else if (ch === '=' && theme.drawLedge) {
+          theme.drawLedge(g, px, py, sd, Dr);
         } else if (ch === '=') {
           Dr.rect(g, px + 1, py + 2, t - 2, 9, sd, theme.ledge, 2, 0.5);
           g.strokeStyle = 'rgba(0,0,0,0.3)'; g.lineWidth = 1;
@@ -196,7 +205,7 @@ PM.LEVELS = PM.LEVELS || {};
         const ch = this.rows[y][x], px = x * t, py = y * t, sd = x * 7 + y * 13;
         if (ch === '~') {
           const surf = this.tile(x, y - 1) !== '~';
-          ctx.fillStyle = '#5f9a3a';
+          ctx.fillStyle = BIOME_THEMES[this.biome].hazard || '#5f9a3a';
           ctx.beginPath();
           const top = surf ? py + 6 + Math.sin(time * 3 + x) * 2 : py;
           ctx.moveTo(px, top); ctx.quadraticCurveTo(px + 16, top + (surf ? Math.sin(time * 4 + x * 2) * 3 : 0), px + t, surf ? py + 6 + Math.sin(time * 3 + x + 1) * 2 : py);
@@ -217,6 +226,10 @@ PM.LEVELS = PM.LEVELS || {};
           Dr.rect(ctx, px + 1, py + 1, t - 2, t - 2, sd, theme.brick, 2.2, 0.8);
           Dr.line(ctx, [[px + 8, py + 4], [px + 14, py + 14], [px + 10, py + 20], [px + 18, py + 28]], sd + 1, 1.6, '#2a2a2a', 0.5);
           Dr.line(ctx, [[px + 14, py + 14], [px + 24, py + 12]], sd + 2, 1.4, '#2a2a2a', 0.5);
+        } else if (ch === 'w') {
+          PM.drawWater(ctx, px, py, this.tile(x, y - 1) !== 'w' && !SOLID.has(this.tile(x, y - 1)), time, x);
+        } else if (ch === 'C' && this.biome === 4) {
+          Dr.pot(ctx, px + 16, py + 32, { seed: x, worm: this.data.wormPots });
         } else if (ch === 'C') {
           Dr.rect(ctx, px + 2, py + 2, t - 4, t - 4, sd, '#c4965a', 2.4, 0.8);
           Dr.line(ctx, [[px + 4, py + 4], [px + 28, py + 28]], sd + 1, 2, '#7a5530'); Dr.line(ctx, [[px + 28, py + 4], [px + 4, py + 28]], sd + 2, 2, '#7a5530');
@@ -292,5 +305,7 @@ PM.LEVELS = PM.LEVELS || {};
   ];
 
   PM.Level = Level;
+  PM.BIOME_THEMES = BIOME_THEMES;
+  PM.LEVEL_SOLID = SOLID;
   PM.drawExit = drawExit;
 })();

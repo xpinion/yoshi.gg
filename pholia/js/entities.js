@@ -69,6 +69,9 @@
       // input
       let dir = (inp.held('right') ? 1 : 0) - (inp.held('left') ? 1 : 0);
       if (this.hurtT > 0.25) dir = 0;
+      this.inWater = level.rectTouches(this.x + 4, this.y + this.h * 0.45, this.w - 8, 2, 'w') !== null;
+      let autoMul = 1;
+      if (game.autoRun) { autoMul = inp.held('left') ? 0.5 : (inp.held('right') ? 1.12 : 1); if (this.hurtT <= 0.25) dir = 1; }
       const wantDuck = inp.held('down') && this.onGround && this.dashT <= 0;
       this.setDuck(wantDuck || (this.ducking && level.rectSolid(this.x + 1, this.y - 16, this.w - 2, 16)), level);
 
@@ -90,7 +93,7 @@
         this.vy = 0;
         if (Math.random() < 0.6) game.particles.add({ x: this.cx - this.facing * 10, y: this.y + 10 + Math.random() * 20, vx: -this.facing * 40, vy: 0, life: 0.25, color: 'rgba(255,255,255,0.7)', r: 3 });
       } else {
-        const maxV = this.ducking ? cfg.DUCK_SPEED : speed;
+        const maxV = (this.ducking ? (game.autoRun ? speed * 0.9 : cfg.DUCK_SPEED) : speed) * autoMul * (this.inWater ? 0.7 : 1);
         const accel = this.onGround ? cfg.RUN_ACCEL : cfg.AIR_ACCEL;
         if (dir) {
           this.vx += dir * accel * dt * (Math.sign(this.vx) !== dir ? 1.6 : 1);
@@ -108,6 +111,11 @@
           const dropThrough = this.ducking && this.standingOnOneWay(level);
           if (dropThrough) {
             this.jumpBuf = 0; this.setDuck(false, level); this.y += 6; this.dropT = 0.2; this.onGround = false;
+          } else if (this.inWater) {
+            const surface = !level.rectTouches(this.x + 4, this.y - 6, this.w - 8, 4, 'w');
+            this.vy = surface ? -cfg.JUMP_VELOCITY * 0.85 : -cfg.SWIM_STROKE; this.jumpBuf = 0;
+            game.particles.add({ x: this.cx, y: this.y + 6, vx: 0, vy: -50, life: 0.5, color: 'rgba(230,250,255,0.8)', r: 3 });
+            A().sfx(surface ? 'jump' : 'move');
           } else if (this.coyote > 0) {
             this.doJump(cfg.JUMP_VELOCITY); this.coyote = 0;
           } else if (this.effect === 'spring' && this.airJumps > 0) {
@@ -115,7 +123,7 @@
             game.particles.burst(this.cx, this.bottom, '#c0392b', 6, 80);
           }
         }
-        if (inp.released('jump') && this.vy < 0) this.vy *= cfg.JUMP_CUT;
+        if (inp.released('jump') && this.vy < 0 && !this.inWater) this.vy *= cfg.JUMP_CUT;
         this.applyGravity(dt, game);
       }
 
@@ -172,11 +180,16 @@
           if (!this.dead) { this.x = this.lastSafe.x; this.y = this.lastSafe.y; this.vx = this.vy = 0; }
         }
       }
+      if (this.inWater && !game.state.scuba && this.invuln <= 0) {
+        game.hurtPlayer(1, this.cx, 'water', true);
+        if (!this.dead) { this.x = this.lastSafe.x; this.y = this.lastSafe.y; this.vx = this.vy = 0; }
+      }
       if (this.y > level.pxH + 40) game.playerFell();
     }
     applyGravity(dt, game) {
       const cfg = C();
-      this.vy = Math.min(cfg.MAX_FALL, this.vy + cfg.GRAVITY * dt);
+      if (this.inWater) { this.vy = Math.min(cfg.SWIM_MAX_FALL * (PM.Input.held('down') ? 2 : 1), this.vy + cfg.GRAVITY * 0.28 * dt); this.vy *= Math.pow(0.5, dt); }
+      else this.vy = Math.min(cfg.MAX_FALL, this.vy + cfg.GRAVITY * dt);
       if (this.frozen) { const r = game.level.moveBody(this, dt); this.onGround = r.ground; }
     }
     doJump(v) {
@@ -211,7 +224,7 @@
       }
       D().cat(ctx, this.cx, this.bottom, 'pholia', {
         facing: this.facing, pose, t: this.t * (this.effect === 'feather' ? 1.6 : 1),
-        hat: st.hat, eyes: this.hurtT > 0 ? 'closed' : (this.sneezeT > 0 ? 'closed' : null),
+        scuba: st.scuba && game.level.biome === 3, hat: st.hat, eyes: this.hurtT > 0 ? 'closed' : (this.sneezeT > 0 ? 'closed' : null),
       });
       // paw swipe arc
       if (this.atkT > 0) {
@@ -243,44 +256,175 @@
   }
 
   // ============================================================ ENEMIES
+  // Kinds: r = tiny boss-type, R = chunky, c = fast critter, e = eel (water).
+  // What they look like / how they move depends on the biome.
+  const ENEMY_TYPES = [
+    { r: ['rat', 'walk', 55], R: ['bigrat', 'walk', 40], c: ['roach', 'walk', 120] },
+    { r: ['flea', 'hop', 0], R: ['bigflea', 'hop', 0], c: ['beetle', 'walk', 125] },
+    { r: ['bird', 'fly', 70], R: ['crow', 'fly', 60], c: ['squirrel', 'walk', 135] },
+    { r: ['snake', 'walk', 60], R: ['bigsnake', 'walk', 45], c: ['frog', 'hop', 0], e: ['eel', 'swim', 80] },
+    { r: ['mole', 'burrow', 60], R: ['guardmole', 'walk', 50], c: ['beetle', 'walk', 130] },
+  ];
+  // Each enemy look has its own attack. wind = warning time (they shake + "!"), cd = cooldown.
+  const near = (e, p, dx, dy = 60) => Math.abs(p.cx - (e.x + e.w / 2)) < dx && Math.abs((p.y + p.h) - (e.y + e.h)) < dy;
+  const ATTACKS = {
+    rat: { cd: 2.2, wind: 0.35, when: (e, p) => near(e, p, 120), go: (e) => { e.vx = e.facing * 280; e.vy = -260; e.act = 0.45; } },
+    bigrat: { cd: 3, wind: 0.5, when: (e, p) => near(e, p, 240), go: (e) => { e.act = 0.9; e.charge = 300; } },
+    roach: { cd: 2.5, wind: 0.25, when: (e, p) => near(e, p, 200), go: (e) => { e.act = 0.5; e.charge = 260; } },
+    bigflea: { cd: 0, wind: 0, land: (e, game) => { for (const d of [-1, 1]) game.projectiles.push(new EnemyShot(e.x + e.w / 2, e.y + e.h - 10, d * 220, 0, 'wave', 0)); } },
+    beetle: { cd: 3, wind: 0.4, when: (e, p) => near(e, p, 230), go: (e) => { e.act = 1.1; e.charge = 320; e.rolling = true; } },
+    crow: { cd: 1.6, wind: 0.2, when: (e, p) => Math.abs(p.cx - e.x - e.w / 2) < 30 && p.y > e.y, go: (e, game) => game.projectiles.push(new EnemyShot(e.x + e.w / 2, e.y + e.h, 0, 50, 'pebble', 1)) },
+    squirrel: { cd: 2.4, wind: 0.3, when: (e, p) => near(e, p, 280, 150), go: (e, game, p) => { const dx = p.cx - e.x; game.projectiles.push(new EnemyShot(e.x + e.w / 2, e.y, dx / 0.8, -C().GRAVITY * 0.4, 'acorn', 1)); } },
+    snake: { cd: 2.6, wind: 0.4, when: (e, p) => near(e, p, 240, 40), go: (e, game) => game.projectiles.push(new EnemyShot(e.x + e.w / 2 + e.facing * 14, e.y + 4, e.facing * 260, 0, 'venom', 0)) },
+    bigsnake: { cd: 2.2, wind: 0.45, when: (e, p) => near(e, p, 150), go: (e) => { e.vx = e.facing * 380; e.act = 0.35; e.charge = 380; } },
+    frog: { cd: 1.8, wind: 0.3, when: (e, p) => near(e, p, 95, 40), go: (e) => { e.tongue = 0.35; } },
+    eel: { cd: 2.2, wind: 0.3, when: (e, p) => p.inWater && near(e, p, 220, 90), go: (e, game, p) => { e.dart = 0.6; e.dartV = { x: Math.sign(p.cx - e.x) * 300, y: Math.sign(p.y - e.y) * 120 }; } },
+    mole: { cd: 2.6, wind: 0.3, when: (e, p) => !e.under && near(e, p, 260, 120), go: (e, game, p) => { const dx = p.cx - e.x; game.projectiles.push(new EnemyShot(e.x + e.w / 2, e.y, dx / 0.8, -C().GRAVITY * 0.4, 'clod', 1)); } },
+    guardmole: { cd: 3, wind: 0.5, when: (e, p) => near(e, p, 220), go: (e) => { e.act = 0.8; e.charge = 260; } },
+  };
+
+  class EnemyShot {
+    constructor(x, y, vx, vy, kind, grav) { this.x = x - 7; this.y = y - 7; this.w = 14; this.h = 14; this.vx = vx; this.vy = vy; this.kind = kind; this.grav = grav; this.t = 0; this.dead = false; }
+    update(dt, game) {
+      this.t += dt;
+      this.vy += C().GRAVITY * this.grav * dt;
+      this.x += this.vx * dt; this.y += this.vy * dt;
+      if (this.kind === 'wave') { this.h = 12; if (this.t > 0.9) this.dead = true; }
+      else if (game.level.rectSolid(this.x, this.y, this.w, this.h) || this.t > 3) { this.dead = true; game.particles.burst(this.x + 7, this.y + 7, '#8b6a42', 5, 90); }
+      if (!this.dead && overlap(this, game.player)) { this.dead = true; game.hurtPlayer(game.enemyDamage(), this.x, 'shot'); }
+    }
+    draw(ctx) {
+      const Dr = D(), cx = this.x + 7, cy = this.y + 7;
+      if (this.kind === 'wave') { ctx.globalAlpha = 1 - this.t; Dr.blob(ctx, cx, this.y + 8, 12, 6, 3, '#d8b080', 2); ctx.globalAlpha = 1; }
+      else if (this.kind === 'venom') Dr.blob(ctx, cx, cy, 7, 5, 4, '#8ad04a', 1.6);
+      else Dr.blob(ctx, cx, cy, 6, 6, 5, { pebble: '#8a8580', acorn: '#a0703a', clod: '#7a5a40' }[this.kind] || '#888', 1.8);
+    }
+  }
+
   class Enemy {
-    constructor(kind, x, y) {
-      this.kind = kind; this.x = x; this.y = y; this.vx = 0; this.vy = 0;
+    constructor(kind, x, y, biome = 0) {
+      const def = (ENEMY_TYPES[biome] || ENEMY_TYPES[0])[kind] || ENEMY_TYPES[0][kind] || ['eel', 'swim', 80];
+      [this.look, this.ai, this.speed] = def;
+      this.kind = kind; this.biome = biome; this.x = x; this.y = y; this.vx = 0; this.vy = 0;
       this.facing = -1; this.t = Math.random() * 10; this.dead = false; this.flash = 0;
-      this.stompable = true; this.hp = 1; this.speed = 50; this.w = 28; this.h = 18; this.coins = 1;
-      this.awake = false;
-      if (kind === 'r') { this.speed = 55; this.tipKey = 'rat'; }
-      if (kind === 'R') { this.hp = 2; this.w = 40; this.h = 26; this.speed = 40; this.coins = 3; this.tipKey = 'bigrat'; }
-      if (kind === 'c') { this.w = 24; this.h = 12; this.speed = 120; this.tipKey = 'roach'; this.coins = 1; }
+      this.hp = 1; this.w = 28; this.h = 18; this.coins = 1; this.awake = false; this.timer = Math.random() * 1.5;
+      this.tipKey = this.look;
+      if (kind === 'R') { this.hp = biome === 4 ? 3 : 2; this.w = 40; this.h = 26; this.coins = 3; }
+      if (kind === 'c') { this.w = 24; this.h = 14; }
+      if (this.ai === 'fly') { this.h = 22; }
+      if (this.ai === 'swim') { this.w = 36; this.h = 16; }
       this.y -= this.h - TS();
       this.x += (TS() - this.w) / 2;
+      this.homeX = this.x; this.homeY = this.y;
     }
+    get harmless() { return this.under; }
     update(dt, game) {
       this.t += dt; this.flash = Math.max(0, this.flash - dt);
+      const p = game.player, L = game.level;
       if (!this.awake) {
-        if (Math.abs(this.x - game.player.x) < C().WIDTH * 0.75) { this.awake = true; if (this.tipKey) game.tip(this.tipKey); }
+        if (Math.abs(this.x - p.x) < C().WIDTH * 0.75) { this.awake = true; game.tip(this.tipKey); }
         else return;
       }
-      if (this.stun > 0) { this.stun -= dt; this.vx *= 0.9; }
-      else this.vx = this.facing * this.speed;
+      if (this.updateAttack(dt, game)) return;
+      if (this.stun > 0) { this.stun -= dt; this.vx *= 0.9; if (this.ai !== 'fly' && this.ai !== 'swim') this.vy += C().GRAVITY * dt; game.level.moveBody(this, dt); return; }
+      if (this.ai === 'fly') return this.updateFly(dt, game);
+      if (this.ai === 'swim') return this.updateSwim(dt, game);
+      if (this.ai === 'hop') {
+        if (this.onGround) {
+          this.vx = 0; this.timer -= dt;
+          if (this.timer <= 0) {
+            this.facing = p.cx < this.x + this.w / 2 ? -1 : 1;
+            const big = this.kind === 'R';
+            this.vx = this.facing * (big ? 120 : 150); this.vy = -(big ? 560 : 500) - Math.random() * 80;
+            this.timer = 0.7 + Math.random() * 0.8; this.onGround = false;
+          }
+        }
+      } else if (this.ai === 'burrow') {
+        this.timer -= dt;
+        if (this.timer <= 0) { this.under = !this.under; this.timer = this.under ? 1.2 : 2.5 + Math.random(); }
+        this.vx = this.under ? 0 : this.facing * this.speed;
+      } else this.vx = this.facing * this.speed;
       this.vy = Math.min(C().MAX_FALL, this.vy + C().GRAVITY * dt);
-      const res = game.level.moveBody(this, dt);
+      const res = L.moveBody(this, dt);
+      if (res.ground && !this.onGround && this.ai === 'hop' && ATTACKS[this.look] && ATTACKS[this.look].land && this.vy === 0 && this.t > 1) ATTACKS[this.look].land(this, game);
+      this.onGround = res.ground;
       if (res.wallL) this.facing = 1;
       if (res.wallR) this.facing = -1;
-      // turn at ledges
-      if (res.ground) {
+      if (res.ground && this.ai !== 'hop') {
         const t = TS();
         const aheadX = this.facing > 0 ? this.x + this.w + 2 : this.x - 2;
         const ty = Math.floor((this.y + this.h + 4) / t), tx = Math.floor(aheadX / t);
-        if (!game.level.isSolid(tx, ty) && !game.level.isOneWay(tx, ty)) this.facing *= -1;
-        const hz = game.level.tile(tx, ty - 0); if (hz === '^' || hz === '~') this.facing *= -1;
+        if (!L.isSolid(tx, ty) && !L.isOneWay(tx, ty)) this.facing *= -1;
+        const hz = L.tile(tx, ty - 1); if (hz === '^' || hz === '~' || hz === 'w') this.facing *= -1;
       }
-      if (this.y > game.level.pxH + 50) this.dead = true;
+      if (this.y > L.pxH + 50) this.dead = true;
     }
-    hit(dmg, fromX, game) {
-      if (this.dead) return;
+    // returns true when the attack is controlling movement this frame
+    updateAttack(dt, game) {
+      const atk = ATTACKS[this.look], p = game.player;
+      if (!atk || this.stun > 0 || p.dead) return false;
+      this.atkCd = (this.atkCd == null ? 1 + Math.random() : this.atkCd) - dt;
+      if (this.tongue > 0) { this.tongue -= dt; const tb = { x: this.facing > 0 ? this.x + this.w : this.x - 60, y: this.y, w: 60, h: 12 }; if (overlap(tb, p)) game.hurtPlayer(game.enemyDamage(), this.x, 'tongue'); return false; }
+      if (this.dart > 0) {
+        this.dart -= dt; this.x += this.dartV.x * dt; this.y += this.dartV.y * dt;
+        if (game.level.tile(Math.floor((this.x + this.w / 2) / TS()), Math.floor((this.y + this.h / 2) / TS())) !== 'w') { this.x -= this.dartV.x * dt; this.y -= this.dartV.y * dt; this.dart = 0; }
+        if (this.dart <= 0) { this.homeX = this.x; this.homeY = this.y; }
+        return true;
+      }
+      if (this.act > 0) {
+        this.act -= dt;
+        if (this.charge) this.vx = this.facing * this.charge;
+        this.vy = Math.min(C().MAX_FALL, this.vy + C().GRAVITY * dt);
+        const res = game.level.moveBody(this, dt);
+        this.onGround = res.ground;
+        if (res.wallL || res.wallR || this.act <= 0) { this.act = 0; this.charge = 0; this.rolling = false; if (res.wallL || res.wallR) this.facing *= -1; }
+        // don't charge off a ledge
+        if (res.ground && this.charge) { const t = TS(), tx = Math.floor((this.facing > 0 ? this.x + this.w + 4 : this.x - 4) / t), ty = Math.floor((this.y + this.h + 4) / t); if (!game.level.isSolid(tx, ty) && !game.level.isOneWay(tx, ty)) { this.act = 0; this.charge = 0; this.rolling = false; } }
+        return true;
+      }
+      if (this.windT > 0) {
+        this.windT -= dt;
+        if (this.windT <= 0) { atk.go(this, game, p); this.atkCd = atk.cd; if (this.ai === 'fly') return false; }
+        return this.ai !== 'fly' && this.ai !== 'swim';
+      }
+      if (atk.when && this.atkCd <= 0 && atk.when(this, p)) {
+        if (this.ai !== 'fly') this.facing = p.cx < this.x + this.w / 2 ? -1 : 1;
+        this.windT = atk.wind; this.vx = 0;
+        if (atk.wind === 0) { atk.go(this, game, p); this.atkCd = atk.cd; }
+        return this.ai !== 'fly' && this.ai !== 'swim';
+      }
+      return false;
+    }
+    updateFly(dt, game) {
+      const p = game.player;
+      if (this.swoop > 0) {
+        this.swoop -= dt;
+        const dx = this.target.x - this.x, dy = this.target.y - this.y, d = Math.hypot(dx, dy) || 1;
+        this.x += dx / d * 260 * dt; this.y += dy / d * 260 * dt;
+        if (d < 10 || this.swoop <= 0) this.swoop = -1.5;
+      } else {
+        if (this.swoop < 0) this.swoop = Math.min(0, this.swoop + dt);
+        this.y += (this.homeY - this.y) * Math.min(1, dt * 1.5) + Math.sin(this.t * 3) * 0.6;
+        this.x += this.facing * this.speed * dt;
+        if (Math.abs(this.x - this.homeX) > 110) this.facing = this.x > this.homeX ? -1 : 1;
+        const dx = p.cx - this.x;
+        if (this.swoop === 0 && Math.abs(dx) < 190 && p.y > this.y && !p.dead) {
+          this.swoop = 1.2; this.target = { x: p.cx - this.w / 2, y: p.y }; this.facing = dx < 0 ? -1 : 1;
+        }
+      }
+    }
+    updateSwim(dt, game) {
+      const L = game.level;
+      this.x += this.facing * this.speed * dt;
+      this.y = this.homeY + Math.sin(this.t * 2) * 10;
+      const ahead = this.facing > 0 ? this.x + this.w + 2 : this.x - 2;
+      if (L.tile(Math.floor(ahead / TS()), Math.floor((this.y + this.h / 2) / TS())) !== 'w' || Math.abs(this.x - this.homeX) > 200) this.facing *= -1;
+    }
+    hit(dmg, fromX, game, how) {
+      if (this.dead || this.under) return;
+      if (this.look === 'guardmole' && how === 'paw' && (fromX - (this.x + this.w / 2)) * this.facing > 0) { A().sfx('hit'); game.floater('clank! shield!', this.x + this.w / 2, this.y - 10, '#ffe9a0'); this.vx = -this.facing * 60; return; }
       this.hp -= dmg; this.flash = 0.15;
-      this.stun = 0.25; this.vx = (this.x > fromX ? 1 : -1) * 160; this.vy = -180;
+      this.stun = 0.25; this.vx = (this.x > fromX ? 1 : -1) * 160; this.vy = this.ai === 'fly' || this.ai === 'swim' ? 0 : -180;
       if (this.hp <= 0) this.kill(game);
       else A().sfx('hit');
     }
@@ -294,11 +438,35 @@
       game.stats.enemies++;
     }
     draw(ctx) {
-      const D_ = D(), cx = this.x + this.w / 2, by = this.y + this.h;
+      const Dr = D(), by = this.y + this.h, o = { facing: this.facing, t: this.t };
+      const cx = this.x + this.w / 2 + (this.windT > 0 ? (Math.random() - 0.5) * 3 : 0);
       if (this.flash > 0) ctx.globalAlpha = 0.5;
-      if (this.kind === 'r') D_.rat(ctx, cx, by, { facing: this.facing, t: this.t, seed: 11 });
-      else if (this.kind === 'R') D_.rat(ctx, cx, by, { facing: this.facing, t: this.t, scale: 1.45, color: '#6f6970', seed: 12 });
-      else if (this.kind === 'c') D_.roach(ctx, cx, by, { facing: this.facing, t: this.t });
+      if (this.windT > 0) Dr.text(ctx, '!', cx, this.y - 8, { size: 18, color: '#ff5040', outline: 3, align: 'center' });
+      if (this.tongue > 0) { Dr.line(ctx, [[cx + this.facing * 10, this.y + 8], [cx + this.facing * 70, this.y + 8]], 9, 4, '#e86a7a'); Dr.dot(ctx, cx + this.facing * 70, this.y + 8, 4, '#e86a7a'); }
+      if (this.rolling) { ctx.save(); ctx.translate(cx, by - 10); ctx.rotate(this.t * 14 * this.facing); Dr.blob(ctx, 0, 0, 11, 11, 7, this.biome === 4 ? '#6a5a8a' : '#3a6a8a', 2); Dr.line(ctx, [[-9, 0], [9, 0]], 8, 1.4, '#1a2a3a'); ctx.restore(); ctx.globalAlpha = 1; return; }
+      if (this.look === 'guardmole' && !this.under) Dr.rect(ctx, cx + this.facing * 16 - 4, by - 26, 8, 22, 10, '#9aa3ad', 2);
+      if (this.under) {
+        Dr.blob(ctx, cx, by - 4, 18, 6, 15, '#8a6a4a', 2);
+        for (let i = 0; i < 2; i++) Dr.dot(ctx, cx - 10 + Math.random() * 20, by - 8 - Math.random() * 6, 2.5, '#a08060');
+        ctx.globalAlpha = 1; return;
+      }
+      switch (this.look) {
+        case 'rat': Dr.rat(ctx, cx, by, { ...o, seed: 11 }); break;
+        case 'bigrat': Dr.rat(ctx, cx, by, { ...o, scale: 1.45, color: '#6f6970', seed: 12 }); break;
+        case 'roach': Dr.roach(ctx, cx, by, o); break;
+        case 'flea': Dr.flea(ctx, cx, by, { ...o, air: !this.onGround }); break;
+        case 'bigflea': Dr.flea(ctx, cx, by, { ...o, air: !this.onGround, scale: 1.5, color: '#6a3418' }); break;
+        case 'beetle': Dr.beetle(ctx, cx, by, { ...o, color: this.biome === 4 ? '#6a5a8a' : '#3a6a8a' }); break;
+        case 'bird': Dr.bird(ctx, cx, by, o); break;
+        case 'crow': Dr.bird(ctx, cx, by, { ...o, scale: 1.5, color: '#4a4458' }); break;
+        case 'squirrel': Dr.squirrel(ctx, cx, by, o); break;
+        case 'snake': Dr.snake(ctx, cx, by, o); break;
+        case 'bigsnake': Dr.snake(ctx, cx, by, { ...o, scale: 1.4, color: '#4a7a3a' }); break;
+        case 'frog': Dr.frog(ctx, cx, by, { ...o, air: !this.onGround }); break;
+        case 'eel': Dr.eel(ctx, cx, by, o); break;
+        case 'mole': Dr.mole(ctx, cx, by, { ...o, scale: 0.45, seed: 33 }); break;
+        case 'guardmole': Dr.mole(ctx, cx, by, { ...o, scale: 0.62, hat: 'hardhat', seed: 34, color: '#5a3d4c' }); break;
+      }
       ctx.globalAlpha = 1;
       if (C().SHOW_HITBOXES) { ctx.strokeStyle = 'red'; ctx.strokeRect(this.x, this.y, this.w, this.h); }
     }
@@ -368,6 +536,26 @@
       D().item(ctx, 'puff', this.x + 9, this.y + 9, 1, this.t);
       if (this.fuse < 0.6 && Math.floor(this.t * 16) % 2) D().blob(ctx, this.x + 9, this.y + 9, 12, 12, 3, 'rgba(255,255,255,0.5)', 0);
     }
+  }
+
+  // Kitty wand / earthworm thrown by Pholia. Lands as a pickup again.
+  class Thrown {
+    constructor(kind, x, y, vx, vy) { this.kind = kind; this.x = x; this.y = y; this.vx = vx; this.vy = vy; this.w = 24; this.h = 24; this.t = 0; this.dead = false; }
+    update(dt, game) {
+      this.t += dt;
+      this.vy = Math.min(C().MAX_FALL, this.vy + C().GRAVITY * (this.kind === 'worm' ? 0.9 : 0.45) * dt);
+      if (game.boss && game.boss.thrownHit && game.boss.thrownHit(this, game)) { this.dead = true; return; }
+      const res = game.level.moveBody(this, dt);
+      if (res.ground || res.wallL || res.wallR || res.ceil || this.y > game.level.pxH) {
+        this.dead = true;
+        if (this.y < game.level.pxH) {
+          const pk = new Pickup(this.kind, this.x, this.y - 4, 0, 0, true);
+          pk.life = Infinity; pk.grabDelay = this.kind === 'worm' ? 1.2 : 0.4; pk.bait = this.kind === 'worm';
+          game.pickups.push(pk);
+        }
+      }
+    }
+    draw(ctx) { ctx.save(); ctx.translate(this.x + 12, this.y + 12); ctx.rotate(this.t * 12); D().item(ctx, this.kind, 0, 0, 1.1, this.t); ctx.restore(); }
   }
 
   // ============================================================ PLATFORMS & HAZARDS
@@ -473,6 +661,27 @@
     }
   }
 
+  // A flag post before a major boss. Touch it to save your spot in the level.
+  class Checkpoint {
+    constructor(tx, ty) { this.x = tx * TS(); this.y = ty * TS(); this.w = TS(); this.h = TS() * 2; this.active = false; this.t = 0; this.raise = 0; }
+    update(dt, game) {
+      this.t += dt;
+      if (this.active) this.raise = Math.min(1, this.raise + dt * 2.5);
+      else if (game.player.overlapsRect(this.x, this.y - TS(), this.w, this.h)) game.activateCheckpoint(this);
+    }
+    draw(ctx) {
+      const Dr = D(), x = this.x + 16, base = this.y + 32;
+      Dr.rect(ctx, x - 10, base - 6, 20, 6, 120, '#8b6a42', 2);
+      Dr.line(ctx, [[x, base - 4], [x, base - 70]], 121, 4, '#6b4a2a');
+      const fy = base - 30 - this.raise * 36 + Math.sin(this.t * 4) * 1.5;
+      Dr.poly(ctx, [[x + 2, fy - 12], [x + 34, fy - 6 + Math.sin(this.t * 6) * 3], [x + 2, fy + 2]], 122, this.active ? '#5ab8ff' : '#b8aea0', 2);
+      Dr.dot(ctx, x + 14, fy - 5, 3, this.active ? '#fff' : '#8a8070');
+      for (const [dx, dy] of [[-3, -4], [0, -5.5], [3, -4]]) Dr.dot(ctx, x + 14 + dx, fy - 5 + dy, 1.4, this.active ? '#fff' : '#8a8070');
+      if (this.active) { ctx.save(); ctx.globalAlpha = 0.25 + Math.sin(this.t * 3) * 0.1; Dr.blob(ctx, x + 14, fy - 5, 26, 22, 123, '#bfe6ff', 0); ctx.restore(); }
+      else Dr.text(ctx, 'checkpoint', x, base - 78, { size: 12, align: 'center', color: '#d8ccb4', outline: 3 });
+    }
+  }
+
   // ============================================================ PARTICLES
   class Particles {
     constructor() { this.list = []; }
@@ -505,5 +714,5 @@
     }
   }
 
-  PM.Entities = { Player, Enemy, Pickup, PuffBomb, MovingPlatform, DripPipe, Sign, Particles, overlap };
+  PM.Entities = { Player, Enemy, Pickup, PuffBomb, Thrown, MovingPlatform, DripPipe, Sign, Checkpoint, Particles, overlap };
 })();

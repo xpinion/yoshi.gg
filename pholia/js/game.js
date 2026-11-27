@@ -30,10 +30,14 @@
     // ============================================================ flow
     toTitle() { this.mode = 'menu'; this.overlay = null; this.screen = new PM.UI.Title(this); }
 
-    startSlot(slot) {
+    startSlot(slot, opts = {}) {
       this.slot = slot;
       const existing = PM.Save.load(slot);
       this.state = existing || PM.Save.fresh();
+      if (!existing) this.state.hard = !!opts.hard;
+      if (!this.state.beaten.length && this.state.level > 1) for (let i = 1; i < this.state.level; i++) this.state.beaten.push(i);
+      if (this.state.replayReturn) { this.state.level = this.state.replayReturn; this.state.replayReturn = null; }
+      if (this.state.level > 50) { this.mode = 'menu'; this.screen = new PM.UI.LevelSelect(this, () => this.toTitle()); return; }
       this.radio = { queue: [], log: [] };
       if (!this.state.introSeen) {
         this.playCutscene('intro', () => { this.state.introSeen = true; this.persist(); this.beginLevel(this.state.level); });
@@ -49,13 +53,14 @@
     persist() { if (this.state) PM.Save.write(this.slot, this.state); }
 
     beginLevel(n, isRetry = false) {
+      if (n > 50) return this.finishGame();
       const data = PM.LEVELS[n];
       if (!data) return this.showNotBuilt(n);
       const s = this.state;
       s.level = n;
       const biome = biomeOf(n);
       // snapshot at the start of a biome (used if all lives are lost)
-      if ((n - 1) % LEVELS_PER_BIOME === 0 && !isRetry) {
+      if ((n - 1) % LEVELS_PER_BIOME === 0 && !isRetry && !s.replayReturn) {
         const snap = JSON.parse(JSON.stringify(s)); delete snap.biomeStart;
         snap.lives = C().START_LIVES; snap.hearts = C().START_HEARTS;
         s.biomeStart = snap;
@@ -63,7 +68,9 @@
       s.armor = s.maxArmor;
       this.persist();
       this.loadLevel(n, data);
-      this.levelStartSnapshot = { coins: s.coins, item: s.item };
+      const cpHere = s.checkpoint && s.checkpoint.level === n;
+      if (cpHere) this.resumeAtCheckpoint(s.checkpoint);
+      this.levelStartSnapshot = cpHere ? { coins: s.checkpoint.coins, item: s.checkpoint.item } : { coins: s.coins, item: s.item };
       if (!isRetry) this.levelStats = { time: 0, hits: 0, coinsGot: 0, restarts: 0, enemies: 0 };
       else { this.levelStats.time = 0; this.levelStats.coinsGot = 0; this.levelStats.enemies = 0; this.levelStats.restarts++; }
       this.stats = this.levelStats;
@@ -81,7 +88,7 @@
       const L = new PM.Level(n, data);
       this.level = L;
       const t = C().TILE;
-      this.enemies = []; this.pickups = []; this.projectiles = []; this.platforms = []; this.hazards = []; this.signs = [];
+      this.enemies = []; this.pickups = []; this.projectiles = []; this.platforms = []; this.hazards = []; this.signs = []; this.checkpoints = [];
       this.particles = new (E().Particles)();
       this.boss = null; this.bossArena = null; this.bossDone = false;
       let signIdx = 0, dripIdx = 0;
@@ -92,11 +99,14 @@
         switch (sp.ch) {
           case 'o': this.pickups.push(new (E().Pickup)('coin', px + 7, py + 7)); coinTotal++; break;
           case 'L': if (!this.state.secretsFound.includes(L.biome)) this.pickups.push(new (E().Pickup)('life', px + 3, py + 3)); break;
-          case 'r': case 'R': case 'c': this.enemies.push(new (E().Enemy)(sp.ch, px, py)); break;
+          case 'r': case 'R': case 'c': case 'e': this.enemies.push(new (E().Enemy)(sp.ch, px, py, L.biome)); break;
+          case 'U': if (!this.state.scuba) this.pickups.push(new (E().Pickup)('scuba', px + 3, py + 3)); break;
+          case 'W': this.pickups.push(new (E().Pickup)('wand', px + 3, py + 3)); break;
           case 'd': this.hazards.push(new (E().DripPipe)(sp.tx, sp.ty, dripIdx++)); break;
           case 'M': this.platforms.push(new (E().MovingPlatform)(L, sp.tx, sp.ty, false)); break;
           case 'V': this.platforms.push(new (E().MovingPlatform)(L, sp.tx, sp.ty, true)); break;
           case 'S': this.signs.push(new (E().Sign)(sp.tx, sp.ty, signTexts[signIdx++] || '')); break;
+          case 'K': if (!this.state.hard) this.checkpoints.push(new (E().Checkpoint)(sp.tx, sp.ty)); break;
         }
       }
       this.coinTotal = coinTotal;
@@ -112,6 +122,23 @@
       }
       this.cam.x = Math.max(0, this.player.x - 300); this.cam.y = Math.max(0, L.pxH - C().HEIGHT);
       this.radioTriggers = (data.radio || []).map((r) => ({ ...r, done: false }));
+      // auto-run levels: the Giant Flea chases from behind
+      this.autoRun = !!data.autorun;
+      this.chaser = data.autorun ? { x: this.player.x - 380, y: this.player.bottom, t: 0, caught: false } : null;
+    }
+
+    // Called after the last level. (The real ending + village celebration will go here.)
+    finishGame() {
+      const wasHard = this.state.hard;
+      PM.Save.unlock('hardMode');
+      if (wasHard) PM.Save.unlock('hardModeBeaten');
+      this.persist();
+      this.mode = 'menu';
+      A().play('title');
+      this.screen = new PM.UI.MessageScreen('You did it!', wasHard
+        ? 'You beat Hard Mode with no checkpoints. Bobby is speechless. (That has never happened before.)'
+        : "Pholia made it home! HARD MODE is now unlocked — start a new game in an empty slot to try it. No checkpoints. Good luck, kitty.",
+        () => this.toTitle(), { cat: 'sit', bg: '#2a1f28' });
     }
 
     showNotBuilt(n) {
@@ -131,6 +158,15 @@
         s.hearts = Math.max(s.hearts, 0.5);
         if (this.player.effect) { /* power-ups end with the level */ }
         const n = this.level.num;
+        if (!s.beaten.includes(n)) s.beaten.push(n);
+        if (s.checkpoint && s.checkpoint.level === n) s.checkpoint = null;
+        if (s.replayReturn) {
+          // replaying an old level: go back to real progress, no cutscenes or shop
+          const back = s.replayReturn; s.replayReturn = null; s.level = back; this.persist();
+          if (back > 50) { this.mode = 'menu'; this.screen = new PM.UI.LevelSelect(this, () => this.toTitle()); }
+          else this.beginLevel(back);
+          return;
+        }
         const next = n + 1;
         s.level = next;
         this.persist();
@@ -150,7 +186,59 @@
       });
     }
 
+    updateChaser(dt) {
+      const ch = this.chaser, p = this.player;
+      ch.t += dt;
+      if (p.dead || p.frozen || this.overlay) return;
+      const gap = p.x - ch.x;
+      ch.x += (C().AUTORUN_FLEA_SPEED + Math.max(0, gap - 400) * 2.5) * dt;
+      ch.y += (p.bottom - ch.y) * Math.min(1, dt * 2);
+      if (gap < 120 && !ch.caught) {
+        ch.caught = true;
+        this.floater('CHOMP!', p.cx, p.y - 20, '#ff5040'); this.shake(10);
+        this.loseLife();
+      }
+    }
+    drawChaser(ctx) {
+      const ch = this.chaser, hop = Math.abs(Math.sin(ch.t * 5)) * 40;
+      D().giantFlea(ctx, ch.x, Math.min(ch.y, this.cam.y + C().HEIGHT - 10) - hop, { facing: 1, t: ch.t, air: hop > 10, angry: true });
+      if (this.player.x - ch.x < 300) D().text(ctx, '!!', ch.x + 60, ch.y - 150, { size: 30, color: '#ff5040', outline: 5, align: 'center' });
+    }
+
+    activateCheckpoint(cp) {
+      const s = this.state, p = this.player;
+      cp.active = true;
+      s.checkpoint = { level: this.level.num, x: cp.x + 4, y: cp.y + C().TILE - 36, coins: s.coins, item: s.item };
+      this.levelStartSnapshot = { coins: s.coins, item: s.item };
+      this.persist();
+      A().sfx('oneup');
+      this.particles.burst(cp.x + 30, cp.y - 30, '#5ab8ff', 14, 200);
+      this.particles.add({ kind: 'text', text: 'Checkpoint!', x: p.cx, y: p.y - 14, life: 1.6, color: '#bfe6ff', size: 22 });
+    }
+    resumeAtCheckpoint(cp) {
+      const p = this.player;
+      p.x = cp.x; p.y = cp.y; p.lastSafe = { x: cp.x, y: cp.y };
+      for (const c of this.checkpoints) if (Math.abs(c.x + 4 - cp.x) < 40) { c.active = true; c.raise = 1; }
+      // everything behind the flag is already done
+      const behind = (o) => o.x < cp.x - 64;
+      this.pickups = this.pickups.filter((o) => !behind(o));
+      this.enemies = this.enemies.filter((o) => !behind(o));
+      for (const r of this.radioTriggers) if (r.at * C().TILE < cp.x) r.done = true;
+      this.cam.x = Math.max(0, p.x - 300);
+    }
+
+    // Start a level from the level select
+    playLevel(n) {
+      const s = this.state;
+      const progress = s.replayReturn || s.level;
+      if (n === progress) { s.replayReturn = null; s.level = n; }
+      else { s.replayReturn = progress; }
+      this.overlay = null;
+      this.beginLevel(n);
+    }
+
     saveAndQuit() {
+      if (this.state.replayReturn) { this.state.level = this.state.replayReturn; this.state.replayReturn = null; }
       // the level restarts when you come back, so undo coins/items picked up in it
       if (this.levelStartSnapshot) { this.state.coins = this.levelStartSnapshot.coins; this.state.item = this.levelStartSnapshot.item; }
       this.persist(); this.toTitle();
@@ -195,7 +283,7 @@
         s.coins = this.levelStartSnapshot.coins;
         s.item = this.levelStartSnapshot.item;
         this.mode = 'menu';
-        this.screen = new PM.UI.MessageScreen(`${s.lives} ${s.lives === 1 ? 'life' : 'lives'} left`, s.lives <= 2 ? "Careful, Pholia! A cat only gets nine." : 'Shake it off and try again!', () => this.beginLevel(this.level.num, true), { cat: 'sit', bg: '#2a1f28' });
+        this.screen = new PM.UI.MessageScreen(`${s.lives} ${s.lives === 1 ? 'life' : 'lives'} left`, (s.checkpoint ? 'Back to the checkpoint flag! ' : '') + (s.lives <= 2 ? "Careful, Pholia! A cat only gets nine." : 'Shake it off and try again!'), () => this.beginLevel(this.level.num, true), { cat: 'sit', bg: '#2a1f28' });
         this.persist();
       } else {
         const b = s.biomeStart;
@@ -203,6 +291,10 @@
         restore.biomeStart = b; restore.introSeen = true;
         restore.deathsTotal = s.deathsTotal;
         restore.seen = s.seen;
+        restore.checkpoint = null;
+        restore.hard = s.hard;
+        restore.beaten = s.beaten;
+        restore.scuba = restore.scuba || (s.scuba && restore.level > 30);
         this.state = restore;
         this.persist();
         this.mode = 'menu';
@@ -216,19 +308,24 @@
       for (let i = 0; i < n; i++) this.pickups.push(new (E().Pickup)('coin', x - 9, y - 10, (Math.random() - 0.5) * 220, -250 - Math.random() * 200, true));
     }
     maybeDrop(x, y) {
+      if (this.boss) return; // no random drops during boss fights
       const cfg = C();
       if (Math.random() >= cfg.DROP_CHANCE) return;
       const r = Math.random(); let acc = 0, kind = 'puff';
       for (const [k, w] of Object.entries(cfg.DROP_TABLE)) { acc += w; if (r < acc) { kind = k; break; } }
       this.pickups.push(new (E().Pickup)(kind, x - 13, y - 20, (Math.random() - 0.5) * 100, -380, true));
     }
-    spawnEnemy(kind, x, y) { const e = new (E().Enemy)(kind, x, y); e.awake = true; this.enemies.push(e); }
+    spawnEnemy(kind, x, y) { const e = new (E().Enemy)(kind, x, y, this.level.biome); e.awake = true; this.enemies.push(e); }
     collect(pk) {
       const s = this.state, p = this.player;
       if (pk.kind === 'coin') {
         pk.dead = true; s.coins++; if (!pk.physics) this.levelStats.coinsGot++;
         A().sfx('coin'); this.tip('coin');
         this.particles.add({ x: pk.x + 9, y: pk.y + 9, vx: 0, vy: -60, life: 0.3, color: '#f6c945', r: 4 });
+      } else if (pk.kind === 'scuba') {
+        pk.dead = true; s.scuba = true; A().sfx('oneup'); this.tip('scuba');
+        this.particles.add({ kind: 'text', text: 'SCUBA SUIT!', x: p.cx, y: p.y - 10, life: 2, color: '#bfe6ff', size: 24 });
+        this.persist();
       } else if (pk.kind === 'life') {
         pk.dead = true;
         s.secretsFound.push(this.level.biome);
@@ -249,20 +346,22 @@
     useItem() {
       const s = this.state, p = this.player;
       if (!s.item) { this.floater('no item!', p.cx, p.y - 12, '#fff'); A().sfx('nope'); return; }
-      if (s.item === 'puff') { this.throwObject(0.35); return; }
+      if (this.throwableKind()) { this.throwObject(0.35); return; }
       p.effect = s.item; p.effectT = C().POWERUP_DURATION;
       if (s.item === 'spring') p.airJumps = 1;
       if (s.item === 'feather') { p.sneezeT = 0.8; A().sfx('sneeze'); this.particles.burst(p.cx + p.facing * 20, p.y + 10, '#ffffff', 12, 200); }
       else A().sfx('powerup');
       s.item = null;
     }
-    throwableKind() { return this.state.item === 'puff' ? 'puff' : null; }
+    throwableKind() { return ['puff', 'wand', 'worm', 'trap'].includes(this.state.item) ? this.state.item : null; }
     throwObject(charge) {
       const s = this.state, p = this.player, cfg = C();
-      if (s.item !== 'puff') return;
+      const kind = this.throwableKind();
+      if (!kind) return;
       s.item = null;
       const v = cfg.THROW_MIN + (cfg.THROW_MAX - cfg.THROW_MIN) * charge;
-      this.projectiles.push(new (E().PuffBomb)(p.cx - 9, p.y, p.facing * v * 0.75 + p.vx * 0.3, -v * 0.65));
+      if (kind === 'puff') this.projectiles.push(new (E().PuffBomb)(p.cx - 9, p.y, p.facing * v * 0.75 + p.vx * 0.3, -v * 0.65));
+      else this.projectiles.push(new (E().Thrown)(kind, p.cx - 12, p.y, p.facing * v * (kind === 'wand' || kind === 'trap' ? 1 : 0.75) + p.vx * 0.3, -v * (kind === 'wand' || kind === 'trap' ? 0.4 : 0.65)));
       A().sfx('throw');
     }
     breakTile(tx, ty) {
@@ -270,12 +369,13 @@
       this.level.setTile(tx, ty, '.');
       A().sfx('crumble');
       this.particles.burst(tx * t + 16, ty * t + 16, ch === 'C' ? '#c4965a' : '#6a7a7b', 14, 200);
-      if (ch === 'C') this.spawnCoins(tx * t + 16, ty * t + 8, 3);
+      if (ch === 'C' && this.level.data.wormPots) this.pickups.push(new (E().Pickup)('worm', tx * t + 3, ty * t, 0, -250, true));
+      else if (ch === 'C') this.spawnCoins(tx * t + 16, ty * t + 8, 3);
     }
 
     playerAttack(box, p) {
       for (const e of this.enemies) {
-        if (!e.dead && !p.atkHit.has(e) && E().overlap(box, e)) { p.atkHit.add(e); e.hit(1, p.cx, this); }
+        if (!e.dead && !p.atkHit.has(e) && E().overlap(box, e)) { p.atkHit.add(e); e.hit(1, p.cx, this, 'paw'); }
       }
       if (this.boss && !p.atkHit.has(this.boss) && this.boss.hitByAttack(box, p, this)) p.atkHit.add(this.boss);
       // break bricks/crates
@@ -329,8 +429,8 @@
       for (const e of this.enemies) e.update(dt, this);
       // enemy contact: pounce or get hurt
       for (const e of this.enemies) {
-        if (e.dead || p.dead || !E().overlap(p, e)) continue;
-        if (p.vy > 0 && p.prevBottom - p.vy * dt <= e.y + 8 || (p.vy > 0 && p.y + p.h - e.y < 14)) { e.hit(e.hp, p.cx, this); p.pounce(); }
+        if (e.dead || p.dead || e.harmless || !E().overlap(p, e)) continue;
+        if (p.vy > 0 && p.prevBottom - p.vy * dt <= e.y + 8 || (p.vy > 0 && p.y + p.h - e.y < 14)) { e.hit(e.hp, p.cx, this, 'stomp'); p.pounce(); }
         else if (p.dashT > 0) { e.hit(1, p.cx, this); }
         else this.hurtPlayer(this.enemyDamage(), e.x + e.w / 2);
       }
@@ -338,9 +438,11 @@
       for (const pk of this.pickups) pk.update(dt, this);
       this.pickups = this.pickups.filter((x) => !x.dead);
       for (const pr of this.projectiles) pr.update(dt, this);
+      if (this.chaser) this.updateChaser(dt);
       this.projectiles = this.projectiles.filter((x) => !x.dead);
       for (const h of this.hazards) h.update(dt, this);
       for (const s of this.signs) s.update(dt, this);
+      for (const c of this.checkpoints) c.update(dt, this);
       this.particles.update(dt);
 
       // radio triggers by position
@@ -367,7 +469,8 @@
         ar.triggered = true;
         for (let ty = 0; ty < Math.floor(ar.floorY / t); ty++) L.setTile(ar.tx0, ty, '#');
         this.boss = new PM.Bosses[ar.type](this, ar);
-        A().play((ar.type === 'digby' ? 'mini-' : 'boss-') + ar.type);
+        A().play((this.level.data.boss.final ? 'boss-' : 'mini-') + ar.type);
+        this.autoRun = false; this.chaser = null;
         const pre = PM.STORY.clyde[ar.type + '_pre'];
         if (pre) this.radioPush('clyde', pre, true);
       }
@@ -379,7 +482,7 @@
             // biome boss: straight to the ending cutscene
             this.boss = null;
             const s = this.state;
-            s.rescued.push(this.level.data.boss.rescue);
+            if (!s.rescued.includes(this.level.data.boss.rescue)) s.rescued.push(this.level.data.boss.rescue);
             this.completeLevel();
           } else {
             // mini-boss: open the far wall
@@ -432,12 +535,14 @@
       // entry pipe above the start
       this.drawEntryPipe(ctx);
       for (const s of this.signs) s.draw(ctx);
+      for (const c of this.checkpoints) c.draw(ctx);
       L.drawTiles(ctx, this.cam, this.time);
       for (const pl of this.platforms) pl.draw(ctx);
       for (const h of this.hazards) h.draw(ctx);
       for (const pk of this.pickups) pk.draw(ctx);
       for (const e of this.enemies) e.draw(ctx);
       if (this.boss) this.boss.draw(ctx);
+      if (this.chaser) this.drawChaser(ctx);
       this.player.draw(ctx, this);
       for (const pr of this.projectiles) pr.draw(ctx);
       this.particles.draw(ctx);

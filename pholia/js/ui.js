@@ -109,19 +109,20 @@
 
   // ------------------------------------------------------------ PAUSE
   class PauseMenu {
-    constructor(g) { this.g = g; this.sel = 0; this.opts = ['Resume', 'Sound: ON', 'Restart level (costs a life)', 'Save & quit to title']; }
+    constructor(g) { this.g = g; this.sel = 0; this.opts = ['Resume', 'Level select', 'Sound: ON', 'Restart level (costs a life)', 'Save & quit to title']; }
     update() {
       const inp = I();
-      this.opts[1] = 'Sound: ' + (A().muted ? 'OFF' : 'ON');
+      this.opts[2] = 'Sound: ' + (A().muted ? 'OFF' : 'ON');
       if (inp.pressed('up') || inp.keyPressed('KeyW')) { this.sel = (this.sel + this.opts.length - 1) % this.opts.length; A().sfx('move'); }
       if (inp.pressed('down')) { this.sel = (this.sel + 1) % this.opts.length; A().sfx('move'); }
       if (inp.pressed('pause')) return this.close();
       if (inp.keyPressed('Enter') || inp.keyPressed('KeyU')) {
         A().sfx('select');
         if (this.sel === 0) this.close();
-        else if (this.sel === 1) A().toggleMute();
-        else if (this.sel === 2) { this.close(); this.g.loseLife(); }
-        else if (this.sel === 3) { this.close(); this.g.saveAndQuit(); }
+        else if (this.sel === 1) this.g.overlay = new LevelSelect(this.g, () => { this.g.overlay = this; });
+        else if (this.sel === 2) A().toggleMute();
+        else if (this.sel === 3) { this.close(); this.g.loseLife(); }
+        else if (this.sel === 4) { this.close(); this.g.saveAndQuit(); }
       }
     }
     close() { this.g.overlay = null; I().clear(); }
@@ -131,11 +132,12 @@
       Dr.panel(ctx, 60, 50, 380, 440, 820, '#fff8e8');
       Dr.text(ctx, 'Paused', 250, 100, { size: 34, align: 'center' });
       this.opts.forEach((o, i) => {
-        const y = 160 + i * 52;
+        const y = 150 + i * 48;
         if (i === this.sel) Dr.rect(ctx, 85, y - 28, 330, 40, 821 + i, '#ffe58a', 2, 0.8);
         Dr.text(ctx, o, 250, y, { size: 19, align: 'center' });
       });
       Dr.text(ctx, `Level ${this.g.level.num} — ${PM.BIOMES[this.g.level.biome].name}`, 250, 400, { size: 15, align: 'center', color: '#7a6a5a' });
+      if (this.g.state.hard) Dr.text(ctx, 'HARD MODE — no checkpoints', 250, 450, { size: 15, align: 'center', color: '#c0392b' });
       Dr.text(ctx, `Secret bell: ${this.g.state.secretsFound.includes(this.g.level.biome) ? 'found! ✓' : 'not found yet'}`, 250, 425, { size: 15, align: 'center', color: '#7a6a5a' });
       // controls
       Dr.panel(ctx, 470, 50, 430, 440, 830, '#fff8e8');
@@ -150,6 +152,69 @@
         Dr.text(ctx, a, 495, 140 + i * 31, { size: 15, color: '#7a4a2a' });
         Dr.text(ctx, b, 670, 140 + i * 31, { size: 15, bold: false });
       });
+    }
+  }
+
+  // ------------------------------------------------------------ LEVEL SELECT
+  class LevelSelect {
+    constructor(g, onBack) {
+      this.g = g; this.onBack = onBack; this.t = 0;
+      const s = g.state, cur = Math.min(50, s.replayReturn || s.level);
+      this.sel = (g.level && g.mode === 'play') ? g.level.num : cur;
+      this.msg = '';
+    }
+    status(n) {
+      const s = this.g.state, progress = s.replayReturn || s.level;
+      if (n === progress) return 'current';
+      if (s.beaten.includes(n)) return 'beaten';
+      return 'locked';
+    }
+    update(dt) {
+      this.t += dt;
+      const inp = I();
+      const move = (d) => { this.sel = Math.max(1, Math.min(50, this.sel + d)); this.msg = ''; A().sfx('move'); };
+      if (inp.pressed('left')) move(-1);
+      if (inp.pressed('right')) move(1);
+      if (inp.pressed('up')) move(-10);
+      if (inp.pressed('down')) move(10);
+      if (inp.pressed('back')) { A().sfx('select'); I().clear(); return this.onBack(); }
+      if (inp.keyPressed('Enter') || inp.keyPressed('Space') || inp.keyPressed('KeyU')) {
+        const st = this.status(this.sel);
+        if (st === 'locked') { this.msg = 'Locked! Beat the levels before it first.'; A().sfx('nope'); return; }
+        A().sfx('select'); I().clear();
+        this.g.playLevel(this.sel);
+      }
+    }
+    draw(ctx) {
+      const Dr = D();
+      if (this.g.mode === 'play') dim(ctx, 0.7); else { ctx.fillStyle = '#2a1f28'; ctx.fillRect(0, 0, W(), H()); }
+      Dr.panel(ctx, 30, 20, 900, 500, 870, '#fff8e8');
+      Dr.text(ctx, 'Level Select', 480, 62, { size: 32, align: 'center' });
+      for (let b = 0; b < 5; b++) {
+        const y = 92 + b * 72;
+        Dr.text(ctx, PM.BIOMES[b].name.replace('The ', ''), 50, y + 36, { size: 15, color: '#7a4a2a' });
+        for (let i = 0; i < 10; i++) {
+          const n = b * 10 + i + 1, x = 170 + i * 72, st = this.status(n);
+          const fill = st === 'locked' ? '#cfc4b0' : st === 'current' ? '#9fd0f0' : '#ffffff';
+          if (n === this.sel) Dr.rect(ctx, x - 4, y - 4, 64, 62, 880 + n, '#ffe58a', 2.5, 0.8);
+          Dr.rect(ctx, x, y, 56, 54, 900 + n, fill, 2, 0.8);
+          if (st === 'locked') {
+            // padlock
+            Dr.rect(ctx, x + 18, y + 24, 20, 16, 960 + n, '#8a8070', 1.8, 0.5);
+            ctx.strokeStyle = '#5a5248'; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(x + 28, y + 24, 7, Math.PI, 0); ctx.stroke();
+            Dr.text(ctx, '' + n, x + 6, y + 16, { size: 12, color: '#7a7060' });
+          } else {
+            Dr.text(ctx, '' + n, x + 28, y + 36, { size: 22, align: 'center' });
+            if (st === 'beaten') Dr.text(ctx, '✓', x + 47, y + 16, { size: 15, color: '#3a8a3a', align: 'center' });
+            if (st === 'current') Dr.text(ctx, '▶', x + 47, y + 16, { size: 13, color: '#2a6a9a', align: 'center' });
+            if (n % 10 === 0 || n % 10 === 5) Dr.text(ctx, '★', x + 9, y + 16, { size: 13, color: '#c0392b', align: 'center' });
+          }
+        }
+      }
+      const data = PM.LEVELS[this.sel];
+      const st = this.status(this.sel);
+      Dr.text(ctx, this.msg || `Level ${this.sel}: ${st === 'locked' ? '???' : (data && data.name) || ''}${st === 'beaten' ? '  (replay — you\'ll come back here after)' : ''}`, 480, 480, { size: 17, align: 'center', color: this.msg ? '#c0392b' : '#3a2a22' });
+      Dr.text(ctx, 'arrows: choose   ENTER: play   ESC: back      ★ = boss', 480, 506, { size: 13, align: 'center', color: '#7a6a5a' });
     }
   }
 
@@ -283,6 +348,12 @@
     update(dt) {
       this.t += dt;
       const inp = I();
+      if (this.mode === 'difficulty') {
+        if (inp.pressed('up') || inp.pressed('down')) { this.diff = 1 - this.diff; A().sfx('move'); }
+        if (inp.pressed('back')) { this.mode = 'slots'; return; }
+        if (inp.keyPressed('Enter') || inp.keyPressed('Space') || inp.keyPressed('KeyU')) { A().sfx('select'); this.g.startSlot(this.sel, { hard: this.diff === 1 }); }
+        return;
+      }
       if (this.mode === 'title') {
         if (this.t > 0.4 && (inp.keyPressed('Enter') || inp.keyPressed('Space') || inp.keyPressed('KeyU'))) { this.mode = 'slots'; A().sfx('select'); }
         return;
@@ -296,7 +367,11 @@
           else { this.confirmErase = this.sel; A().sfx('nope'); }
         }
       }
-      if (inp.keyPressed('Enter') || inp.keyPressed('Space') || inp.keyPressed('KeyU')) { A().sfx('select'); this.g.startSlot(this.sel); }
+      if (inp.keyPressed('Enter') || inp.keyPressed('Space') || inp.keyPressed('KeyU')) {
+        A().sfx('select');
+        if (!PM.Save.load(this.sel) && PM.Save.unlocked('hardMode')) { this.mode = 'difficulty'; this.diff = 0; }
+        else this.g.startSlot(this.sel);
+      }
     }
     draw(ctx) {
       const Dr = D(), w = W(), h = H(), t = this.t;
@@ -309,11 +384,26 @@
         Dr.text(ctx, "Pholia's Mission", 0, 0, { size: 78, align: 'center', color: '#f6a14b', outline: 10 });
         ctx.restore();
         Dr.text(ctx, 'a cat, a walkie-talkie, and a very long way home', w / 2, 225, { size: 19, align: 'center', color: '#5a4a3a' });
-        const px = ((t * 120) % (w + 200)) - 100;
-        Dr.cat(ctx, px, 440, 'pholia', { pose: 'run', t, scale: 1.8 });
-        Dr.cat(ctx, w * 0.5, 440, 'tommy', { pose: 'sit', t, scale: 1.5, facing: -1 });
-        Dr.text(ctx, 'still waiting...', w * 0.5 + 20, 350, { size: 14, color: '#5a4a3a', align: 'center' });
+        // the whole gang, with Pholia in the middle
+        const gang = [['chalice', 0.13, 1], ['bobby', 0.26, 1], ['clyde', 0.36, 1], ['bandit', 0.645, -1], ['tommy', 0.74, -1]];
+        for (const [who, fx, f] of gang) Dr.cat(ctx, w * fx, 452, who, { pose: 'sit', t: t + fx * 3, scale: 1.55, facing: f, eyes: who === 'tommy' && Math.sin(t) > 0.6 ? 'closed' : null });
+        Dr.rock(ctx, w * 0.86, 452, 0.9);
+        Dr.text(ctx, 'still waiting...', w * 0.79, 372, { size: 13, color: '#5a4a3a', align: 'center' });
+        const hop = Math.abs(Math.sin(t * 2.2)) * 10;
+        Dr.cat(ctx, w * 0.5, 456 - hop, 'pholia', { pose: hop > 6 ? 'jump' : 'stand', t, scale: 2.3, eyes: 'happy' });
         if (Math.floor(t * 2) % 2 === 0) Dr.text(ctx, 'Press ENTER to start', w / 2, 300, { size: 26, align: 'center', color: '#fff', outline: 6 });
+        return;
+      }
+      if (this.mode === 'difficulty') {
+        Dr.text(ctx, 'Choose a mode', w / 2, 90, { size: 36, align: 'center', color: '#fff', outline: 7 });
+        const opts = [['Normal', 'Checkpoint flags before each big boss.'], ['Hard Mode', 'No checkpoints. Lose a life, start the level over. Good luck, kitty.']];
+        opts.forEach(([name, desc], i) => {
+          const y = 150 + i * 140;
+          Dr.panel(ctx, w / 2 - 280, y, 560, 110, 640 + i, i === this.diff ? (i ? '#f0a8a8' : '#ffe58a') : '#fff8e8');
+          Dr.text(ctx, name, w / 2 - 250, y + 44, { size: 28, color: i ? '#a02a2a' : '#3a2a22' });
+          Dr.text(ctx, desc, w / 2 - 250, y + 80, { size: 16, bold: false });
+        });
+        Dr.text(ctx, '↑/↓ choose   ENTER start   ESC back', w / 2, 515, { size: 15, align: 'center', color: '#5a4a3a' });
         return;
       }
       Dr.text(ctx, 'Choose a save slot', w / 2, 70, { size: 36, align: 'center', color: '#fff', outline: 7 });
@@ -326,6 +416,7 @@
           Dr.text(ctx, `Level ${s.level} — ${b ? b.name : ''}`, w / 2 - 250, y + 66, { size: 17, bold: false });
           Dr.catFace(ctx, w / 2 + 110, y + 50, 14, 'pholia'); Dr.text(ctx, '× ' + s.lives, w / 2 + 130, y + 56, { size: 18 });
           Dr.coin(ctx, w / 2 + 200, y + 50, 0, 1); Dr.text(ctx, '' + s.coins, w / 2 + 216, y + 56, { size: 18 });
+          if (s.hard) Dr.text(ctx, 'HARD MODE', w / 2 - 150, y + 34, { size: 16, color: '#c0392b' });
           if (this.confirmErase === i) Dr.text(ctx, 'Press DELETE/X again to erase!', w / 2 + 260, y + 88, { size: 13, color: '#c0392b', align: 'right' });
         } else Dr.text(ctx, 'New game', w / 2 - 250, y + 66, { size: 17, color: '#7a6a5a', bold: false });
       }
@@ -347,5 +438,5 @@
     }
   }
 
-  PM.UI = { drawHUD, RadioPanel, PauseMenu, CompleteCard, Shop, Title, MessageScreen, dim };
+  PM.UI = { drawHUD, RadioPanel, PauseMenu, LevelSelect, CompleteCard, Shop, Title, MessageScreen, dim };
 })();

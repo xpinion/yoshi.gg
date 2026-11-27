@@ -24,6 +24,10 @@ PM.CONFIG = {
   JUMP_BUFFER: 0.12,        // seconds a jump press is remembered before landing
   DUCK_SPEED: 90,
 
+  SWIM_STROKE: 330,         // upward push per jump press while swimming
+  SWIM_MAX_FALL: 150,
+  AUTORUN_FLEA_SPEED: 185,  // how fast the Giant Flea chases in auto-run levels
+
   DASH_SPEED: 560,
   DASH_TIME: 0.17,
   DASH_COOLDOWN: 0.55,
