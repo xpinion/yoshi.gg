@@ -384,11 +384,12 @@
         Dr.text(ctx, "Pholia's Mission", 0, 0, { size: 78, align: 'center', color: '#f6a14b', outline: 10 });
         ctx.restore();
         Dr.text(ctx, 'a cat, a walkie-talkie, and a very long way home', w / 2, 225, { size: 19, align: 'center', color: '#5a4a3a' });
+        Dr.text(ctx, 'A Game by Enzo Miller', w / 2, 260, { size: 20, align: 'center', color: '#fff8e8', outline: 5, outlineColor: '#7a4a2a' });
         const px = ((t * 120) % (w + 200)) - 100;
         Dr.cat(ctx, px, 440, 'pholia', { pose: 'run', t, scale: 1.8 });
         Dr.cat(ctx, w * 0.5, 440, 'tommy', { pose: 'sit', t, scale: 1.5, facing: -1 });
         Dr.text(ctx, 'still waiting...', w * 0.5 + 20, 350, { size: 14, color: '#5a4a3a', align: 'center' });
-        if (Math.floor(t * 2) % 2 === 0) Dr.text(ctx, 'Press ENTER to start', w / 2, 300, { size: 26, align: 'center', color: '#fff', outline: 6 });
+        if (Math.floor(t * 2) % 2 === 0) Dr.text(ctx, 'Press ENTER to start', w / 2, 318, { size: 26, align: 'center', color: '#fff', outline: 6 });
         return;
       }
       if (this.mode === 'difficulty') {
