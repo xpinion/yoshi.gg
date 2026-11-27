@@ -384,13 +384,10 @@
         Dr.text(ctx, "Pholia's Mission", 0, 0, { size: 78, align: 'center', color: '#f6a14b', outline: 10 });
         ctx.restore();
         Dr.text(ctx, 'a cat, a walkie-talkie, and a very long way home', w / 2, 225, { size: 19, align: 'center', color: '#5a4a3a' });
-        // the whole gang, with Pholia in the middle
-        const gang = [['chalice', 0.13, 1], ['bobby', 0.26, 1], ['clyde', 0.36, 1], ['bandit', 0.645, -1], ['tommy', 0.74, -1]];
-        for (const [who, fx, f] of gang) Dr.cat(ctx, w * fx, 452, who, { pose: 'sit', t: t + fx * 3, scale: 1.55, facing: f, eyes: who === 'tommy' && Math.sin(t) > 0.6 ? 'closed' : null });
-        Dr.rock(ctx, w * 0.86, 452, 0.9);
-        Dr.text(ctx, 'still waiting...', w * 0.79, 372, { size: 13, color: '#5a4a3a', align: 'center' });
-        const hop = Math.abs(Math.sin(t * 2.2)) * 10;
-        Dr.cat(ctx, w * 0.5, 456 - hop, 'pholia', { pose: hop > 6 ? 'jump' : 'stand', t, scale: 2.3, eyes: 'happy' });
+        const px = ((t * 120) % (w + 200)) - 100;
+        Dr.cat(ctx, px, 440, 'pholia', { pose: 'run', t, scale: 1.8 });
+        Dr.cat(ctx, w * 0.5, 440, 'tommy', { pose: 'sit', t, scale: 1.5, facing: -1 });
+        Dr.text(ctx, 'still waiting...', w * 0.5 + 20, 350, { size: 14, color: '#5a4a3a', align: 'center' });
         if (Math.floor(t * 2) % 2 === 0) Dr.text(ctx, 'Press ENTER to start', w / 2, 300, { size: 26, align: 'center', color: '#fff', outline: 6 });
         return;
       }
