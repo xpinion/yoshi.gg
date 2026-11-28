@@ -276,7 +276,7 @@
     bigflea: { cd: 0, wind: 0, land: (e, game) => { for (const d of [-1, 1]) game.projectiles.push(new EnemyShot(e.x + e.w / 2, e.y + e.h - 10, d * 220, 0, 'wave', 0)); } },
     beetle: { cd: 3, wind: 0.4, when: (e, p) => near(e, p, 230), go: (e) => { e.act = 1.1; e.charge = 320; e.rolling = true; } },
     crow: { cd: 1.6, wind: 0.2, when: (e, p) => Math.abs(p.cx - e.x - e.w / 2) < 30 && p.y > e.y, go: (e, game) => game.projectiles.push(new EnemyShot(e.x + e.w / 2, e.y + e.h, 0, 50, 'pebble', 1)) },
-    squirrel: { cd: 2.4, wind: 0.3, when: (e, p) => near(e, p, 280, 150), go: (e, game, p) => { const dx = p.cx - e.x; game.projectiles.push(new EnemyShot(e.x + e.w / 2, e.y, dx / 0.8, -C().GRAVITY * 0.4, 'acorn', 1)); } },
+    squirrel: { cd: 2.4, wind: 0.3, when: (e, p) => near(e, p, 180, 150), go: (e, game, p) => { const dx = (p.cx - e.x) * (0.55 + Math.random() * 0.9) + (Math.random() - 0.5) * 80; game.projectiles.push(new EnemyShot(e.x + e.w / 2, e.y, dx / 0.8, -C().GRAVITY * 0.4, 'acorn', 1)); } },
     snake: { cd: 2.6, wind: 0.4, when: (e, p) => near(e, p, 240, 40), go: (e, game) => game.projectiles.push(new EnemyShot(e.x + e.w / 2 + e.facing * 14, e.y + 4, e.facing * 260, 0, 'venom', 0)) },
     bigsnake: { cd: 2.2, wind: 0.45, when: (e, p) => near(e, p, 150), go: (e) => { e.vx = e.facing * 380; e.act = 0.35; e.charge = 380; } },
     frog: { cd: 1.8, wind: 0.3, when: (e, p) => near(e, p, 95, 40), go: (e) => { e.tongue = 0.35; } },
