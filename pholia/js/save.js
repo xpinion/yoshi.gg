@@ -15,7 +15,11 @@
       seen: {},             // bandit/clyde tips already shown
       rescued: [],
       deathsTotal: 0,
-      playTime: 0,
+      playTime: 0,          // total time actually playing (paused / menus / cutscenes don't count)
+      gameOvers: 0,         // times all lives were lost (the "Restarts" counter)
+      name: null,           // leaderboard username, asked for at the start
+      runId: PM.LB.newRunId(),
+      levelClock: null,     // {level, t}: leaderboard time for the level in progress (kept across checkpoints)
       biomeStart: null,     // snapshot used when all 9 lives are lost
       shopVisited: [],
       introSeen: false,

@@ -37,6 +37,12 @@
       ctx.fillStyle = p.effect === 'feather' ? '#5ab8ff' : '#e2475b'; ctx.fillRect(362, 22, 96 * frac, 12);
       ctx.strokeStyle = Dr.INK; ctx.lineWidth = 1.5; ctx.strokeRect(362, 22, 96, 12);
     }
+    // timer + restarts (game overs), top right next to the walkie-talkie
+    Dr.panel(ctx, W() - 250, 8, 160, 62, 706, 'rgba(255,248,232,0.92)');
+    Dr.text(ctx, 'Time', W() - 236, 33, { size: 15, color: '#7a6a5a' });
+    Dr.text(ctx, PM.LB.fmt(s.playTime), W() - 104, 34, { size: 20, align: 'right' });
+    Dr.text(ctx, 'Restarts', W() - 236, 59, { size: 15, color: '#7a6a5a' });
+    Dr.text(ctx, '' + (s.gameOvers || 0), W() - 104, 60, { size: 20, align: 'right', color: s.gameOvers ? '#c0392b' : Dr.INK });
     // walkie-talkie
     const unread = g.radio.queue.length > 0;
     const wx = W() - 50, wy = 42;
@@ -219,9 +225,39 @@
   }
 
   // ------------------------------------------------------------ LEVEL COMPLETE (Bobby's rating)
+  // ↑/↓ (hold to keep going) scroll a list of rows shown 'vis' at a time
+  function scrollList(lb, dt, vis) {
+    const inp = I(), dir = inp.held('down') ? 1 : inp.held('up') ? -1 : 0;
+    if (!dir) { lb.holdT = 0; return; }
+    if (lb.holdT === 0 || lb.holdT > 0.35) { if (lb.holdT > 0.35) lb.holdT -= 0.06; lb.scroll = Math.max(0, Math.min(Math.max(0, (lb.rows || []).length - vis), lb.scroll + dir)); }
+    lb.holdT += dt;
+  }
+  // rank / name / value rows; mine(row, index) highlights the player's own entry
+  function drawRows(ctx, lb, x, y, w, vis, value, mine, rowH = 32) {
+    const Dr = D();
+    lb.rows.slice(lb.scroll, lb.scroll + vis).forEach((r, k) => {
+      const i = lb.scroll + k, ry = y + k * rowH;
+      if (mine(r, i)) { ctx.fillStyle = '#ffe58a'; ctx.fillRect(x - 6, ry - 2, w + 12, rowH - 4); }
+      const medal = ['#f5c542', '#c9ced6', '#d8955a'][i];
+      if (medal) Dr.dot(ctx, x + 12, ry + rowH / 2 - 3, 11, medal);
+      Dr.text(ctx, '' + (i + 1), x + 12, ry + rowH / 2 + 3, { size: 15, align: 'center' });
+      Dr.text(ctx, r.name + (r.hard ? ' ★' : ''), x + 34, ry + rowH / 2 + 3, { size: 17, color: r.hard ? '#a02a2a' : Dr.INK });
+      Dr.text(ctx, value(r), x + w, ry + rowH / 2 + 3, { size: 17, align: 'right' });
+    });
+    if (!lb.rows.length) Dr.text(ctx, 'No times yet — be the first!', x + w / 2, y + 60, { size: 17, align: 'center', color: '#7a6a5a' });
+  }
+
   class CompleteCard {
-    constructor(g, stats, onDone) {
+    constructor(g, stats, board, onDone) {
       this.g = g; this.onDone = onDone; this.t = 0;
+      // level leaderboard, shown in a panel beside the card
+      this.lb = { state: 'loading', rows: [], rank: 0, total: 0, scroll: 0, holdT: 0 };
+      this.myTime = stats.clock;
+      board.then((d) => {
+        if (!d || d.error) throw new Error(d && d.error);
+        Object.assign(this.lb, { state: 'ok', rows: d.rows || [], rank: d.rank || 0, total: d.total || 0 });
+        if (this.lb.rank > 10) this.lb.scroll = Math.min(this.lb.rank - 5, Math.max(0, this.lb.rows.length - 10));
+      }).catch(() => { this.lb.state = 'offline'; });
       const par = g.level.data.par || 90;
       let score = 100;
       score -= stats.hits * 8;
@@ -236,15 +272,17 @@
     }
     update(dt) {
       this.t += dt;
+      scrollList(this.lb, dt, 10);
       if (this.t > 0.8 && (I().keyPressed('Enter') || I().keyPressed('Space') || I().keyPressed('KeyU'))) { A().sfx('select'); this.onDone(); }
     }
     draw(ctx) {
       const Dr = D(), s = this.stats;
       dim(ctx, 0.55);
+      ctx.save(); ctx.translate(-162, 0);   // card slides left to make room for the leaderboard
       Dr.panel(ctx, 180, 50, 600, 440, 850, '#fff8e8');
       Dr.text(ctx, 'Level Complete!', 480, 100, { size: 34, align: 'center', color: '#c0583e' });
       Dr.text(ctx, this.g.level.data.name || '', 480, 130, { size: 17, align: 'center', color: '#7a6a5a' });
-      const m = Math.floor(s.time / 60), sec = Math.floor(s.time % 60);
+      const m = Math.floor(s.clock / 60), sec = Math.floor(s.clock % 60);   // whole level, deaths and checkpoints included
       const rows = [['Time', `${m}:${String(sec).padStart(2, '0')}  (par ${this.g.level.data.par || 90}s)`], ['Coins found', `${s.coinsGot} / ${s.coinTotal}`], ['Times hit', '' + s.hits], ['Enemies bonked', '' + s.enemies]];
       rows.forEach(([a, b], i) => { if (this.t > 0.2 + i * 0.15) { Dr.text(ctx, a, 230, 180 + i * 32, { size: 18, color: '#7a4a2a' }); Dr.text(ctx, b, 420, 180 + i * 32, { size: 18, bold: false }); } });
       if (this.t > 0.9) {
@@ -261,6 +299,20 @@
         Dr.wrap(ctx, this.line, 420, 17).forEach((l, i) => Dr.text(ctx, l, 310, 382 + i * 21, { size: 17 }));
       }
       if (this.t > 1.4) Dr.text(ctx, 'ENTER to continue', 480, 465, { size: 15, align: 'center', color: '#7a6a5a' });
+      ctx.restore();
+      this.drawBoard(ctx);
+    }
+    drawBoard(ctx) {
+      const Dr = D(), lb = this.lb, x = 632, y = 50, w = 318;
+      Dr.panel(ctx, x, y, w, 440, 853, '#fff8e8');
+      Dr.text(ctx, `Level ${this.g.level.num} Leaderboard`, x + w / 2, y + 36, { size: 22, align: 'center', color: '#c0583e' });
+      Dr.text(ctx, `${this.g.state.name}: ${PM.LB.fmtShort(this.myTime)}` + (lb.rank ? `   (#${lb.rank} of ${lb.total})` : ''), x + w / 2, y + 62, { size: 15, align: 'center', color: '#7a4a2a' });
+      if (lb.state !== 'ok') {
+        Dr.text(ctx, lb.state === 'loading' ? 'Loading...' : "Couldn't reach the leaderboard", x + w / 2, y + 200, { size: 17, align: 'center', color: '#7a6a5a' });
+        return;
+      }
+      drawRows(ctx, lb, x + 14, y + 92, w - 28, 10, (r) => PM.LB.fmtShort(r.time), (r, i) => i + 1 === lb.rank);
+      if (lb.rows.length > 10) Dr.text(ctx, '↑/↓ scroll top 100', x + w / 2, y + 428, { size: 13, align: 'center', color: '#7a6a5a' });
     }
   }
 
@@ -355,6 +407,7 @@
         return;
       }
       if (this.mode === 'title') {
+        if (this.t > 0.4 && inp.keyPressed('KeyL')) { A().sfx('select'); this.g.screen = new Leaderboard(this.g, () => this.g.toTitle()); return; }
         if (this.t > 0.4 && (inp.keyPressed('Enter') || inp.keyPressed('Space') || inp.keyPressed('KeyU'))) { this.mode = 'slots'; A().sfx('select'); }
         return;
       }
@@ -390,6 +443,7 @@
         Dr.cat(ctx, w * 0.5, 440, 'tommy', { pose: 'sit', t, scale: 1.5, facing: -1 });
         Dr.text(ctx, 'still waiting...', w * 0.5 + 20, 350, { size: 14, color: '#5a4a3a', align: 'center' });
         if (Math.floor(t * 2) % 2 === 0) Dr.text(ctx, 'Press ENTER to start', w / 2, 318, { size: 26, align: 'center', color: '#fff', outline: 6 });
+        Dr.text(ctx, 'L  Leaderboards', w / 2, 500, { size: 18, align: 'center', color: '#fff', outline: 4 });
         return;
       }
       if (this.mode === 'difficulty') {
@@ -408,13 +462,14 @@
       for (let i = 0; i < 3; i++) {
         const s = PM.Save.load(i), y = 110 + i * 120;
         Dr.panel(ctx, w / 2 - 280, y, 560, 100, 600 + i, i === this.sel ? '#ffe58a' : '#fff8e8');
-        Dr.text(ctx, `Slot ${i + 1}`, w / 2 - 250, y + 34, { size: 22 });
+        Dr.text(ctx, `Slot ${i + 1}` + (s && s.name ? ` — ${s.name}` : ''), w / 2 - 250, y + 34, { size: 22 });
         if (s) {
           const b = PM.BIOMES[Math.min(4, Math.floor((s.level - 1) / 10))];
           Dr.text(ctx, `Level ${s.level} — ${b ? b.name : ''}`, w / 2 - 250, y + 66, { size: 17, bold: false });
           Dr.catFace(ctx, w / 2 + 110, y + 50, 14, 'pholia'); Dr.text(ctx, '× ' + s.lives, w / 2 + 130, y + 56, { size: 18 });
           Dr.coin(ctx, w / 2 + 200, y + 50, 0, 1); Dr.text(ctx, '' + s.coins, w / 2 + 216, y + 56, { size: 18 });
-          if (s.hard) Dr.text(ctx, 'HARD MODE', w / 2 - 150, y + 34, { size: 16, color: '#c0392b' });
+          if (s.hard) Dr.text(ctx, 'HARD MODE', w / 2 + 260, y + 34, { size: 16, color: '#c0392b', align: 'right' });
+          Dr.text(ctx, PM.LB.fmt(s.playTime), w / 2 + 260, y + 66, { size: 16, color: '#7a6a5a', align: 'right', bold: false });
           if (this.confirmErase === i) Dr.text(ctx, 'Press DELETE/X again to erase!', w / 2 + 260, y + 88, { size: 13, color: '#c0392b', align: 'right' });
         } else Dr.text(ctx, 'New game', w / 2 - 250, y + 66, { size: 17, color: '#7a6a5a', bold: false });
       }
@@ -436,5 +491,91 @@
     }
   }
 
-  PM.UI = { drawHUD, RadioPanel, PauseMenu, LevelSelect, CompleteCard, Shop, Title, MessageScreen, dim };
+  // ------------------------------------------------------------ username entry (a real text box over the canvas)
+  class NameEntry {
+    constructor(g, onDone, onBack) {
+      this.g = g; this.onDone = onDone; this.onBack = onBack; this.t = 0; this.err = '';
+      const el = this.el = document.createElement('input');
+      el.type = 'text'; el.maxLength = 16; el.value = PM.LB.lastName(); el.autocomplete = 'off'; el.spellcheck = false;
+      Object.assign(el.style, { position: 'fixed', fontFamily: 'PatrickHand, sans-serif', textAlign: 'center', border: '3px solid #3a2a22',
+        borderRadius: '10px', background: '#fffdf6', color: '#3a2a22', outline: 'none', padding: '0', boxSizing: 'border-box' });
+      document.body.appendChild(el);
+      this.place(); this.onResize = () => this.place(); window.addEventListener('resize', this.onResize);
+      el.addEventListener('keydown', (e) => {
+        e.stopPropagation();   // typing W/A/S/D/U/space shouldn't move or confirm anything
+        if (e.key === 'Enter') this.submit();
+        if (e.key === 'Escape') { this.close(); I().clear(); this.onBack(); }
+      });
+      setTimeout(() => { el.focus(); el.select(); }, 0);
+    }
+    place() {
+      const r = this.g.canvas.getBoundingClientRect(), k = r.width / W();
+      Object.assign(this.el.style, { left: r.left + (W() / 2 - 180) * k + 'px', top: r.top + 235 * k + 'px', width: 360 * k + 'px', height: 56 * k + 'px', fontSize: 32 * k + 'px' });
+    }
+    submit() {
+      const n = PM.LB.cleanName(this.el.value);
+      if (!n) { this.err = 'Type a name first! (letters and numbers)'; A().sfx('nope'); return; }
+      A().sfx('select'); this.close(); I().clear(); this.onDone(n);
+    }
+    close() { this.el.remove(); window.removeEventListener('resize', this.onResize); }
+    update(dt) { this.t += dt; if (document.activeElement !== this.el && this.el.isConnected && I().anyPressed()) this.el.focus(); }
+    draw(ctx) {
+      const Dr = D(), w = W();
+      const g = ctx.createLinearGradient(0, 0, 0, H()); g.addColorStop(0, '#9fd4f0'); g.addColorStop(1, '#f5e6c8');
+      ctx.fillStyle = g; ctx.fillRect(0, 0, w, H());
+      Dr.text(ctx, "What's your name?", w / 2, 150, { size: 44, align: 'center', color: '#fff', outline: 8 });
+      Dr.text(ctx, 'It goes on the leaderboards with your times.', w / 2, 200, { size: 19, align: 'center', color: '#5a4a3a' });
+      if (this.err) Dr.text(ctx, this.err, w / 2, 330, { size: 17, align: 'center', color: '#c0392b' });
+      Dr.text(ctx, 'ENTER ok   ESC back', w / 2, 370, { size: 15, align: 'center', color: '#5a4a3a' });
+      Dr.cat(ctx, w / 2, 490, 'pholia', { pose: 'sit', t: this.t, scale: 1.6 });
+    }
+  }
+
+  // ------------------------------------------------------------ leaderboards screen (title menu, L)
+  class Leaderboard {
+    constructor(g, onBack) {
+      this.g = g; this.onBack = onBack; this.t = 0; this.cache = {};
+      const levels = Object.keys(PM.LEVELS).map(Number).filter((n) => n >= 1 && n <= 50).sort((a, b) => a - b);
+      this.tabs = [{ key: 'fastest', title: 'Fastest Full Game' }, { key: 'penalty', title: 'Time + Penalty' }, { key: 'furthest', title: 'Furthest Reached' },
+        ...levels.map((n) => ({ key: 'L' + n, level: n, title: `Level ${n}: ${PM.LEVELS[n].name || ''}` }))];
+      this.tab = 0; this.me = PM.LB.lastName(); this.open();
+    }
+    open() {
+      const tb = this.tabs[this.tab];
+      if (!this.cache[tb.key]) {
+        const lb = this.cache[tb.key] = { state: 'loading', rows: [], scroll: 0, holdT: 0 };
+        (tb.level ? PM.LB.level(tb.level) : PM.LB.board(tb.key)).then((rows) => { lb.rows = rows; lb.state = 'ok'; }).catch(() => { lb.state = 'offline'; });
+      }
+      this.lb = this.cache[tb.key];
+    }
+    update(dt) {
+      this.t += dt;
+      const inp = I();
+      if (inp.pressed('back')) { A().sfx('select'); this.onBack(); return; }
+      const d = (inp.keyPressed('ArrowRight') || inp.keyPressed('KeyD') ? 1 : 0) - (inp.keyPressed('ArrowLeft') || inp.keyPressed('KeyA') ? 1 : 0);
+      if (d) { this.tab = (this.tab + d + this.tabs.length) % this.tabs.length; A().sfx('move'); this.open(); }
+      scrollList(this.lb, dt, 11);
+    }
+    value(r) {
+      const k = this.tabs[this.tab].key, LB = PM.LB;
+      if (this.tabs[this.tab].level) return LB.fmtShort(r.time);
+      if (k === 'fastest') return LB.fmt(r.time) + (r.gameOvers ? `   ${r.gameOvers} restart${r.gameOvers > 1 ? 's' : ''}` : '');
+      if (k === 'penalty') return LB.fmt(r.score) + (r.gameOvers ? `  (${LB.fmt(r.time)} + ${r.gameOvers}×${LB.PENALTY}s)` : '');
+      return (r.finished ? 'Beat the game!' : `Level ${r.level}`) + '   ' + LB.fmt(r.time);
+    }
+    draw(ctx) {
+      const Dr = D(), w = W(), tb = this.tabs[this.tab], lb = this.lb;
+      ctx.fillStyle = '#2a1f28'; ctx.fillRect(0, 0, w, H());
+      Dr.text(ctx, 'Leaderboards', w / 2, 52, { size: 38, align: 'center', color: '#ffd77a', outline: 7 });
+      Dr.text(ctx, '◀  ' + tb.title + '  ▶', w / 2, 92, { size: 22, align: 'center', color: '#fff' });
+      const sub = { fastest: 'Beat all 50 levels in the least time', penalty: `Total time, plus ${PM.LB.PENALTY} seconds for every restart (game over)`, furthest: 'How far every player has made it' }[tb.key] || 'Fastest clears of this level';
+      Dr.text(ctx, sub, w / 2, 116, { size: 15, align: 'center', color: '#a89a86' });
+      Dr.panel(ctx, 150, 130, 660, 370, 860, '#fff8e8');
+      if (lb.state !== 'ok') Dr.text(ctx, lb.state === 'loading' ? 'Loading...' : "Couldn't reach the leaderboard", w / 2, 300, { size: 20, align: 'center', color: '#7a6a5a' });
+      else drawRows(ctx, lb, 175, 142, 610, 11, (r) => this.value(r), (r) => this.me && r.name === this.me, 32);
+      Dr.text(ctx, `←/→ change board (${this.tab + 1}/${this.tabs.length})   ↑/↓ scroll   ★ = Hard Mode   ESC back`, w / 2, 525, { size: 14, align: 'center', color: '#a89a86' });
+    }
+  }
+
+  PM.UI = { drawHUD, RadioPanel, PauseMenu, LevelSelect, CompleteCard, Shop, Title, MessageScreen, NameEntry, Leaderboard, dim };
 })();

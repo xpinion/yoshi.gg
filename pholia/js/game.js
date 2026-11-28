@@ -35,6 +35,17 @@
       const existing = PM.Save.load(slot);
       this.state = existing || PM.Save.fresh();
       if (!existing) this.state.hard = !!opts.hard;
+      if (!this.state.runId) this.state.runId = PM.LB.newRunId();
+      if (!this.state.name) {
+        // every save needs a leaderboard name (older saves are asked the first time they're loaded)
+        this.mode = 'menu';
+        this.screen = new PM.UI.NameEntry(this, (name) => { this.state.name = name; PM.LB.rememberName(name); this.persist(); this.continueSlot(); }, () => this.toTitle());
+        return;
+      }
+      this.continueSlot();
+    }
+
+    continueSlot() {
       if (!this.state.beaten.length && this.state.level > 1) for (let i = 1; i < this.state.level; i++) this.state.beaten.push(i);
       if (this.state.replayReturn) { this.state.level = this.state.replayReturn; this.state.replayReturn = null; }
       if (this.state.level > 50) { this.mode = 'menu'; this.screen = new PM.UI.LevelSelect(this, () => this.toTitle()); return; }
@@ -50,7 +61,11 @@
       this.screen = new PM.Cutscene(PM.STORY.cutscenes[name], done);
     }
 
-    persist() { if (this.state) PM.Save.write(this.slot, this.state); }
+    persist() {
+      if (!this.state) return;
+      if (this.mode === 'play' && this.level && this.levelStats) this.state.levelClock = { level: this.level.num, t: this.levelStats.clock };
+      PM.Save.write(this.slot, this.state);
+    }
 
     beginLevel(n, isRetry = false) {
       if (n > 50) return this.finishGame();
@@ -71,7 +86,8 @@
       const cpHere = s.checkpoint && s.checkpoint.level === n;
       if (cpHere) this.resumeAtCheckpoint(s.checkpoint);
       this.levelStartSnapshot = cpHere ? { coins: s.checkpoint.coins, item: s.checkpoint.item } : { coins: s.coins, item: s.item };
-      if (!isRetry) this.levelStats = { time: 0, hits: 0, coinsGot: 0, restarts: 0, enemies: 0 };
+      // clock = leaderboard time for this level: keeps running through deaths, and resumes at a checkpoint after quitting
+      if (!isRetry) this.levelStats = { time: 0, hits: 0, coinsGot: 0, restarts: 0, enemies: 0, clock: cpHere && s.levelClock && s.levelClock.level === n ? s.levelClock.t : 0 };
       else { this.levelStats.time = 0; this.levelStats.coinsGot = 0; this.levelStats.enemies = 0; this.levelStats.restarts++; }
       this.stats = this.levelStats;
       // radio messages at the start of a level
@@ -133,6 +149,7 @@
       PM.Save.unlock('hardMode');
       if (wasHard) PM.Save.unlock('hardModeBeaten');
       this.persist();
+      PM.LB.submitRun(this.state, true);
       this.mode = 'menu';
       A().play('title');
       this.screen = new PM.UI.MessageScreen('You did it!', wasHard
@@ -153,7 +170,8 @@
       const s = this.state;
       this.levelStats.coinTotal = this.coinTotal;
       this.player.frozen = true;
-      this.overlay = new PM.UI.CompleteCard(this, this.levelStats, () => {
+      const board = PM.LB.submitLevel(s, this.level.num, this.levelStats.clock);
+      this.overlay = new PM.UI.CompleteCard(this, this.levelStats, board, () => {
         this.overlay = null;
         s.hearts = Math.max(s.hearts, 0.5);
         if (this.player.effect) { /* power-ups end with the level */ }
@@ -170,6 +188,7 @@
         const next = n + 1;
         s.level = next;
         this.persist();
+        PM.LB.submitRun(s);
         const afterShop = () => {
           if (n % 10 === 0) {
             // biome finished: boss cutscene, then next biome
@@ -290,6 +309,9 @@
         const restore = b ? JSON.parse(JSON.stringify(b)) : PM.Save.fresh();
         restore.biomeStart = b; restore.introSeen = true;
         restore.deathsTotal = s.deathsTotal;
+        restore.playTime = s.playTime;            // the timer never rolls back
+        restore.gameOvers = (s.gameOvers || 0) + 1;
+        restore.name = s.name; restore.runId = s.runId;
         restore.seen = s.seen;
         restore.checkpoint = null;
         restore.hard = s.hard;
@@ -297,6 +319,7 @@
         restore.scuba = restore.scuba || (s.scuba && restore.level > 30);
         this.state = restore;
         this.persist();
+        PM.LB.submitRun(restore);
         this.mode = 'menu';
         A().play('cutscene-dark');
         this.screen = new PM.UI.MessageScreen('Out of lives!', `All nine lives are used up... Pholia shakes off the dust and starts ${PM.BIOMES[biomeOf(restore.level)].name} again from the beginning, with nine fresh lives.`, () => this.beginLevel(restore.level, false), { cat: 'duck', eyes: 'closed', bg: '#1d1418', color: '#e2475b' });
@@ -421,7 +444,7 @@
       if (PM.Editor && inp.keyPressed('F2')) { PM.Editor.open(this); return; }
 
       const p = this.player, L = this.level, t = C().TILE;
-      this.levelStats.time += dt;
+      this.levelStats.time += dt; this.levelStats.clock += dt;
       this.bannerT = Math.max(0, (this.bannerT || 0) - dt);
       L.update(dt);
       for (const pl of this.platforms) pl.update(dt, this);
