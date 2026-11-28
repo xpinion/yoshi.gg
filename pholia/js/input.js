@@ -22,16 +22,19 @@
 
   const PREVENT = new Set(['Space', 'Tab', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight']);
 
+  // the numpad's Enter works exactly like the main Enter key
+  const codeOf = (e) => (e.code === 'NumpadEnter' ? 'Enter' : e.code);
+
   window.addEventListener('keydown', (e) => {
     if (PREVENT.has(e.code)) e.preventDefault();
     if (e.repeat) return;
-    down.add(e.code);
-    pressed.add(e.code);
+    down.add(codeOf(e));
+    pressed.add(codeOf(e));
     PM.Audio && PM.Audio.unlock();
   });
   window.addEventListener('keyup', (e) => {
-    down.delete(e.code);
-    released.add(e.code);
+    down.delete(codeOf(e));
+    released.add(codeOf(e));
   });
   window.addEventListener('blur', () => down.clear());
 
