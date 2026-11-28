@@ -103,6 +103,14 @@
     ctx.translate(x, y);
     ctx.scale(facing * s, s);
     if (o.alpha != null) ctx.globalAlpha = o.alpha;
+    // paw swat: o.swipe = 0..1 progress. Quick wind-up (lean back, paw high) then a hard forward sweep.
+    const swipe = o.swipe != null && pose !== 'sit' ? o.swipe : null;
+    let swA = 0;
+    if (swipe != null) {
+      const wind = 0.25, e = swipe < wind ? 0 : 1 - Math.pow(1 - (swipe - wind) / (1 - wind), 3);
+      swA = swipe < wind ? -2.0 - (swipe / wind) * 0.3 : -2.3 + e * 2.9;   // paw angle (0 = straight ahead, negative = up)
+      ctx.rotate(swipe < wind ? -0.06 * (swipe / wind) : -0.06 + e * 0.18 - Math.max(0, e - 0.7) * 0.25);
+    }
 
     let bodyY = -18, bodyRx = 18, bodyRy = 11, headX = 17, headY = -31;
     let legSwing = 0, tailWave = Math.sin(t * 3) * 4;
@@ -135,6 +143,7 @@
       const ly = pose === 'duck' ? -4 : -10;
       legs.forEach(([lx, sw], i) => {
         const back = i < 2;
+        if (swipe != null && i === 3) return;   // swatting paw is drawn in front of the head
         if (pose === 'crawl') {
           // bent legs: shoulder -> raised elbow -> paw; the paw lifts while stepping forward
           const lift = o.still ? 0 : Math.max(0, Math.sin(t * 11 + (i % 2 ? Math.PI : 0))) * 3;
@@ -201,6 +210,19 @@
     line(ctx, [[headX + 9, headY + 4], [headX + 18, headY + 2]], sd + 65, 1, INK, 0.4);
     line(ctx, [[headX + 9, headY + 5.5], [headX + 18, headY + 7]], sd + 66, 1, INK, 0.4);
 
+    if (swipe != null) {
+      // swatting front leg: shoulder -> elbow -> outstretched paw with claws out
+      const sx = 12, sy = bodyY - 1, len = pose === 'crawl' ? 18 : 24;
+      const px = sx + Math.cos(swA) * len, py = sy + Math.sin(swA) * len;
+      const mx = sx + Math.cos(swA - 0.5) * len * 0.55, my = sy + Math.sin(swA - 0.5) * len * 0.55;
+      line(ctx, [[sx, sy], [mx, my], [px, py]], sd + 13, 7.5, INK);
+      line(ctx, [[sx, sy], [mx, my], [px, py]], sd + 13, 4.8, legColor);
+      for (let k = -1; k <= 1; k++) {
+        const ca = swA + k * 0.45;
+        line(ctx, [[px + Math.cos(ca) * 2.5, py + Math.sin(ca) * 2.5], [px + Math.cos(ca) * 7, py + Math.sin(ca) * 7]], sd + 80 + k, 1.6, '#fff');
+      }
+      dot(ctx, px, py, 3.6, pawColor);
+    }
     if (o.hat) hat(ctx, headX - 1, headY - 9, o.hat, sd);
     if (o.scuba) blob(ctx, headX + 2, headY, 14, 13, sd + 70, 'rgba(160,220,255,0.35)', 2);
     ctx.restore();

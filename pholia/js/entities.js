@@ -224,11 +224,11 @@
       }
       D().cat(ctx, this.cx, this.bottom, 'pholia', {
         facing: this.facing, pose, t: this.t * (this.effect === 'feather' ? 1.6 : 1),
-        scuba: st.scuba && game.level.biome === 3, hat: st.hat, eyes: this.hurtT > 0 ? 'closed' : (this.sneezeT > 0 ? 'closed' : null),
+        scuba: st.scuba && game.level.biome === 3, hat: st.hat, swipe: this.atkT > 0 ? 1 - this.atkT / C().ATTACK_TIME : null, eyes: this.hurtT > 0 ? 'closed' : (this.sneezeT > 0 ? 'closed' : null),
       });
       // paw swipe arc
-      if (this.atkT > 0) {
-        const p = 1 - this.atkT / C().ATTACK_TIME;
+      if (this.atkT > 0 && 1 - this.atkT / C().ATTACK_TIME > 0.25) {
+        const p = (1 - this.atkT / C().ATTACK_TIME - 0.25) / 0.75;
         const bx = this.cx + this.facing * 26, by = this.y + this.h * 0.45;
         ctx.save(); ctx.globalAlpha = 1 - p * 0.6;
         ctx.strokeStyle = '#fff'; ctx.lineWidth = 4; ctx.lineCap = 'round';
